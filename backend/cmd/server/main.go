@@ -107,7 +107,7 @@ func runServer(ctx context.Context, cfg *config.Config, logger *slog.Logger) err
 		HealthCheckPeriod: cfg.DatabaseHealthCheckEvery,
 	}
 
-	pool, err := db.Connect(ctx, cfg.DatabaseURL, db.WithPoolOptions(poolOpts))
+	pool, err := db.Connect(ctx, cfg.GetDatabaseURL(), db.WithPoolOptions(poolOpts))
 	if err != nil {
 		return fmt.Errorf("connect db: %w", err)
 	}

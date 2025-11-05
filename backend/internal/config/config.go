@@ -13,7 +13,12 @@ import (
 type Config struct {
 	ServerAddress            string
 	FrontendDistDir          string
-	DatabaseURL              string
+	DatabaseHost             string
+	DatabasePort             string
+	DatabaseName             string
+	DatabaseUser             string
+	DatabasePassword         string
+	DatabaseSSLMode          string
 	DatabaseMaxConns         *int32
 	DatabaseMinConns         *int32
 	DatabaseMaxConnLifetime  *time.Duration
@@ -29,14 +34,6 @@ type Config struct {
 	AllowedOrigins           []string
 	EnableMetrics            bool
 	LogLevel                 string
-	SAMLMetadataURL          string
-	SAMLEntityID             string
-	SAMLACSURL               string
-	SAMLNameIDFormat         string
-	SAMLObjectIDAttribute    string
-	SAMLUPNAttribute         string
-	SAMLEmailAttribute       string
-	SAMLDisplayNameAttribute string
 	// Initial admin user configuration
 	InitialAdminEmail       string
 	InitialAdminPrincipal   string
@@ -47,29 +44,26 @@ type Config struct {
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		ServerAddress:            getEnv("SERVER_ADDRESS", ":8080"),
-		FrontendDistDir:          getEnv("FRONTEND_DIST", "/frontend"),
-		DatabaseURL:              os.Getenv("DATABASE_URL"),
-		CookieName:               getEnv("SESSION_COOKIE_NAME", "grinch_session"),
-		CookieSecret:             os.Getenv("SESSION_COOKIE_SECRET"),
-		AzureTenantID:            os.Getenv("AZURE_TENANT_ID"),
-		AzureClientID:            os.Getenv("AZURE_CLIENT_ID"),
-		AzureClientSecret:        os.Getenv("AZURE_CLIENT_SECRET"),
-		SSEBufferSize:            getEnvInt("EVENT_SSE_BUFFER", 64),
-		EnableMetrics:            getEnvBool("ENABLE_METRICS", true),
-		LogLevel:                 getEnv("LOG_LEVEL", "info"),
-		SAMLMetadataURL:          os.Getenv("SAML_METADATA_URL"),
-		SAMLEntityID:             os.Getenv("SAML_SP_ENTITY_ID"),
-		SAMLACSURL:               os.Getenv("SAML_ACS_URL"),
-		SAMLNameIDFormat:         getEnv("SAML_NAME_ID_FORMAT", ""),
-		SAMLObjectIDAttribute:    getEnv("SAML_OBJECT_ID_ATTRIBUTE", "http://schemas.microsoft.com/identity/claims/objectidentifier"),
-		SAMLUPNAttribute:         getEnv("SAML_UPN_ATTRIBUTE", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn"),
-		SAMLEmailAttribute:       getEnv("SAML_EMAIL_ATTRIBUTE", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"),
-		SAMLDisplayNameAttribute: getEnv("SAML_DISPLAY_NAME_ATTRIBUTE", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"),
-		InitialAdminEmail:        os.Getenv("INITIAL_ADMIN_EMAIL"),
-		InitialAdminPrincipal:    os.Getenv("INITIAL_ADMIN_PRINCIPAL_NAME"),
-		InitialAdminDisplayName:  os.Getenv("INITIAL_ADMIN_DISPLAY_NAME"),
-		InitialAdminPassword:     os.Getenv("INITIAL_ADMIN_PASSWORD"),
+		ServerAddress:           getEnv("SERVER_ADDRESS", ":8080"),
+		FrontendDistDir:         getEnv("FRONTEND_DIST", "/frontend"),
+		DatabaseHost:            os.Getenv("DATABASE_HOST"),
+		DatabasePort:            getEnv("DATABASE_PORT", "5432"),
+		DatabaseName:            os.Getenv("DATABASE_NAME"),
+		DatabaseUser:            os.Getenv("DATABASE_USER"),
+		DatabasePassword:        os.Getenv("DATABASE_PASSWORD"),
+		DatabaseSSLMode:         getEnv("DATABASE_SSLMODE", "disable"),
+		CookieName:              getEnv("SESSION_COOKIE_NAME", "grinch_session"),
+		CookieSecret:            os.Getenv("SESSION_COOKIE_SECRET"),
+		AzureTenantID:           os.Getenv("AZURE_TENANT_ID"),
+		AzureClientID:           os.Getenv("AZURE_CLIENT_ID"),
+		AzureClientSecret:       os.Getenv("AZURE_CLIENT_SECRET"),
+		SSEBufferSize:           getEnvInt("EVENT_SSE_BUFFER", 64),
+		EnableMetrics:           getEnvBool("ENABLE_METRICS", true),
+		LogLevel:                getEnv("LOG_LEVEL", "info"),
+		InitialAdminEmail:       os.Getenv("INITIAL_ADMIN_EMAIL"),
+		InitialAdminPrincipal:   os.Getenv("INITIAL_ADMIN_PRINCIPAL_NAME"),
+		InitialAdminDisplayName: os.Getenv("INITIAL_ADMIN_DISPLAY_NAME"),
+		InitialAdminPassword:    os.Getenv("INITIAL_ADMIN_PASSWORD"),
 	}
 
 	if raw := os.Getenv("SYNC_INTERVAL"); raw != "" {
@@ -103,8 +97,17 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL not set")
+	if cfg.DatabaseHost == "" {
+		return nil, fmt.Errorf("DATABASE_HOST not set")
+	}
+	if cfg.DatabaseName == "" {
+		return nil, fmt.Errorf("DATABASE_NAME not set")
+	}
+	if cfg.DatabaseUser == "" {
+		return nil, fmt.Errorf("DATABASE_USER not set")
+	}
+	if cfg.DatabasePassword == "" {
+		return nil, fmt.Errorf("DATABASE_PASSWORD not set")
 	}
 	if cfg.CookieSecret == "" {
 		return nil, fmt.Errorf("SESSION_COOKIE_SECRET not set")
@@ -130,6 +133,12 @@ func (c *Config) GetLogLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// GetDatabaseURL builds a PostgreSQL connection string.
+func (c *Config) GetDatabaseURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName, c.DatabaseSSLMode)
 }
 
 func getEnv(key, fallback string) string {
