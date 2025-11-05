@@ -186,22 +186,22 @@ func (s *Store) GetSantaRulesForMachine(ctx context.Context, machineID string, l
 
 	if lastRuleID == nil {
 		q = `
-			SELECT a.id, a.identifier, a.rule_type, asc.action, a.description, a.created_at
+			SELECT a.id, a.identifier, a.rule_type, s.action, a.description, a.created_at
 			FROM applications a
-			JOIN application_scopes asc ON a.id = asc.application_id
-			WHERE (asc.target_type = 'user' AND asc.target_id = ANY($1))
-			   OR (asc.target_type = 'group' AND asc.target_id = ANY($1))
+			JOIN application_scopes s ON a.id = s.application_id
+			WHERE (s.target_type = 'user' AND s.target_id = ANY($1))
+			   OR (s.target_type = 'group' AND s.target_id = ANY($1))
 			ORDER BY a.id
 			LIMIT $2;
 		`
 		args = []interface{}{targetIDs, limit}
 	} else {
 		q = `
-			SELECT a.id, a.identifier, a.rule_type, asc.action, a.description, a.created_at
+			SELECT a.id, a.identifier, a.rule_type, s.action, a.description, a.created_at
 			FROM applications a
-			JOIN application_scopes asc ON a.id = asc.application_id
-			WHERE ((asc.target_type = 'user' AND asc.target_id = ANY($1))
-			    OR (asc.target_type = 'group' AND asc.target_id = ANY($1)))
+			JOIN application_scopes s ON a.id = s.application_id
+			WHERE ((s.target_type = 'user' AND s.target_id = ANY($1))
+			    OR (s.target_type = 'group' AND s.target_id = ANY($1)))
 			  AND a.id > $2
 			ORDER BY a.id
 			LIMIT $3;

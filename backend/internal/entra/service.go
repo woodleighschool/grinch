@@ -49,23 +49,31 @@ func NewService(cfg *config.Config, st *store.Store, logger *slog.Logger) (*Serv
 
 func (s *Service) Start(ctx context.Context, interval time.Duration) {
 	go func() {
+		s.logger.Info("starting Entra sync scheduler", "interval", interval)
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		for {
+			s.logger.Debug("initiating scheduled Entra sync")
 			if err := s.Sync(ctx); err != nil {
 				s.logger.Error("periodic sync failed", "error", err)
+			} else {
+				s.logger.Debug("scheduled Entra sync completed")
 			}
 			select {
 			case <-ctx.Done():
+				s.logger.Debug("stopping Entra sync scheduler")
 				return
 			case <-ticker.C:
+				s.logger.Debug("Entra sync ticker fired")
 			}
 		}
 	}()
 }
 
 func (s *Service) Sync(ctx context.Context) error {
+	start := time.Now()
+	s.logger.Info("starting Entra sync cycle")
 	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{"https://graph.microsoft.com/.default"}})
 	if err != nil {
 		return fmt.Errorf("get token: %w", err)
@@ -73,29 +81,60 @@ func (s *Service) Sync(ctx context.Context) error {
 
 	// First, get all current Entra users to track deletions
 	entraSyncStart := time.Now()
+	stats := struct {
+		usersSynced                 int
+		usersSkipped                int
+		usersConverted              int
+		usersEvaluatedForConversion int
+		usersRemoved                int
+		usersEvaluatedForRemoval    int
+		groupsProcessed             int
+		membershipsUpdated          int
+	}{}
 
 	// Sync all users from the tenant
-	if err := s.syncAllUsers(ctx, token.Token); err != nil {
+	usersSynced, usersSkipped, err := s.syncAllUsers(ctx, token.Token)
+	if err != nil {
 		return fmt.Errorf("sync all users: %w", err)
 	}
+	stats.usersSynced = usersSynced
+	stats.usersSkipped = usersSkipped
+	s.logger.Debug("synchronised Entra users into store", "processed", usersSynced, "skipped", usersSkipped)
 
 	// Mark this as a full Entra sync to identify cloud users
-	if err := s.convertLocalToCloudUsers(ctx, token.Token); err != nil {
+	usersConverted, usersEvaluated, err := s.convertLocalToCloudUsers(ctx, token.Token)
+	if err != nil {
 		return fmt.Errorf("convert local to cloud users: %w", err)
 	}
+	stats.usersConverted = usersConverted
+	stats.usersEvaluatedForConversion = usersEvaluated
+	s.logger.Debug("evaluated local users for conversion",
+		"evaluated", usersEvaluated,
+		"converted", usersConverted,
+	)
 
 	// Remove users that no longer exist in Entra
-	if err := s.removeDeletedEntraUsers(ctx, token.Token, entraSyncStart); err != nil {
+	usersRemoved, usersEvaluatedForRemoval, err := s.removeDeletedEntraUsers(ctx, token.Token, entraSyncStart)
+	if err != nil {
 		return fmt.Errorf("remove deleted entra users: %w", err)
 	}
+	stats.usersRemoved = usersRemoved
+	stats.usersEvaluatedForRemoval = usersEvaluatedForRemoval
+	s.logger.Debug("evaluated cloud users for removal",
+		"evaluated", usersEvaluatedForRemoval,
+		"removed", usersRemoved,
+	)
 
 	// Then sync groups and their memberships
 	groups, err := s.fetchGroups(ctx, token.Token)
 	if err != nil {
 		return err
 	}
+	stats.groupsProcessed = len(groups)
+	s.logger.Debug("fetched Entra groups", "count", len(groups))
 
 	for _, g := range groups {
+		s.logger.Debug("synchronising group", "group_id", g.ID, "display_name", g.DisplayName)
 		groupModel, err := s.store.UpsertGroup(ctx, g.ID, g.DisplayName, g.Description)
 		if err != nil {
 			return fmt.Errorf("upsert group %s: %w", g.ID, err)
@@ -105,6 +144,8 @@ func (s *Service) Sync(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("fetch members for %s: %w", g.ID, err)
 		}
+		s.logger.Debug("fetched group members", "group_id", g.ID, "member_count", len(members))
+		stats.membershipsUpdated += len(members)
 		memberIDs := make([]uuid.UUID, 0, len(members))
 		for _, m := range members {
 			user, err := s.store.UpsertCloudUserByExternal(ctx, m.ID, m.PrincipalName(), m.DisplayName, m.Mail)
@@ -116,7 +157,20 @@ func (s *Service) Sync(ctx context.Context) error {
 		if err := s.store.ReplaceGroupMemberships(ctx, groupModel.ID, memberIDs); err != nil {
 			return fmt.Errorf("replace memberships for %s: %w", g.ID, err)
 		}
+		s.logger.Debug("replaced group memberships", "group_id", g.ID, "member_count", len(memberIDs))
 	}
+
+	s.logger.Info("Entra sync cycle completed",
+		"duration", time.Since(start),
+		"users_synced", stats.usersSynced,
+		"users_skipped", stats.usersSkipped,
+		"users_converted", stats.usersConverted,
+		"users_evaluated_for_conversion", stats.usersEvaluatedForConversion,
+		"users_removed", stats.usersRemoved,
+		"users_evaluated_for_removal", stats.usersEvaluatedForRemoval,
+		"groups_processed", stats.groupsProcessed,
+		"memberships_updated", stats.membershipsUpdated,
+	)
 
 	return nil
 }
@@ -206,13 +260,22 @@ func (s *Service) doGraphRequest(ctx context.Context, token, url string) ([]byte
 		return nil, "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	start := time.Now()
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
+		s.logger.Error("graph request failed", "url", url, "error", err)
 		return nil, "", err
 	}
 	defer resp.Body.Close()
+	duration := time.Since(start)
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		s.logger.Warn("graph request returned error",
+			"url", url,
+			"status", resp.StatusCode,
+			"duration", duration,
+			"body", string(b),
+		)
 		return nil, "", fmt.Errorf("graph %s returned %d: %s", url, resp.StatusCode, string(b))
 	}
 	body, err := io.ReadAll(resp.Body)
@@ -225,58 +288,69 @@ func (s *Service) doGraphRequest(ctx context.Context, token, url string) ([]byte
 	if err := json.Unmarshal(body, &aux); err != nil {
 		return nil, "", err
 	}
+	s.logger.Debug("graph request succeeded", "url", url, "status", resp.StatusCode, "duration", duration, "next_link", aux.NextLink)
 	return body, aux.NextLink, nil
 }
 
 // syncAllUsers fetches all users from the tenant and syncs them to the database
-func (s *Service) syncAllUsers(ctx context.Context, token string) error {
+func (s *Service) syncAllUsers(ctx context.Context, token string) (int, int, error) {
 	url := graphBase + "/users?$select=id,displayName,mail,userPrincipalName,accountEnabled"
+	var processed, skipped int
 	for url != "" {
 		body, next, err := s.doGraphRequest(ctx, token, url)
 		if err != nil {
-			return fmt.Errorf("request all users: %w", err)
+			return processed, skipped, fmt.Errorf("request all users: %w", err)
 		}
 		var payload struct {
 			Value []graphMember `json:"value"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			return fmt.Errorf("decode users: %w", err)
+			return processed, skipped, fmt.Errorf("decode users: %w", err)
 		}
 		for _, user := range payload.Value {
 			// Skip disabled users and external users
 			if !user.shouldIncludeUser() {
+				skipped++
 				continue
 			}
 			if _, err := s.store.UpsertCloudUserByExternal(ctx, user.ID, user.PrincipalName(), user.DisplayName, user.Mail); err != nil {
-				return fmt.Errorf("upsert user %s: %w", user.ID, err)
+				return processed, skipped, fmt.Errorf("upsert user %s: %w", user.ID, err)
 			}
+			processed++
 		}
 		url = next
 	}
-	return nil
+	return processed, skipped, nil
 }
 
 // convertLocalToCloudUsers checks if any local users now exist in Entra and converts them
-func (s *Service) convertLocalToCloudUsers(ctx context.Context, token string) error {
+func (s *Service) convertLocalToCloudUsers(ctx context.Context, token string) (int, int, error) {
 	localUsers, err := s.store.ListLocalUsers(ctx)
 	if err != nil {
-		return fmt.Errorf("list local users: %w", err)
+		return 0, 0, fmt.Errorf("list local users: %w", err)
 	}
 
+	converted := 0
 	for _, localUser := range localUsers {
 		// Check if this user now exists in Entra by searching for their principal name
-		if err := s.checkAndConvertLocalUser(ctx, token, localUser); err != nil {
+		convertedUser, err := s.checkAndConvertLocalUser(ctx, token, localUser)
+		if err != nil {
 			// Log but don't fail the entire sync
 			s.logger.Warn("failed to check local user", "principal", localUser.PrincipalName, "error", err)
+			continue
+		}
+		if convertedUser {
+			converted++
 		}
 	}
 
-	return nil
+	return converted, len(localUsers), nil
 }
 
 // checkAndConvertLocalUser checks if a local user exists in Entra and converts them if found
-func (s *Service) checkAndConvertLocalUser(ctx context.Context, token string, localUser *models.User) error {
+func (s *Service) checkAndConvertLocalUser(ctx context.Context, token string, localUser *models.User) (bool, error) {
 	// Search for user by userPrincipalName and filter for enabled, non-external users
+	// TO:DO - Fix potential OData injection vulnerability
 	upn := strings.ReplaceAll(localUser.PrincipalName, "'", "''")
 	u, _ := url.Parse(graphBase + "/users")
 	q := url.Values{}
@@ -287,14 +361,14 @@ func (s *Service) checkAndConvertLocalUser(ctx context.Context, token string, lo
 
 	body, _, err := s.doGraphRequest(ctx, token, searchURL)
 	if err != nil {
-		return fmt.Errorf("search for user %s: %w", localUser.PrincipalName, err)
+		return false, fmt.Errorf("search for user %s: %w", localUser.PrincipalName, err)
 	}
 
 	var payload struct {
 		Value []graphMember `json:"value"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return fmt.Errorf("decode search results: %w", err)
+		return false, fmt.Errorf("decode search results: %w", err)
 	}
 
 	if len(payload.Value) > 0 {
@@ -302,23 +376,30 @@ func (s *Service) checkAndConvertLocalUser(ctx context.Context, token string, lo
 		// Only convert if the user is enabled and not external
 		if entraMember.shouldIncludeUser() {
 			if err := s.store.ConvertLocalToCloudUser(ctx, localUser.ID, entraMember.ID, entraMember.DisplayName, entraMember.Mail); err != nil {
-				return fmt.Errorf("convert local user to cloud: %w", err)
+				return false, fmt.Errorf("convert local user to cloud: %w", err)
 			}
 			s.logger.Info("converted local user to cloud user", "principal", localUser.PrincipalName)
+			return true, nil
 		}
+		s.logger.Debug("local user present in Entra but not eligible for conversion",
+			"principal", localUser.PrincipalName,
+			"account_enabled", entraMember.AccountEnabled,
+			"external", strings.Contains(entraMember.UserPrincipalName, "#EXT#"),
+		)
 	}
 
-	return nil
+	return false, nil
 }
 
 // removeDeletedEntraUsers removes users that no longer exist in Entra, or have become disabled/external
-func (s *Service) removeDeletedEntraUsers(ctx context.Context, token string, syncStart time.Time) error {
+func (s *Service) removeDeletedEntraUsers(ctx context.Context, token string, syncStart time.Time) (int, int, error) {
 	// Get all cloud users that haven't been synced in this sync cycle
 	deletedUsers, err := s.store.GetCloudUsersNotSyncedSince(ctx, syncStart)
 	if err != nil {
-		return fmt.Errorf("get users not synced: %w", err)
+		return 0, 0, fmt.Errorf("get users not synced: %w", err)
 	}
 
+	removed := 0
 	for _, user := range deletedUsers {
 		// Double-check by looking up the user in Entra
 		if user.ExternalID != nil {
@@ -333,12 +414,15 @@ func (s *Service) removeDeletedEntraUsers(ctx context.Context, token string, syn
 					s.logger.Error("failed to delete user", "principal", user.PrincipalName, "error", err)
 				} else {
 					s.logger.Info("deleted user not found in Entra or became disabled/external", "principal", user.PrincipalName)
+					removed++
 				}
 			}
+		} else {
+			s.logger.Debug("skipping user removal check without external ID", "principal", user.PrincipalName)
 		}
 	}
 
-	return nil
+	return removed, len(deletedUsers), nil
 }
 
 // verifyUserExistsInEntra checks if a user still exists in Entra and is enabled/non-external

@@ -17,7 +17,7 @@ func GenerateConfigXML(req *http.Request) string {
 
 	// Santa sync requires HTTPS, always build a https:// base.
 	baseURL := fmt.Sprintf("https://%s", strings.TrimSpace(host))
-	syncURL := baseURL + "/api/santa/v1"
+	syncURL := baseURL + "/santa"
 
 	var config strings.Builder
 	config.WriteString(fmt.Sprintf("<key>SyncBaseURL</key>\n<string>%s</string>\n", syncURL))

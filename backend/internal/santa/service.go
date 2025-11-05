@@ -181,11 +181,27 @@ func (s *Service) Postflight(ctx context.Context, machineID string, req models.P
 
 	now := time.Now()
 
+	// Get the current sync state to use the existing sync type if none provided
+	currentState, err := s.store.GetSantaSyncState(ctx, machineID)
+	if err != nil {
+		return nil, fmt.Errorf("get current sync state: %w", err)
+	}
+
+	// Use the provided sync type, or fall back to the current state, or default to NORMAL
+	syncType := req.SyncType
+	if syncType == "" {
+		if currentState != nil && currentState.LastSyncType != "" {
+			syncType = currentState.LastSyncType
+		} else {
+			syncType = models.SyncTypeNormal
+		}
+	}
+
 	// Update sync state
 	syncState := models.SyncState{
 		MachineID:           machineID,
 		LastSyncTime:        &now,
-		LastSyncType:        req.SyncType,
+		LastSyncType:        syncType,
 		RulesDelivered:      req.RulesReceived,
 		RulesProcessed:      req.RulesProcessed,
 		RuleCountHash:       req.RuleCountHash,

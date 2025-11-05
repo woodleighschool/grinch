@@ -1,11 +1,14 @@
 package api
 
 import (
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -84,12 +87,40 @@ func NewServer(ctx context.Context, cfg *config.Config, store *store.Store, sant
 	return srv, nil
 }
 
+// decompressRequestBody handles decompression of Santa client request bodies
+// Santa clients can send data compressed with deflate, gzip, or uncompressed
+func (s *Server) decompressRequestBody(bodyBytes []byte, logger *slog.Logger) (io.Reader, error) {
+	if len(bodyBytes) == 0 {
+		return strings.NewReader(""), nil
+	}
+
+	// Check for gzip compression
+	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x1f && bodyBytes[1] == 0x8b {
+		gzReader, err := gzip.NewReader(strings.NewReader(string(bodyBytes)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		return gzReader, nil
+	}
+
+	// Check for deflate compression
+	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x78 &&
+		(bodyBytes[1] == 0x01 || bodyBytes[1] == 0x5e || bodyBytes[1] == 0x9c || bodyBytes[1] == 0xda) {
+		flateReader := flate.NewReader(strings.NewReader(string(bodyBytes)))
+		return flateReader, nil
+	}
+
+	// No compression
+	return strings.NewReader(string(bodyBytes)), nil
+}
+
 func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(requestLogger(s.logger))
 
 	if len(s.cfg.AllowedOrigins) > 0 {
 		r.Use(cors.Handler(cors.Options{
@@ -117,7 +148,7 @@ func (s *Server) Routes() http.Handler {
 		r.With(s.sessions.RequireAuth).Get("/me", s.handleMe)
 	})
 
-	r.Route("/api/santa/v1", func(r chi.Router) {
+	r.Route("/santa", func(r chi.Router) {
 		// Santa sync protocol endpoints - no authentication required as per protocol
 		r.Post("/preflight/{machine_id}", s.handleSantaPreflight)
 		r.Post("/eventupload/{machine_id}", s.handleSantaEventUpload)
@@ -156,6 +187,7 @@ func (s *Server) Routes() http.Handler {
 }
 
 func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "auth_providers")
 	resp := struct {
 		SAML  bool `json:"saml"`
 		Local bool `json:"local"`
@@ -163,47 +195,58 @@ func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
 		SAML:  s.samlEnabled(),
 		Local: true,
 	}
+	logger.Debug("reporting authentication providers", "saml_enabled", resp.SAML, "local_enabled", resp.Local)
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "saml_login")
 	samlSvc := s.samlService()
 	if samlSvc == nil {
+		logger.Warn("SAML login requested but service is not configured")
 		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
 		return
 	}
 	sess, err := s.sessions.Session(r)
 	if err != nil {
+		logger.Error("failed to obtain session for SAML login", "error", err)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
 	state := randomString()
 	sess.Values["saml_relay"] = state
 	if err := sess.Save(r, w); err != nil {
+		logger.Error("failed to persist SAML relay state", "error", err)
 		http.Error(w, "session save", http.StatusInternalServerError)
 		return
 	}
 	authURL, err := samlSvc.BuildAuthURL(state)
 	if err != nil {
+		logger.Error("failed to build SAML auth URL", "error", err)
 		http.Error(w, "saml redirect", http.StatusInternalServerError)
 		return
 	}
+	logger.Info("redirecting to SAML identity provider")
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
 func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "saml_callback")
 	samlSvc := s.samlService()
 	if samlSvc == nil {
+		logger.Warn("SAML callback invoked but service is not configured")
 		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
 		return
 	}
 	ctx := r.Context()
 	sess, err := s.sessions.Session(r)
 	if err != nil {
+		logger.Error("failed to load session for SAML callback", "error", err)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
+		logger.Warn("failed to parse SAML response form", "error", err)
 		http.Error(w, "invalid response", http.StatusBadRequest)
 		return
 	}
@@ -211,28 +254,33 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 	expectedRelay, _ := sess.Values["saml_relay"].(string)
 	relayState := r.FormValue("RelayState")
 	if expectedRelay != "" && relayState != expectedRelay {
+		logger.Warn("SAML relay state mismatch", "expected", expectedRelay, "received", relayState)
 		http.Error(w, "invalid relay state", http.StatusBadRequest)
 		return
 	}
 	samlResponse := r.FormValue("SAMLResponse")
 	if samlResponse == "" {
+		logger.Warn("SAML response missing from callback")
 		http.Error(w, "missing saml response", http.StatusBadRequest)
 		return
 	}
 
 	assertion, err := samlSvc.ParseAssertion(samlResponse)
 	if err != nil {
+		logger.Warn("invalid SAML assertion", "error", err)
 		http.Error(w, "invalid saml assertion", http.StatusUnauthorized)
 		return
 	}
 
 	identity := samlSvc.ExtractIdentity(assertion)
 	if identity.ExternalID == "" {
+		logger.Warn("SAML assertion missing external identifier")
 		http.Error(w, "missing object identifier", http.StatusForbidden)
 		return
 	}
 	principal := firstNonEmpty(identity.Principal, identity.Email, identity.RawNameID)
 	if principal == "" {
+		logger.Warn("SAML assertion missing principal attributes", "external_id", identity.ExternalID)
 		http.Error(w, "missing principal", http.StatusForbidden)
 		return
 	}
@@ -244,83 +292,110 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.store.UpsertCloudUserByExternal(ctx, identity.ExternalID, principal, displayName, email)
 	if err != nil {
+		logger.Error("failed to upsert SAML user", "error", err, "principal", principal)
 		http.Error(w, "user upsert failed", http.StatusInternalServerError)
 		return
 	}
 
 	if err := s.sessions.SetUser(w, r, user.ID); err != nil {
+		logger.Error("failed to establish session after SAML login", "error", err, "user_id", user.ID)
 		http.Error(w, "set session", http.StatusInternalServerError)
 		return
 	}
 	delete(sess.Values, "saml_relay")
-	_ = sess.Save(r, w)
+	if err := sess.Save(r, w); err != nil {
+		logger.Error("failed to persist session after SAML login", "error", err, "user_id", user.ID)
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+	logger.Info("SAML login completed", "user_id", user.ID, "principal", principal)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "logout")
 	if err := s.sessions.Clear(w, r); err != nil {
+		logger.Error("failed to clear session during logout", "error", err)
 		http.Error(w, "logout failed", http.StatusInternalServerError)
 		return
 	}
+	logger.Info("user logged out successfully")
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "current_user")
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
+		logger.Warn("request missing authenticated user context")
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	user, err := s.store.GetUser(r.Context(), userID)
 	if err != nil {
+		logger.Error("failed to load authenticated user", "error", err, "user_id", userID)
 		http.Error(w, "load user", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("returning authenticated user details", "user_id", userID)
 	s.writeJSON(w, http.StatusOK, user)
 }
 
 func (s *Server) handleMetadata(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "saml_metadata")
 	samlSvc := s.samlService()
 	if samlSvc == nil {
+		logger.Warn("metadata requested but SAML service not configured")
 		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
 		return
 	}
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(samlSvc.Metadata())
+	logger.Debug("served SAML metadata document")
 }
 
 func (s *Server) handleListApplications(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "list_applications")
+	logger.Debug("listing applications")
 	apps, err := s.store.ListApplications(r.Context())
 	if err != nil {
+		logger.Error("failed to list applications", "error", err)
 		http.Error(w, "list apps", http.StatusInternalServerError)
 		return
 	}
+	logger.Info("applications listed", "count", len(apps))
 	s.writeJSON(w, http.StatusOK, apps)
 }
 
 func (s *Server) handleCheckApplicationExists(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "check_application_exists")
 	identifier := r.URL.Query().Get("identifier")
 	if identifier == "" {
+		logger.Warn("identifier query parameter missing")
 		http.Error(w, "identifier parameter required", http.StatusBadRequest)
 		return
 	}
+	logger.Debug("checking application existence", "identifier", identifier)
 
 	app, err := s.store.GetApplicationByIdentifier(r.Context(), identifier)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Info("application identifier not found", "identifier", identifier)
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
-		s.logger.Error("Failed to check application existence", "error", err)
+		logger.Error("failed to check application existence", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Info("application identifier found", "application_id", app.ID, "identifier", identifier)
 	s.writeJSON(w, http.StatusOK, app)
 }
 
 func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "create_application")
 	var payload struct {
 		Name        string `json:"name"`
 		RuleType    string `json:"rule_type"`
@@ -328,10 +403,12 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 		Description string `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		logger.Warn("failed to decode create application payload", "error", err)
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 	if payload.Name == "" || payload.Identifier == "" {
+		logger.Warn("application payload missing required fields", "has_name", payload.Name != "", "has_identifier", payload.Identifier != "")
 		http.Error(w, "name and identifier required", http.StatusBadRequest)
 		return
 	}
@@ -342,11 +419,12 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 	// Check if application with this identifier already exists
 	existing, err := s.store.GetApplicationByIdentifier(r.Context(), payload.Identifier)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		s.logger.Error("Failed to check for existing application", "error", err)
+		logger.Error("failed to check for existing application", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	if existing != nil {
+		logger.Warn("duplicate application identifier detected", "identifier", payload.Identifier, "existing_id", existing.ID)
 		errorResponse := map[string]interface{}{
 			"error":   "DUPLICATE_IDENTIFIER",
 			"message": fmt.Sprintf("An application rule with identifier '%s' already exists", payload.Identifier),
@@ -369,10 +447,11 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 	}
 	created, err := s.store.CreateApplication(r.Context(), app)
 	if err != nil {
-		s.logger.Error("Failed to create application", "error", err)
+		logger.Error("failed to create application", "error", err)
 		http.Error(w, "create app", http.StatusInternalServerError)
 		return
 	}
+	logger.Info("application created", "application_id", created.ID, "identifier", created.Identifier)
 	s.writeJSON(w, http.StatusCreated, created)
 }
 
@@ -613,130 +692,360 @@ func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSantaPreflight(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "santa_preflight")
 	// Validate Content-Type for Santa protocol compliance
 	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+		logger.Warn("invalid Content-Type for Santa preflight", "content_type", ct)
+		s.writeJSONError(r, w, http.StatusBadRequest, "Content-Type must be application/json", "content_type", ct)
 		return
 	}
 
 	machineID := chi.URLParam(r, "machine_id")
+	logger = logger.With("machine_id", machineID)
 	if machineID == "" {
-		http.Error(w, "machine_id required", http.StatusBadRequest)
+		logger.Warn("missing machine ID in preflight request")
+		s.writeJSONError(r, w, http.StatusBadRequest, "machine_id required")
 		return
 	}
 
+	// Read the raw body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Warn("failed to read request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	// Decompress the request body
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	if err != nil {
+		logger.Warn("failed to decompress request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
+		return
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
 	var req models.PreflightRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	decoder := json.NewDecoder(bodyReader)
+	if err := decoder.Decode(&req); err != nil {
+		logger.Warn("failed to decode preflight request body", "error", err, "body_length", len(bodyBytes))
+		s.writeJSONError(r, w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	resp, err := s.santa.Preflight(r.Context(), machineID, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logger.Error("santa preflight error", "error", err)
+		s.writeJSONError(r, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	logger.Info("santa preflight responded successfully",
+		"sync_type", resp.SyncType,
+		"batch_size", resp.BatchSize,
+	)
 
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleSantaEventUpload(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "santa_event_upload")
 	// Validate Content-Type for Santa protocol compliance
 	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+		logger.Warn("invalid Content-Type for event upload", "content_type", ct)
+		s.writeJSONError(r, w, http.StatusBadRequest, "Content-Type must be application/json", "content_type", ct)
 		return
 	}
 
 	machineID := chi.URLParam(r, "machine_id")
+	logger = logger.With("machine_id", machineID)
 	if machineID == "" {
-		http.Error(w, "machine_id required", http.StatusBadRequest)
+		logger.Warn("missing machine ID in event upload")
+		s.writeJSONError(r, w, http.StatusBadRequest, "machine_id required")
 		return
+	}
+
+	// Read the raw body to check for compression
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Warn("failed to read request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	// Decompress the request body
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	if err != nil {
+		logger.Warn("failed to decompress request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
+		return
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
 	}
 
 	var req models.EventUploadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	decoder := json.NewDecoder(bodyReader)
+	if err := decoder.Decode(&req); err != nil {
+		logger.Warn("failed to decode event upload payload", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
+	logger.Debug("processing uploaded Santa events", "event_count", len(req.Events))
+
 	resp, err := s.santa.EventUpload(r.Context(), machineID, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logger.Error("santa event upload error", "error", err)
+		s.writeJSONError(r, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	// Broadcast events to UI
+	blocked := 0
 	for _, event := range req.Events {
 		if strings.Contains(string(event.Decision), "BLOCK") {
 			payload, _ := json.Marshal(event)
 			s.broadcaster.Publish(payload)
+			blocked++
 		}
 	}
+
+	logger.Info("processed Santa event upload",
+		"events_processed", len(req.Events),
+		"blocked_events", blocked,
+		"bundle_response_count", len(resp.EventUploadBundleBinaries),
+	)
 
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleSantaRuleDownload(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "santa_rule_download")
 	// Validate Content-Type for Santa protocol compliance
 	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+		logger.Warn("invalid Content-Type for rule download", "content_type", ct)
+		s.writeJSONError(r, w, http.StatusBadRequest, "Content-Type must be application/json", "content_type", ct)
 		return
 	}
 
 	machineID := chi.URLParam(r, "machine_id")
+	logger = logger.With("machine_id", machineID)
 	if machineID == "" {
-		http.Error(w, "machine_id required", http.StatusBadRequest)
+		logger.Warn("missing machine ID in rule download request")
+		s.writeJSONError(r, w, http.StatusBadRequest, "machine_id required")
 		return
 	}
 
+	// Read the raw body to check for compression
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Warn("failed to read request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	// Decompress the request body if needed (Santa supports deflate, gzip, or none)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	if err != nil {
+		logger.Warn("failed to decompress request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
+		return
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
 	var req models.RuleDownloadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	decoder := json.NewDecoder(bodyReader)
+	if err := decoder.Decode(&req); err != nil {
+		logger.Warn("failed to decode rule download payload", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	resp, err := s.santa.RuleDownload(r.Context(), machineID, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logger.Error("santa rule download error", "error", err)
+		s.writeJSONError(r, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	logger.Info("served Santa rule download",
+		"rules_count", len(resp.Rules),
+		"cursor", resp.Cursor,
+	)
 
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleSantaPostflight(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "santa_postflight")
 	// Validate Content-Type for Santa protocol compliance
 	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+		logger.Warn("invalid Content-Type for postflight", "content_type", ct)
+		s.writeJSONError(r, w, http.StatusBadRequest, "Content-Type must be application/json", "content_type", ct)
 		return
 	}
 
 	machineID := chi.URLParam(r, "machine_id")
+	logger = logger.With("machine_id", machineID)
 	if machineID == "" {
-		http.Error(w, "machine_id required", http.StatusBadRequest)
+		logger.Warn("missing machine ID in postflight request")
+		s.writeJSONError(r, w, http.StatusBadRequest, "machine_id required")
 		return
 	}
 
+	// Read the raw body to check for compression
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Warn("failed to read request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	// Decompress the request body if needed (Santa supports deflate, gzip, or none)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	if err != nil {
+		logger.Warn("failed to decompress request body", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
+		return
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
 	var req models.PostflightRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	decoder := json.NewDecoder(bodyReader)
+	if err := decoder.Decode(&req); err != nil {
+		logger.Warn("failed to decode postflight payload", "error", err)
+		s.writeJSONError(r, w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	resp, err := s.santa.Postflight(r.Context(), machineID, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logger.Error("santa postflight error", "error", err)
+		s.writeJSONError(r, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
+	logger.Info("santa postflight completed",
+		"rules_received", req.RulesReceived,
+		"rules_processed", req.RulesProcessed,
+		"sync_type", req.SyncType,
+	)
+
 	s.writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) loggerForRequest(r *http.Request) *slog.Logger {
+	logger := s.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	attrs := []any{
+		"method", r.Method,
+		"path", r.URL.Path,
+	}
+	if reqID := middleware.GetReqID(r.Context()); reqID != "" {
+		attrs = append(attrs, "request_id", reqID)
+	}
+	if r.RemoteAddr != "" {
+		attrs = append(attrs, "remote_addr", r.RemoteAddr)
+	}
+	return logger.With(attrs...)
+}
+
+func (s *Server) logOperation(r *http.Request, operation string) *slog.Logger {
+	logger := s.loggerForRequest(r)
+	if operation != "" {
+		logger = logger.With("operation", operation)
+	}
+	return logger
+}
+
+func requestLogger(base *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger := base
+			if logger == nil {
+				logger = slog.Default()
+			}
+			reqLogger := logger.With(
+				"method", r.Method,
+				"path", r.URL.Path,
+			)
+			if reqID := middleware.GetReqID(r.Context()); reqID != "" {
+				reqLogger = reqLogger.With("request_id", reqID)
+			}
+			if r.RemoteAddr != "" {
+				reqLogger = reqLogger.With("remote_addr", r.RemoteAddr)
+			}
+
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			reqLogger.Debug("request started")
+			next.ServeHTTP(ww, r)
+
+			status := ww.Status()
+			if status == 0 {
+				status = http.StatusOK
+			}
+			duration := time.Since(start)
+			fields := []any{
+				"status", status,
+				"duration", duration,
+				"bytes_written", ww.BytesWritten(),
+			}
+
+			switch {
+			case status >= 500:
+				reqLogger.Error("request completed with server error", fields...)
+			case status >= 400:
+				reqLogger.Warn("request completed with client error", fields...)
+			default:
+				reqLogger.Info("request completed", fields...)
+			}
+		})
+	}
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		s.logger.Error("encode json", "error", err)
+		logger := s.logger
+		if logger == nil {
+			logger = slog.Default()
+		}
+		logger.Error("failed to encode JSON response", "error", err, "status", status)
+	}
+}
+
+func (s *Server) writeJSONError(r *http.Request, w http.ResponseWriter, status int, message string, attrs ...any) {
+	resp := struct {
+		Error string `json:"error"`
+	}{
+		Error: message,
+	}
+	s.writeJSON(w, status, resp)
+
+	logger := s.loggerForRequest(r)
+	fields := append([]any{
+		"status", status,
+		"error_message", message,
+	}, attrs...)
+
+	switch {
+	case status >= 500:
+		logger.Error("responded with JSON error", fields...)
+	case status >= 400:
+		logger.Warn("responded with JSON error", fields...)
+	default:
+		logger.Info("responded with JSON error", fields...)
 	}
 }
 
@@ -822,17 +1131,23 @@ func (s *Server) handleGetSantaConfig(w http.ResponseWriter, r *http.Request) {
 // Local authentication handler
 
 func (s *Server) handleLocalLogin(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "local_login")
 	var credentials struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		logger.Warn("failed to decode local login payload", "error", err)
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	if credentials.Username == "" || credentials.Password == "" {
+		logger.Warn("missing username or password in login payload",
+			"has_username", credentials.Username != "",
+			"has_password", credentials.Password != "",
+		)
 		http.Error(w, "username and password required", http.StatusBadRequest)
 		return
 	}
@@ -840,23 +1155,29 @@ func (s *Server) handleLocalLogin(w http.ResponseWriter, r *http.Request) {
 	// Authenticate user
 	user, err := s.store.AuthenticateLocalUser(r.Context(), credentials.Username, credentials.Password)
 	if err != nil {
+		logger.Error("local authentication backend failure", "error", err, "username", credentials.Username)
 		http.Error(w, "authentication failed", http.StatusInternalServerError)
 		return
 	}
 
 	if user == nil {
+		logger.Info("local login rejected", "username", credentials.Username)
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	// Create session
 	if err := s.sessions.SetUser(w, r, user.ID); err != nil {
+		logger.Error("failed to establish session for local login", "error", err, "user_id", user.ID)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Info("local login succeeded", "user_id", user.ID, "username", credentials.Username)
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(user); err != nil {
+		logger.Error("failed to encode login response", "error", err, "user_id", user.ID)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
