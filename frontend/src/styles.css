@@ -387,7 +387,7 @@ button.secondary {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
-/* ApplicationManager dropdown styling */
+/* Applications dropdown styling */
 .target-selector-dropdown {
     position: absolute;
     top: 100%;

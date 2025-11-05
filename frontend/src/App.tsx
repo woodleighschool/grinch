@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
-import ApplicationManager from './components/ApplicationManager';
+import Applications from './components/Applications';
 import Users from './components/Users';
 import Devices from './components/Devices';
 import Settings from './components/Settings';
@@ -74,7 +74,7 @@ export default function App() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/applications" element={<ApplicationManager />} />
+          <Route path="/applications" element={<Applications />} />
           <Route path="/users" element={<Users />} />
           <Route path="/devices" element={<Devices />} />
           <Route path="/settings" element={<Settings />} />

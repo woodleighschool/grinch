@@ -234,7 +234,7 @@ function TargetSelector({ groups, users, onSelect, selectedType, onTypeChange, s
   );
 }
 
-export default function ApplicationManager() {
+export default function Applications() {
   const [apps, setApps] = useState<Application[]>([]);
   const [groups, setGroups] = useState<DirectoryGroup[]>([]);
   const [users, setUsers] = useState<DirectoryUser[]>([]);
@@ -897,6 +897,7 @@ function ApplicationRuleCard({
         <div className="assignment-card-summary">
           <span className="assignment-card-chevron" aria-hidden="true">
             ›
+            {/* TO:DO - Make same as Settings collapse icon */}
           </span>
           <span className="assignment-card-icon" aria-hidden="true">🛡️</span>
           <div className="assignment-card-summary-main">
