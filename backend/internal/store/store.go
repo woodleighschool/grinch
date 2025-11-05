@@ -982,6 +982,33 @@ func (s *Store) ListApplications(ctx context.Context) ([]models.Application, err
 	return apps, rows.Err()
 }
 
+func (s *Store) GetApplicationByIdentifier(ctx context.Context, identifier string) (*models.Application, error) {
+	const q = `
+		SELECT id, name, rule_type, identifier, description, created_at, updated_at
+		FROM applications WHERE identifier = $1;
+	`
+	var (
+		app           models.Application
+		dbDescription sql.NullString
+	)
+	row := s.pool.QueryRow(ctx, q, identifier)
+	if err := row.Scan(
+		&app.ID,
+		&app.Name,
+		&app.RuleType,
+		&app.Identifier,
+		&dbDescription,
+		&app.CreatedAt,
+		&app.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	if dbDescription.Valid {
+		app.Description = dbDescription.String
+	}
+	return &app, nil
+}
+
 func (s *Store) CreateApplication(ctx context.Context, app models.Application) (*models.Application, error) {
 	const q = `
 		INSERT INTO applications (name, rule_type, identifier, description, created_at, updated_at)

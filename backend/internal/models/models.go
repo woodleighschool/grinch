@@ -2,9 +2,16 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+// Common errors
+var (
+	ErrApplicationExists   = errors.New("application with this identifier already exists")
+	ErrApplicationNotFound = errors.New("application not found")
 )
 
 // SyncType represents the type of sync operation

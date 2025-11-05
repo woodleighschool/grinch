@@ -48,7 +48,7 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		ServerAddress:            getEnv("SERVER_ADDRESS", ":8080"),
-		FrontendDistDir:          getEnv("FRONTEND_DIST", ""),
+		FrontendDistDir:          getEnv("FRONTEND_DIST", "/frontend"),
 		DatabaseURL:              os.Getenv("DATABASE_URL"),
 		CookieName:               getEnv("SESSION_COOKIE_NAME", "grinch_session"),
 		CookieSecret:             os.Getenv("SESSION_COOKIE_SECRET"),

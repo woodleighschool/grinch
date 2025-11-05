@@ -6,6 +6,25 @@ export interface ApiUser {
   is_admin: boolean;
 }
 
+export interface ApiError {
+  error: string;
+  message: string;
+  existing_application?: {
+    id: string;
+    name: string;
+  };
+}
+
+export class ApplicationDuplicateError extends Error {
+  constructor(
+    message: string,
+    public existingApplication: { id: string; name: string }
+  ) {
+    super(message);
+    this.name = 'ApplicationDuplicateError';
+  }
+}
+
 export interface BlockedEvent {
   id: number;
   process_path: string;
@@ -138,7 +157,28 @@ export interface AuthProviders {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    
+    // Try to parse as JSON for structured error responses
+    try {
+      const errorData: ApiError = JSON.parse(text);
+      
+      // Handle duplicate identifier error specifically
+      if (errorData.error === 'DUPLICATE_IDENTIFIER' && errorData.existing_application) {
+        throw new ApplicationDuplicateError(
+          errorData.message,
+          errorData.existing_application
+        );
+      }
+      
+      // For other structured errors, throw with the message
+      throw new Error(errorData.message || text || res.statusText);
+    } catch (parseError) {
+      // If it's not JSON or parsing fails, fall back to text
+      if (parseError instanceof ApplicationDuplicateError) {
+        throw parseError;
+      }
+      throw new Error(text || res.statusText);
+    }
   }
   return res.json() as Promise<T>;
 }
@@ -163,6 +203,16 @@ export async function getAuthProviders(): Promise<AuthProviders> {
 export async function listApplications(): Promise<Application[]> {
   const res = await fetch('/api/apps', { credentials: 'include' });
   return handleResponse<Application[]>(res);
+}
+
+export async function checkApplicationExists(identifier: string): Promise<Application | null> {
+  const res = await fetch(`/api/apps/check?identifier=${encodeURIComponent(identifier)}`, {
+    credentials: 'include'
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  return handleResponse<Application>(res);
 }
 
 export async function createApplication(payload: { name: string; rule_type: string; identifier: string; description?: string; }): Promise<Application> {

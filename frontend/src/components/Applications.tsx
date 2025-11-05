@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Application, ApplicationScope, DirectoryGroup, DirectoryUser, GroupMembership } from '../api';
-import { createApplication, deleteApplication, createScope, deleteScope, listApplications, listGroupMemberships, listGroups, listScopes, listUsers } from '../api';
+import { createApplication, deleteApplication, createScope, deleteScope, listApplications, listGroupMemberships, listGroups, listScopes, listUsers, ApplicationDuplicateError } from '../api';
 
 interface NewAppForm {
   name: string;
@@ -370,15 +370,14 @@ export default function Applications() {
       setScopes((current) => ({ ...current, [created.id]: [] }));
       setForm(defaultApp);
     } catch (err) {
-      if (err instanceof Error) {
-        const message = err.message;
-        if (/duplicate/i.test(message) || /idx_applications_identifier/i.test(message)) {
-          setValidationError('Looks like that identifier is already in use. Check the existing application rules below.');
-        } else if (/bad gateway/i.test(message) || /502/.test(message)) {
-          setValidationError('We already have a rule with that identifier. You can manage it in the list below.');
-        } else {
-          setError(message);
-        }
+      if (err instanceof ApplicationDuplicateError) {
+        setValidationError(
+          `The identifier "${trimmedIdentifier}" already belongs to "${err.existingApplication.name}". You can manage it in the list below.`
+        );
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
       }
     } finally {
       setBusy(false);

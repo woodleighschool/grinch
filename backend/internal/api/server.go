@@ -132,6 +132,7 @@ func (s *Server) Routes() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.sessions.RequireAdmin)
 			r.Get("/apps", s.handleListApplications)
+			r.Get("/apps/check", s.handleCheckApplicationExists)
 			r.Post("/apps", s.handleCreateApplication)
 			r.Delete("/apps/{id}", s.handleDeleteApplication)
 			r.Get("/apps/{id}/scopes", s.handleListApplicationScopes)
@@ -298,6 +299,27 @@ func (s *Server) handleListApplications(w http.ResponseWriter, r *http.Request) 
 	s.writeJSON(w, http.StatusOK, apps)
 }
 
+func (s *Server) handleCheckApplicationExists(w http.ResponseWriter, r *http.Request) {
+	identifier := r.URL.Query().Get("identifier")
+	if identifier == "" {
+		http.Error(w, "identifier parameter required", http.StatusBadRequest)
+		return
+	}
+
+	app, err := s.store.GetApplicationByIdentifier(r.Context(), identifier)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		s.logger.Error("Failed to check application existence", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, app)
+}
+
 func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Name        string `json:"name"`
@@ -316,6 +338,29 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 	if payload.RuleType == "" {
 		payload.RuleType = "BINARY"
 	}
+
+	// Check if application with this identifier already exists
+	existing, err := s.store.GetApplicationByIdentifier(r.Context(), payload.Identifier)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		s.logger.Error("Failed to check for existing application", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		errorResponse := map[string]interface{}{
+			"error":   "DUPLICATE_IDENTIFIER",
+			"message": fmt.Sprintf("An application rule with identifier '%s' already exists", payload.Identifier),
+			"existing_application": map[string]interface{}{
+				"id":   existing.ID,
+				"name": existing.Name,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
 	app := models.Application{
 		Name:        payload.Name,
 		RuleType:    payload.RuleType,
@@ -324,6 +369,7 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 	}
 	created, err := s.store.CreateApplication(r.Context(), app)
 	if err != nil {
+		s.logger.Error("Failed to create application", "error", err)
 		http.Error(w, "create app", http.StatusInternalServerError)
 		return
 	}
