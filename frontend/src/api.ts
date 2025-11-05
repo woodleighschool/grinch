@@ -75,6 +75,10 @@ export interface SAMLSettings {
   display_name_attribute?: string;
 }
 
+export interface SantaConfig {
+  xml: string;
+}
+
 export interface Device {
   id: string;
   hostname: string;
@@ -271,4 +275,11 @@ export async function updateSAMLSettings(settings: SAMLSettings): Promise<SAMLSe
     body: JSON.stringify(settings),
   });
   return handleResponse<SAMLSettings>(res);
+}
+
+export async function getSantaConfig(): Promise<SantaConfig> {
+  const res = await fetch('/api/settings/santa-config', {
+    credentials: 'include'
+  });
+  return handleResponse<SantaConfig>(res);
 }

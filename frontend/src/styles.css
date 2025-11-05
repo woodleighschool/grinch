@@ -570,7 +570,7 @@ button.secondary {
 
 .assignment-card-summary-meta {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     min-width: 0;
     flex: 1;
@@ -584,10 +584,9 @@ button.secondary {
     padding: 4px 8px;
     border-radius: 8px;
     flex: 1;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-width: 0;
+    word-wrap: break-word;
+    hyphens: auto;
 }
 
 .assignment-card-summary-stats {

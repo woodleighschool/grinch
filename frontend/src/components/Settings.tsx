@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SantaConfig } from '../api';
 
 interface SAMLSettings {
   enabled: boolean;
@@ -46,7 +47,7 @@ function SettingsModule({
   description,
   icon,
   children,
-  enabled = true,
+  enabled,
   moduleId,
   isExpanded,
   onToggleExpand,
@@ -99,9 +100,11 @@ function SettingsModule({
                 {description}
               </div>
               <div className="assignment-card-summary-stats">
-                <div className={`summary-pill ${enabled ? 'success' : 'neutral'}`}>
-                  {enabled ? 'Enabled' : 'Disabled'}
-                </div>
+                {enabled !== undefined && (
+                  <div className={`summary-pill ${enabled ? 'success' : 'neutral'}`}>
+                    {enabled ? 'Enabled' : 'Disabled'}
+                  </div>
+                )}
                 {showToggle && onToggleEnabled && (
                   <button
                     type="button"
@@ -121,6 +124,7 @@ function SettingsModule({
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: '18px' }}>
           {isExpanded ? '−' : '+'}
+          {/* TO:DO - This could be animated */}
         </div>
       </div>
 
@@ -320,8 +324,133 @@ function SAMLSettingsModule({ settings, onSettingsChange, onSave, onReset, savin
   );
 }
 
+interface SantaConfigModuleProps {
+  config: SantaConfig | null;
+}
+
+function SantaConfigModule({ config }: SantaConfigModuleProps) {
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+
+  if (!config) {
+    return (
+      <div className="settings-form">
+        <div className="settings-form-field">
+          <p>Loading Santa configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const copyButtonLabel = copyStatus === 'copied'
+    ? 'Copied!'
+    : copyStatus === 'error'
+      ? 'Copy failed'
+      : 'Copy XML';
+
+  const handleCopy = async () => {
+    if (!config.xml) {
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.clipboard) {
+      setCopyStatus('error');
+      window.setTimeout(() => setCopyStatus('idle'), 2000);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(config.xml);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('error');
+    } finally {
+      window.setTimeout(() => setCopyStatus('idle'), 2000);
+    }
+  };
+
+  return (
+    <div className="settings-form">
+      <div className="grid two-column">
+        <section className="settings-form-section" style={{ marginBottom: 0 }}>
+          <p style={{ margin: '0 0 16px 0', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Deploy this XML via MDM to preconfigure Santa&apos;s sync URLs, baseline telemetry, and ownership metadata.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleCopy}
+              title="Copy XML to clipboard"
+            >
+              {copyButtonLabel}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => window.open('https://northpole.dev/configuration/keys/', '_blank', 'noopener,noreferrer')}
+              title="Open Santa Keys configuration reference"
+            >
+              📖 Configuration Help
+            </button>
+          </div>
+          <label htmlFor="santa-config-xml">Santa Configuration XML</label>
+          <div>
+            <textarea
+              id="santa-config-xml"
+              className="settings-textarea-mono"
+              value={config.xml}
+              readOnly
+              rows={20}
+              style={{
+                width: '100%',
+                resize: 'vertical',
+                minHeight: '400px'
+              }}
+            />
+          </div>
+          <small className="settings-field-help">
+            Paste this payload into a preferences file and upload to your MDM. Curly-brace <code>{'{{ }}'}</code> placeholders should be expanded by your provider.
+          </small>
+        </section>
+
+        <aside className="settings-form-section" style={{ marginBottom: 0 }}>
+          <div className="settings-advanced-section" style={{ marginBottom: '16px' }}>
+            <h4 className="settings-section-header" style={{ marginTop: 0 }}>
+              Deployment checklist
+            </h4>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '8px', color: 'var(--text-primary)' }}>
+              <li>
+                Deploy the payload as a profile targeting <code>com.northpolesec.santa</code>.
+              </li>
+              <li>
+                Sync server URLs should already point at this Grinch instance.
+              </li>
+              <li>
+                Defaults keep Santa in Monitor mode; raise the enforcement level when you're ready.
+              </li>
+            </ul>
+          </div>
+
+          <div className="settings-advanced-section" style={{ marginBottom: 0 }}>
+            <h4 className="settings-section-header" style={{ marginTop: 0 }}>
+              Template placeholders
+            </h4>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '8px', color: 'var(--text-primary)' }}>
+              <li>
+                Adjust <code>{'{{username}}'}</code> to your MDM provider's placeholder expectations.
+                {/* TO:DO - Grinch expects email, do we use email or mail alias (username)? */}
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const [samlSettings, setSamlSettings] = useState<SAMLSettings>(defaultSAMLSettings);
+  const [santaConfig, setSantaConfig] = useState<SantaConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -329,8 +458,37 @@ export default function Settings() {
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSAMLSettings();
+    loadSettings();
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      // Load both SAML settings and Santa config in parallel
+      const [samlResponse, santaResponse] = await Promise.all([
+        fetch('/api/settings/saml', { credentials: 'include' }),
+        fetch('/api/settings/santa-config', { credentials: 'include' })
+      ]);
+
+      if (!samlResponse.ok) {
+        throw new Error('Failed to load SAML settings');
+      }
+
+      if (!santaResponse.ok) {
+        throw new Error('Failed to load Santa configuration');
+      }
+
+      const samlSettingsData = await samlResponse.json();
+      const santaConfigData = await santaResponse.json();
+
+      setSamlSettings(samlSettingsData);
+      setSantaConfig(santaConfigData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadSAMLSettings = async () => {
     try {
@@ -429,6 +587,21 @@ export default function Settings() {
           onReset={loadSAMLSettings}
           saving={saving}
         />
+      </SettingsModule>
+
+      <SettingsModule
+        title="Santa Client Configuration"
+        description="Generate configuration XML for Santa clients to deploy via MDM"
+        icon="🎅"
+        moduleId="santa"
+        isExpanded={expandedModuleId === 'santa'}
+        onToggleExpand={(moduleId) => {
+          setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId);
+        }}
+        showToggle={false}
+        enabled={undefined}
+      >
+        <SantaConfigModule config={santaConfig} />
       </SettingsModule>
     </div>
   );

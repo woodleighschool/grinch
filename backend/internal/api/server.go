@@ -147,6 +147,7 @@ func (s *Server) Routes() http.Handler {
 			// Settings endpoints
 			r.Get("/settings/saml", s.handleGetSAMLSettings)
 			r.Put("/settings/saml", s.handleUpdateSAMLSettings)
+			r.Get("/settings/santa-config", s.handleGetSantaConfig)
 		})
 	})
 
@@ -757,6 +758,19 @@ func (s *Server) handleUpdateSAMLSettings(w http.ResponseWriter, r *http.Request
 	}
 
 	s.writeJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) handleGetSantaConfig(w http.ResponseWriter, r *http.Request) {
+	// Generate Santa client configuration XML
+	config := santa.GenerateConfigXML(r)
+
+	resp := struct {
+		XML string `json:"xml"`
+	}{
+		XML: config,
+	}
+
+	s.writeJSON(w, http.StatusOK, resp)
 }
 
 // Local authentication handler
