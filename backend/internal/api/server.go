@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
 	"context"
 	"crypto/rand"
@@ -89,37 +88,28 @@ func NewServer(ctx context.Context, cfg *config.Config, store *store.Store, sant
 }
 
 // decompressRequestBody handles decompression of Santa client request bodies
-// Santa clients can send data compressed with deflate, gzip, or uncompressed
-func (s *Server) decompressRequestBody(bodyBytes []byte, logger *slog.Logger) (io.Reader, error) {
+func (s *Server) decompressRequestBody(bodyBytes []byte, logger *slog.Logger, r *http.Request) (io.Reader, error) {
 	if len(bodyBytes) == 0 {
 		return bytes.NewReader(nil), nil
 	}
 
-	br := bytes.NewReader(bodyBytes)
-
 	// Check for gzip compression
-	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x1F && bodyBytes[1] == 0x8B {
+	contentEncoding := r.Header.Get("Content-Encoding")
+	switch contentEncoding {
+	case "gzip":
+		br := bytes.NewReader(bodyBytes)
 		gz, err := gzip.NewReader(br)
 		if err != nil {
 			return nil, fmt.Errorf("gzip decode failed: %w", err)
 		}
 		return gz, nil
+	case "", "identity":
+		// No compression
+		return bytes.NewReader(bodyBytes), nil
+	default:
+		logger.Warn("unsupported Content-Encoding", "encoding", contentEncoding)
+		return nil, fmt.Errorf("unsupported Content-Encoding: %s", contentEncoding)
 	}
-
-	// Check for deflate compression
-	{
-		defBr := bytes.NewReader(bodyBytes)
-		fr := flate.NewReader(defBr)
-		buf := make([]byte, 1)
-		if _, err := fr.Read(buf); err == nil {
-			fr.Close()
-			return flate.NewReader(bytes.NewReader(bodyBytes)), nil
-		}
-		fr.Close()
-	}
-
-	// No compression
-	return bytes.NewReader(bodyBytes), nil
 }
 
 func (s *Server) Routes() http.Handler {
@@ -725,7 +715,7 @@ func (s *Server) handleSantaPreflight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decompress the request body
-	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger, r)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
 		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
@@ -784,7 +774,7 @@ func (s *Server) handleSantaEventUpload(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Decompress the request body
-	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger, r)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
 		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
@@ -856,7 +846,7 @@ func (s *Server) handleSantaRuleDownload(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Decompress the request body
-	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger, r)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
 		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")
@@ -915,7 +905,7 @@ func (s *Server) handleSantaPostflight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decompress the request body
-	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
+	bodyReader, err := s.decompressRequestBody(bodyBytes, logger, r)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
 		s.writeJSONError(r, w, http.StatusBadRequest, "failed to decompress request body")

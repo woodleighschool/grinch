@@ -24,6 +24,7 @@ func GenerateConfigXML(req *http.Request) string {
 	config.WriteString("<key>MachineOwner</key>\n<string>{{username}}</string>\n")
 	config.WriteString("<key>EnableAllEventUpload</key>\n<true/>\n")
 	config.WriteString("<key>DisableUnknownEventUpload</key>\n<false/>\n")
+	config.WriteString("<key>SyncClientContentEncoding</key>\n<string>gzip</string>\n")
 
 	return config.String()
 }
