@@ -459,14 +459,8 @@ export default function Applications() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '200px',
-        color: '#6b7280'
-      }}>
-        Loading directory data...
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+        <span className="muted-text">Loading directory data...</span>
       </div>
     );
   }
@@ -476,14 +470,7 @@ export default function Applications() {
       <div className="card">
         <h2>Add Application Rule</h2>
         <p>Define application rules using Santa-compatible identifiers. Rules can then be assigned to groups or users.</p>
-        {error && <div style={{
-          color: '#dc2626',
-          backgroundColor: '#fef2f2',
-          padding: '12px',
-          borderRadius: '6px',
-          marginBottom: '16px',
-          border: '1px solid #fecaca'
-        }}>{error}</div>}
+        {error && <div className="alert error" style={{ marginBottom: '16px' }}>{error}</div>}
         <form onSubmit={handleCreateApp}>
           <div>
             <label htmlFor="name">
@@ -548,18 +535,7 @@ export default function Applications() {
             {busy ? 'Creating Rule...' : 'Create Application Rule'}
           </button>
           {validationError && (
-            <div style={{
-              color: '#dc2626',
-              backgroundColor: '#fef2f2',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              marginTop: '8px',
-              border: '1px solid #fecaca',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
+            <div className="alert error" style={{ marginTop: '8px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>⚠️</span>
               <span>{validationError}</span>
             </div>
@@ -673,30 +649,18 @@ export default function Applications() {
                 </button>
               )}
             </div>
-            <div style={{
-              color: '#6b7280',
-              fontSize: '14px',
-              marginLeft: 'auto',
-              textAlign: 'right'
-            }}>
+            <div className="muted-text" style={{ fontSize: '14px', marginLeft: 'auto', textAlign: 'right' }}>
               Showing {filteredApps.length} of {apps.length} application{apps.length !== 1 ? 's' : ''} · {totalScopes} total assignment{totalScopes !== 1 ? 's' : ''}
             </div>
           </div>
         )}
-
         {apps.length === 0 ? (
           <div className="empty-state">
             <h3>No application rules yet</h3>
             <p>Create your first application rule above to get started.</p>
           </div>
         ) : filteredApps.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '32px',
-            color: '#6b7280',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px'
-          }}>
+          <div className="empty-state">
             <h3 style={{ margin: '0 0 8px 0' }}>No matching applications</h3>
             <p style={{ margin: 0 }}>
               We couldn&apos;t find any applications matching &quot;{appSearch}&quot;. Try a different search or clear the filter.

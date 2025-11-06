@@ -61,16 +61,16 @@ export default function Devices() {
     }
   }
 
-  function getStatusColor(lastSeen?: string | null) {
+  function getStatusCategory(lastSeen?: string | null): 'success' | 'warning' | 'danger' | 'muted' {
     if (!lastSeen) {
-      return '#6b7280';
+      return 'muted';
     }
     const lastSeenDate = new Date(lastSeen);
     const diffMs = Date.now() - lastSeenDate.getTime();
     const diffMinutes = diffMs / (1000 * 60);
-    if (diffMinutes <= 15) return '#059669'; // online
-    if (diffMinutes <= 120) return '#d97706'; // warning
-    return '#dc2626'; // offline
+    if (diffMinutes <= 15) return 'success'; // online
+    if (diffMinutes <= 120) return 'warning'; // recently active
+    return 'danger'; // offline
   }
 
   const statusCounts = useMemo(() => {
@@ -78,10 +78,10 @@ export default function Devices() {
     let warning = 0;
     let offline = 0;
     devices.forEach((device) => {
-      const color = getStatusColor(device.last_seen);
-      if (color === '#059669') online += 1;
-      else if (color === '#d97706') warning += 1;
-      else offline += 1;
+      const category = getStatusCategory(device.last_seen);
+      if (category === 'success') online += 1;
+      else if (category === 'warning') warning += 1;
+      else if (category === 'danger') offline += 1;
     });
     return { online, warning, offline, total: devices.length };
   }, [devices]);
@@ -191,24 +191,17 @@ export default function Devices() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: getStatusColor(device.last_seen)
-                      }} />
-                      <span style={{
-                        color: getStatusColor(device.last_seen),
-                        fontWeight: '500',
-                      }}>
-                        {(() => {
-                          const color = getStatusColor(device.last_seen);
-                          if (color === '#059669') return 'Online';
-                          if (color === '#d97706') return 'Inactive';
-                          if (device.last_seen) return 'Offline';
-                          return 'Unknown';
-                        })()}
-                      </span>
+                      {(() => {
+                        const category = getStatusCategory(device.last_seen);
+                        return (
+                          <>
+                            <span className={`status-dot ${category}`} />
+                            <span className={`status-text ${category}`} style={{ fontWeight: 500 }}>
+                              {category === 'success' ? 'Online' : category === 'warning' ? 'Inactive' : device.last_seen ? 'Offline' : 'Unknown'}
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td>

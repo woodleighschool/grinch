@@ -81,22 +81,13 @@ export default function Login({ onLogin }: LoginProps) {
   const showSAMLPanel = samlEnabled && !showLocalLogin;
 
   return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <div className="center-page">
       <div className="card" style={{ maxWidth: '480px', width: '100%' }}>
         <h1>🎄 Grinch</h1>
         <p>Manage Santa rules and monitor blocked executions.</p>
 
         {error && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            color: '#dc2626',
-            marginBottom: '20px'
-          }}>
-            {error}
-          </div>
+          <div className="alert error" style={{ marginBottom: '20px' }}>{error}</div>
         )}
 
         {showSAMLPanel ? (
@@ -187,14 +178,7 @@ export default function Login({ onLogin }: LoginProps) {
           </form>
         )}
 
-        <div style={{
-          marginTop: '24px',
-          paddingTop: '24px',
-          borderTop: '1px solid #e5e7eb',
-          fontSize: '14px',
-          color: '#6b7280',
-          textAlign: 'center'
-        }}>
+        <div className="panel-footer">
           {showSAMLPanel ? (
             <>Choose your preferred sign-in method. Local login is available for system administrators.</>
           ) : samlEnabled ? (

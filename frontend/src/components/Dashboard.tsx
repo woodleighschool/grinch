@@ -63,7 +63,7 @@ function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div className="toolbar" style={{ marginBottom: '16px' }}>
         {(['overview', 'groups', 'users'] as const).map(tab => (
           <button
             key={tab}
@@ -99,7 +99,7 @@ function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
                 {filteredGroups.map((group) => (
                   <li key={group.id} style={{
                     padding: '8px 0',
-                    borderBottom: '1px solid #f3f4f6',
+                    borderBottom: '1px solid var(--border-secondary)',
                     display: 'flex',
                     justifyContent: 'space-between'
                   }}>
@@ -112,11 +112,11 @@ function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
                 {filteredUsers.map((user) => (
                   <li key={user.id} style={{
                     padding: '8px 0',
-                    borderBottom: '1px solid #f3f4f6'
+                    borderBottom: '1px solid var(--border-secondary)'
                   }}>
                     <div>{user.display_name || user.principal_name}</div>
                     {user.display_name && user.display_name !== user.principal_name && (
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{user.principal_name}</div>
+                      <div className="muted-text" style={{ fontSize: '12px' }}>{user.principal_name}</div>
                     )}
                   </li>
                 ))}

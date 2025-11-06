@@ -24,7 +24,11 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return <div className="app-container"><p style={{ padding: '48px' }}>Loading…</p></div>;
+    return (
+      <div className="center-page">
+        <p className="muted-text">Loading…</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -38,8 +42,8 @@ export default function App() {
 
   if (user && !user.is_admin) {
     return (
-      <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div className="card" style={{ maxWidth: '480px' }}>
+      <div className="center-page">
+        <div className="card" style={{ maxWidth: '480px', width: '100%' }}>
           <h1>Access Restricted</h1>
           <p>Your account does not have administrator access to the Santa control plane.</p>
           <button className="primary" onClick={handleLogout} style={{ marginTop: '24px' }}>
