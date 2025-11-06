@@ -74,9 +74,8 @@ function SettingsModule({
                             <div className="assignment-card-summary-stats">
                                 {enabled !== undefined && (
                                     <div
-                                        className={`summary-pill ${
-                                            enabled ? "success" : "neutral"
-                                        }`}
+                                        className={`summary-pill ${enabled ? "success" : "neutral"
+                                            }`}
                                     >
                                         {enabled ? "Enabled" : "Disabled"}
                                     </div>
@@ -84,9 +83,8 @@ function SettingsModule({
                                 {showToggle && onToggleEnabled && (
                                     <button
                                         type="button"
-                                        className={`settings-toggle-btn ${
-                                            enabled ? "enabled" : "disabled"
-                                        }`}
+                                        className={`settings-toggle-btn ${enabled ? "enabled" : "disabled"
+                                            }`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onToggleEnabled(!enabled);
@@ -107,9 +105,8 @@ function SettingsModule({
             </div>
 
             <div
-                className={`assignment-card-expanded-wrapper${
-                    isExpanded ? " expanded" : ""
-                }`}
+                className={`assignment-card-expanded-wrapper${isExpanded ? " expanded" : ""
+                    }`}
                 style={{
                     maxHeight: isExpanded ? `${contentHeight}px` : "0px",
                 }}
@@ -138,10 +135,8 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
 
     if (!config) {
         return (
-            <div className="settings-form">
-                <div className="settings-form-field">
-                    <p>Loading Santa configuration...</p>
-                </div>
+            <div>
+                <p>Loading Santa configuration...</p>
             </div>
         );
     }
@@ -150,8 +145,8 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
         copyStatus === "copied"
             ? "Copied!"
             : copyStatus === "error"
-            ? "Copy failed"
-            : "Copy XML";
+                ? "Copy failed"
+                : "Copy XML";
 
     const handleCopy = async () => {
         if (!config.xml) {
@@ -175,7 +170,7 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
     };
 
     return (
-        <div className="settings-form">
+        <div>
             <div className="grid two-column">
                 <section
                     className="settings-form-section"

@@ -17,7 +17,6 @@ import {
   listScopes,
   listUsers,
 } from "../api";
-import { getRuleTypeDescription } from "./Applications";
 
 interface ScopeAssignmentRowProps {
   scope: ApplicationScope;
@@ -236,7 +235,7 @@ function TargetSelector({
       type === "group"
         ? (item as DirectoryGroup).display_name
         : (item as DirectoryUser).display_name ||
-          (item as DirectoryUser).principal_name;
+        (item as DirectoryUser).principal_name;
 
     onSelectTarget({
       type,
@@ -396,7 +395,7 @@ function TargetSelector({
                         {activeTab === "groups"
                           ? (item as DirectoryGroup).display_name
                           : (item as DirectoryUser).display_name ||
-                            (item as DirectoryUser).principal_name}
+                          (item as DirectoryUser).principal_name}
                       </div>
                       {activeTab === "users" &&
                         (item as DirectoryUser).display_name && (
@@ -552,8 +551,7 @@ export default function ApplicationDetails() {
 
     if (existingScope) {
       setAssignmentError(
-        `${selectedTarget.type === "group" ? "Group" : "User"} "${selectedTarget.name}" already has a ${
-          existingScope.action
+        `${selectedTarget.type === "group" ? "Group" : "User"} "${selectedTarget.name}" already has a ${existingScope.action
         } rule assigned. Remove the existing assignment first.`,
       );
       return;
@@ -715,7 +713,6 @@ export default function ApplicationDetails() {
         >
           <span
             className={`rule-chip rule-chip-${app.rule_type.toLowerCase()}`}
-            title={getRuleTypeDescription(app.rule_type)}
           >
             {app.rule_type}
           </span>

@@ -10,5 +10,4 @@ export { default as ApplicationDetails } from "./ApplicationDetails";
 export { default as UserDetails } from "./UserDetails";
 
 // Utility exports
-export { getRuleTypeDescription } from "./Applications";
 export type { SelectedTarget } from "./Applications";

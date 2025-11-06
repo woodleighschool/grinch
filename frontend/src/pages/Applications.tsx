@@ -39,23 +39,6 @@ export interface SelectedTarget {
   name: string;
 }
 
-export function getRuleTypeDescription(ruleType: string): string {
-  switch (ruleType) {
-    case "BINARY":
-      return "Specific binary version";
-    case "CERTIFICATE":
-      return "All binaries from this certificate";
-    case "SIGNINGID":
-      return "All versions with this signing ID";
-    case "TEAMID":
-      return "All apps from this Apple Developer Team";
-    case "CDHASH":
-      return "Specific code directory hash";
-    default:
-      return "";
-  }
-}
-
 export function getIdentifierPlaceholder(ruleType: string): string {
   switch (ruleType) {
     case "BINARY":
@@ -378,7 +361,7 @@ export default function Applications() {
       <div className="card">
         <h2>Add Application Rule</h2>
         <p>
-          Define application rules using Santa-compatible identifiers. Rules can
+          Define application rules using reference-compatible identifiers. Rules can
           then be assigned to groups or users from the application detail page.
         </p>
         {error && (
@@ -398,9 +381,11 @@ export default function Applications() {
                 onChange={(event) =>
                   setForm({ ...form, name: event.target.value })
                 }
-                placeholder="Santa.app"
+                placeholder="Santa"
               />
             </div>
+
+            <div></div>
 
             <div className="app-form-field">
               <label htmlFor="rule_type">Rule Type</label>
@@ -415,7 +400,7 @@ export default function Applications() {
                   })
                 }
               >
-                {["BINARY", "CERTIFICATE", "SIGNINGID", "TEAMID", "CDHASH"].map(
+                {["BINARY", "TEAMID", "SIGNINGID", "CDHASH", "CERTIFICATE"].map(
                   (type) => (
                     <option key={type} value={type}>
                       {type}
@@ -423,9 +408,6 @@ export default function Applications() {
                   ),
                 )}
               </select>
-              <p className="muted-text app-form-helper">
-                {getRuleTypeDescription(form.rule_type)}
-              </p>
             </div>
 
             <div className="app-form-field">
@@ -449,7 +431,7 @@ export default function Applications() {
               />
             </div>
 
-            <div className="app-form-field app-form-field--full">
+            <div className="app-form-field">
               <label htmlFor="description">Description (optional)</label>
               <textarea
                 id="description"
@@ -463,8 +445,11 @@ export default function Applications() {
                 }
                 rows={2}
                 placeholder="Explain why this rule exists or what it covers…"
+                style={{ resize: "none" }}
               />
             </div>
+
+            <div></div>
           </div>
 
           {validationError && (
@@ -491,84 +476,66 @@ export default function Applications() {
         </p>
 
         <div className="field-reference-guide">
-          <div className="santa-output-example-compact">
-            <div className="santa-output-item">
-              <div className="santa-field">
-                <span className="santa-key">SHA-256</span>
-                <span className="santa-separator">:</span>
-                <span className="santa-value">
+          <div className="reference-output-example">
+            <div className="reference-output-item">
+              <div className="reference-field">
+                <span className="reference-key">SHA-256</span>
+                <span className="reference-separator">:</span>
+                <span
+                  className={`reference-value ${form.rule_type === "BINARY" ? "active" : ""}`}
+                >
                   f820d4f4ed9aade09e1810314f21e4152988c54e489245670cc9de5639bc14ef
                 </span>
               </div>
-              <div
-                className={`santa-arrow-compact ${form.rule_type === "BINARY" ? "active" : ""}`}
-              >
-                <span className="arrow-head">→</span>
-                <span className="arrow-label">BINARY</span>
+            </div>
+
+            <div className="reference-output-item">
+              <div className="reference-field">
+                <span className="reference-key">Team ID</span>
+                <span className="reference-separator">:</span>
+                <span
+                  className={`reference-value ${form.rule_type === "TEAMID" ? "active" : ""}`}
+                >
+                  ZMCG7MLDV9
+                </span>
               </div>
             </div>
 
-            <div className="santa-output-item">
-              <div className="santa-field">
-                <span className="santa-key">Team ID</span>
-                <span className="santa-separator">:</span>
-                <span className="santa-value">ZMCG7MLDV9</span>
-              </div>
-              <div
-                className={`santa-arrow-compact ${form.rule_type === "TEAMID" ? "active" : ""}`}
-              >
-                <span className="arrow-head">→</span>
-                <span className="arrow-label">TEAMID</span>
-              </div>
-            </div>
-
-            <div className="santa-output-item">
-              <div className="santa-field">
-                <span className="santa-key">Signing ID</span>
-                <span className="santa-separator">:</span>
-                <span className="santa-value">
+            <div className="reference-output-item">
+              <div className="reference-field">
+                <span className="reference-key">Signing ID</span>
+                <span className="reference-separator">:</span>
+                <span
+                  className={`reference-value ${form.rule_type === "SIGNINGID" ? "active" : ""}`}
+                >
                   ZMCG7MLDV9:com.northpolesec.santa
                 </span>
               </div>
-              <div
-                className={`santa-arrow-compact ${form.rule_type === "SIGNINGID" ? "active" : ""}`}
-              >
-                <span className="arrow-head">→</span>
-                <span className="arrow-label">SIGNINGID</span>
-              </div>
             </div>
 
-            <div className="santa-output-item">
-              <div className="santa-field">
-                <span className="santa-key">CDHash</span>
-                <span className="santa-separator">:</span>
-                <span className="santa-value">
+            <div className="reference-output-item">
+              <div className="reference-field">
+                <span className="reference-key">CDHash</span>
+                <span className="reference-separator">:</span>
+                <span
+                  className={`reference-value ${form.rule_type === "CDHASH" ? "active" : ""}`}
+                >
                   a9fdcbc0427a0a585f91bbc7342c261c8ead1942
                 </span>
               </div>
-              <div
-                className={`santa-arrow-compact ${form.rule_type === "CDHASH" ? "active" : ""}`}
-              >
-                <span className="arrow-head">→</span>
-                <span className="arrow-label">CDHASH</span>
-              </div>
             </div>
 
-            <div className="santa-output-section">
-              <span className="santa-section-title">Signing Chain:</span>
-              <div className="santa-output-item indented">
-                <div className="santa-field">
-                  <span className="santa-key">1. SHA-256</span>
-                  <span className="santa-separator">:</span>
-                  <span className="santa-value">
+            <div>
+              <span className="reference-section-title">Signing Chain:</span>
+              <div className="reference-output-item indented">
+                <div className="reference-field">
+                  <span className="reference-key">1. SHA-256</span>
+                  <span className="reference-separator">:</span>
+                  <span
+                    className={`reference-value ${form.rule_type === "CERTIFICATE" ? "active" : ""}`}
+                  >
                     1afd16f5b920f0d3b5f841aace6e948d6190ea8b5156b02deb36572d1d082f64
                   </span>
-                </div>
-                <div
-                  className={`santa-arrow-compact ${form.rule_type === "CERTIFICATE" ? "active" : ""}`}
-                >
-                  <span className="arrow-head">→</span>
-                  <span className="arrow-label">CERTIFICATE</span>
                 </div>
               </div>
             </div>
@@ -690,7 +657,6 @@ export default function Applications() {
                           <h3 className="assignment-card-title">{app.name}</h3>
                           <span
                             className={`rule-chip rule-chip-${app.rule_type.toLowerCase()}`}
-                            title={getRuleTypeDescription(app.rule_type)}
                           >
                             {app.rule_type}
                           </span>

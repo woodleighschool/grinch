@@ -50,30 +50,43 @@ export default function App() {
   return (
     <div className="app-container">
       <nav className="navbar">
-        <div>
-          <Link to="/">🎄 Grinch</Link>
+        <div className="navbar-brand">
+          <Link to="/" className="brand-link">
+            <span className="brand-icon">🎄</span>
+            <span className="brand-text">Grinch</span>
+          </Link>
         </div>
         <div className="nav-links">
-          <NavLink to="/" end>
-            Dashboard
+          <NavLink to="/" end className="nav-link">
+            <span className="nav-icon">📊</span>
+            <span>Dashboard</span>
           </NavLink>
-          <NavLink to="/applications">Applications</NavLink>
-          <NavLink to="/users">Users</NavLink>
-          <NavLink to="/devices">Devices</NavLink>
+          <NavLink to="/applications" className="nav-link">
+            <span className="nav-icon">📱</span>
+            <span>Applications</span>
+          </NavLink>
+          <NavLink to="/users" className="nav-link">
+            <span className="nav-icon">👥</span>
+            <span>Users</span>
+          </NavLink>
+          <NavLink to="/devices" className="nav-link">
+            <span className="nav-icon">💻</span>
+            <span>Devices</span>
+          </NavLink>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
-          <NavLink to="/settings" title="Settings">
-            ⚙️
+        <div className="navbar-actions">
+          <NavLink to="/settings" className="settings-link" title="Settings">
+            <span className="settings-icon">⚙️</span>
           </NavLink>
-          <span>{user.display_name ?? user.principal_name}</span>
-          <button className="secondary" onClick={handleLogout}>
-            Logout
+          <div className="user-info">
+            <div className="user-avatar">
+              {(user.display_name ?? user.principal_name)?.[0]?.toUpperCase() ?? 'U'}
+            </div>
+            <span className="user-name">{user.display_name ?? user.principal_name}</span>
+          </div>
+          <button className="logout-btn" onClick={handleLogout}>
+            <span className="logout-icon">🚪</span>
+            <span>Logout</span>
           </button>
         </div>
       </nav>
