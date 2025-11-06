@@ -163,6 +163,7 @@ func (s *Server) Routes() http.Handler {
 			r.Get("/apps", s.handleListApplications)
 			r.Get("/apps/check", s.handleCheckApplicationExists)
 			r.Post("/apps", s.handleCreateApplication)
+			r.Patch("/apps/{id}", s.handleUpdateApplication)
 			r.Delete("/apps/{id}", s.handleDeleteApplication)
 			r.Get("/apps/{id}/scopes", s.handleListApplicationScopes)
 			r.Post("/apps/{id}/scopes", s.handleCreateScope)
@@ -442,6 +443,7 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 		RuleType:    payload.RuleType,
 		Identifier:  payload.Identifier,
 		Description: payload.Description,
+		Enabled:     true,
 	}
 	created, err := s.store.CreateApplication(r.Context(), app)
 	if err != nil {
@@ -468,6 +470,40 @@ func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
+	logger := s.logOperation(r, "update_application")
+	appID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		logger.Warn("invalid application ID", "error", err)
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var payload struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		logger.Warn("failed to decode update application payload", "error", err)
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	updated, err := s.store.UpdateApplication(r.Context(), appID, payload.Enabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("application not found", "application_id", appID)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		logger.Error("failed to update application", "error", err, "application_id", appID)
+		http.Error(w, "update app", http.StatusInternalServerError)
+		return
+	}
+
+	logger.Info("application updated", "application_id", appID, "enabled", payload.Enabled)
+	s.writeJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) handleListApplicationScopes(w http.ResponseWriter, r *http.Request) {

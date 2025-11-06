@@ -948,7 +948,7 @@ func (s *Store) ReplaceGroupMemberships(ctx context.Context, groupID uuid.UUID, 
 
 func (s *Store) ListApplications(ctx context.Context) ([]models.Application, error) {
 	const q = `
-		SELECT id, name, rule_type, identifier, description, created_at, updated_at
+		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
 		FROM applications ORDER BY created_at DESC;
 	`
 	rows, err := s.pool.Query(ctx, q)
@@ -969,6 +969,7 @@ func (s *Store) ListApplications(ctx context.Context) ([]models.Application, err
 			&app.RuleType,
 			&app.Identifier,
 			&dbDescription,
+			&app.Enabled,
 			&app.CreatedAt,
 			&app.UpdatedAt,
 		); err != nil {
@@ -984,7 +985,7 @@ func (s *Store) ListApplications(ctx context.Context) ([]models.Application, err
 
 func (s *Store) GetApplicationByIdentifier(ctx context.Context, identifier string) (*models.Application, error) {
 	const q = `
-		SELECT id, name, rule_type, identifier, description, created_at, updated_at
+		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
 		FROM applications WHERE identifier = $1;
 	`
 	var (
@@ -998,6 +999,7 @@ func (s *Store) GetApplicationByIdentifier(ctx context.Context, identifier strin
 		&app.RuleType,
 		&app.Identifier,
 		&dbDescription,
+		&app.Enabled,
 		&app.CreatedAt,
 		&app.UpdatedAt,
 	); err != nil {
@@ -1011,11 +1013,15 @@ func (s *Store) GetApplicationByIdentifier(ctx context.Context, identifier strin
 
 func (s *Store) CreateApplication(ctx context.Context, app models.Application) (*models.Application, error) {
 	const q = `
-		INSERT INTO applications (name, rule_type, identifier, description, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		INSERT INTO applications (name, rule_type, identifier, description, enabled, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
 		RETURNING id, created_at, updated_at;
 	`
-	row := s.pool.QueryRow(ctx, q, app.Name, app.RuleType, app.Identifier, app.Description)
+	// Default enabled to true if not set
+	if !app.Enabled {
+		app.Enabled = true
+	}
+	row := s.pool.QueryRow(ctx, q, app.Name, app.RuleType, app.Identifier, app.Description, app.Enabled)
 	if err := row.Scan(&app.ID, &app.CreatedAt, &app.UpdatedAt); err != nil {
 		return nil, err
 	}
@@ -1032,6 +1038,36 @@ func (s *Store) DeleteApplication(ctx context.Context, id uuid.UUID) error {
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func (s *Store) UpdateApplication(ctx context.Context, id uuid.UUID, enabled bool) (*models.Application, error) {
+	const q = `
+		UPDATE applications 
+		SET enabled = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, name, rule_type, identifier, description, enabled, created_at, updated_at;
+	`
+	var (
+		app           models.Application
+		dbDescription sql.NullString
+	)
+	row := s.pool.QueryRow(ctx, q, id, enabled)
+	if err := row.Scan(
+		&app.ID,
+		&app.Name,
+		&app.RuleType,
+		&app.Identifier,
+		&dbDescription,
+		&app.Enabled,
+		&app.CreatedAt,
+		&app.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	if dbDescription.Valid {
+		app.Description = dbDescription.String
+	}
+	return &app, nil
 }
 
 func (s *Store) AddApplicationScope(ctx context.Context, scope models.ApplicationScope) (*models.ApplicationScope, error) {
@@ -1207,7 +1243,7 @@ func (s *Store) ApplicationsByIDs(ctx context.Context, ids []uuid.UUID) (map[uui
 		return map[uuid.UUID]models.Application{}, nil
 	}
 	const q = `
-		SELECT id, name, rule_type, identifier, description, created_at, updated_at
+		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
 		FROM applications
 		WHERE id = ANY($1);
 	`
@@ -1223,7 +1259,7 @@ func (s *Store) ApplicationsByIDs(ctx context.Context, ids []uuid.UUID) (map[uui
 			app           models.Application
 			dbDescription sql.NullString
 		)
-		if err := rows.Scan(&app.ID, &app.Name, &app.RuleType, &app.Identifier, &dbDescription, &app.CreatedAt, &app.UpdatedAt); err != nil {
+		if err := rows.Scan(&app.ID, &app.Name, &app.RuleType, &app.Identifier, &dbDescription, &app.Enabled, &app.CreatedAt, &app.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if dbDescription.Valid {

@@ -62,12 +62,14 @@ CREATE TABLE applications (
     rule_type TEXT NOT NULL,
     identifier TEXT NOT NULL,
     description TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX idx_applications_identifier ON applications (identifier);
+CREATE INDEX idx_applications_enabled ON applications (enabled);
 
 CREATE TABLE application_scopes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

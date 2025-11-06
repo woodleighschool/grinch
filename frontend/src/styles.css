@@ -406,6 +406,116 @@ button.secondary {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
+.grid.equal-split {
+    grid-template-columns: 1fr 1fr;
+}
+
+/* Application form grid */
+.app-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.app-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.app-form-field--full {
+    grid-column: 1 / -1;
+}
+
+.app-form-helper {
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Compact santa output styling */
+.santa-output-example-compact {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+        "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.santa-output-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    min-height: 24px;
+}
+
+.santa-output-item.indented {
+    margin-left: 20px;
+}
+
+.santa-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.santa-arrow-compact {
+    display: flex;
+    align-items: center;
+    opacity: 0.3;
+    transition: all 0.3s ease;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+.santa-arrow-compact.active {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.santa-arrow-compact .arrow-head {
+    color: var(--stat-success-text);
+    font-size: 16px;
+    font-weight: bold;
+    margin-right: 6px;
+}
+
+.santa-arrow-compact .arrow-label {
+    color: var(--stat-warning-text);
+    font-weight: bold;
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--stat-warning-bg);
+    border: 1px solid var(--stat-warning-border);
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.santa-arrow-compact.active .arrow-label {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
+}
+
+@media (max-width: 768px) {
+    .grid.equal-split {
+        grid-template-columns: 1fr;
+    }
+    
+    .app-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Applications dropdown styling */
 .target-selector-dropdown {
     position: absolute;
@@ -776,52 +886,24 @@ button.secondary {
     margin-top: 16px;
 }
 
-.santa-output-example {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-primary);
-    border-radius: 8px;
-    padding: 16px;
-    font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
-        "Courier New", monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    margin-bottom: 16px;
-    overflow-x: auto;
-}
-
-.santa-output-line {
-    display: grid;
-    grid-template-columns: 120px 20px 1fr 180px;
-    align-items: center;
-    margin-bottom: 4px;
-    position: relative;
-    min-height: 24px;
-    gap: 8px;
-}
-
-.santa-output-line.indented {
-    margin-left: 20px;
-}
-
 .santa-key {
     color: var(--stat-info-text);
     font-weight: 600;
-    justify-self: start;
 }
 
 .santa-separator {
     color: var(--stat-success-text);
     font-weight: bold;
-    justify-self: center;
 }
 
 .santa-value {
     color: var(--stat-info-text);
     font-weight: 500;
     word-break: break-all;
-    justify-self: start;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
 }
 
 .assignment-card-expanded-details {
@@ -843,65 +925,6 @@ button.secondary {
     font-weight: bold;
     display: block;
     margin-bottom: 8px;
-    grid-column: 1 / -1;
-}
-
-.santa-arrow {
-    justify-self: start;
-    display: flex;
-    align-items: center;
-    opacity: 0.3;
-    transition: all 0.3s ease;
-    z-index: 10;
-}
-
-.santa-arrow.active {
-    opacity: 1;
-    transform: scale(1.1);
-}
-
-.arrow-line {
-    width: 40px;
-    height: 2px;
-    background: linear-gradient(
-        90deg,
-        var(--stat-info-text),
-        var(--stat-success-text)
-    );
-    border-radius: 1px;
-    box-shadow: 0 0 4px var(--shadow);
-}
-
-.santa-arrow.active .arrow-line {
-    animation: pulse-glow 2s ease-in-out infinite alternate;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
-}
-
-.arrow-head {
-    color: var(--stat-success-text);
-    font-size: 16px;
-    font-weight: bold;
-    margin-left: 4px;
-    text-shadow: 0 0 4px var(--shadow);
-}
-
-.arrow-label {
-    color: var(--stat-warning-text);
-    font-weight: bold;
-    font-size: 11px;
-    margin-left: 8px;
-    padding: 2px 6px;
-    background: var(--stat-warning-bg);
-    border: 1px solid var(--stat-warning-border);
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.santa-arrow.active .arrow-label {
-    background: rgba(245, 158, 11, 0.2);
-    border-color: rgba(245, 158, 11, 0.5);
-    box-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
 }
 
 .assignment-form {

@@ -342,6 +342,7 @@ type Application struct {
 	RuleType    string    `json:"rule_type"`
 	Identifier  string    `json:"identifier"`
 	Description string    `json:"description,omitempty"`
+	Enabled     bool      `json:"enabled"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
