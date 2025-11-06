@@ -148,14 +148,8 @@ async function handleResponse<T>(res: Response): Promise<T> {
       const errorData: ApiError = JSON.parse(text);
 
       // Handle duplicate identifier error specifically
-      if (
-        errorData.error === "DUPLICATE_IDENTIFIER" &&
-        errorData.existing_application
-      ) {
-        throw new ApplicationDuplicateError(
-          errorData.message,
-          errorData.existing_application,
-        );
+      if (errorData.error === "DUPLICATE_IDENTIFIER" && errorData.existing_application) {
+        throw new ApplicationDuplicateError(errorData.message, errorData.existing_application);
       }
 
       // For other structured errors, throw with the message
@@ -193,15 +187,10 @@ export async function listApplications(): Promise<Application[]> {
   return handleResponse<Application[]>(res);
 }
 
-export async function checkApplicationExists(
-  identifier: string,
-): Promise<Application | null> {
-  const res = await fetch(
-    `/api/apps/check?identifier=${encodeURIComponent(identifier)}`,
-    {
-      credentials: "include",
-    },
-  );
+export async function checkApplicationExists(identifier: string): Promise<Application | null> {
+  const res = await fetch(`/api/apps/check?identifier=${encodeURIComponent(identifier)}`, {
+    credentials: "include",
+  });
   if (res.status === 404) {
     return null;
   }
@@ -233,10 +222,7 @@ export async function deleteApplication(appId: string): Promise<void> {
   }
 }
 
-export async function updateApplication(
-  appId: string,
-  payload: { enabled: boolean },
-): Promise<Application> {
+export async function updateApplication(appId: string, payload: { enabled: boolean }): Promise<Application> {
   const res = await fetch(`/api/apps/${appId}`, {
     method: "PATCH",
     credentials: "include",
@@ -270,10 +256,7 @@ export async function createScope(
   return handleResponse<ApplicationScope>(res);
 }
 
-export async function deleteScope(
-  appId: string,
-  scopeId: string,
-): Promise<void> {
+export async function deleteScope(appId: string, scopeId: string): Promise<void> {
   const res = await fetch(`/api/apps/${appId}/scopes/${scopeId}`, {
     method: "DELETE",
     credentials: "include",
@@ -300,9 +283,7 @@ export async function listUsers(): Promise<DirectoryUser[]> {
   return handleResponse<DirectoryUser[]>(res);
 }
 
-export async function getUserDetails(
-  userId: string,
-): Promise<UserDetailResponse> {
+export async function getUserDetails(userId: string): Promise<UserDetailResponse> {
   const res = await fetch(`/api/users/${userId}`, { credentials: "include" });
   return handleResponse<UserDetailResponse>(res);
 }
@@ -317,9 +298,7 @@ export async function listBlocked(): Promise<BlockedEvent[]> {
   return handleResponse<BlockedEvent[]>(res);
 }
 
-export function subscribeBlockedEvents(
-  onEvent: (event: BlockedEvent) => void,
-): () => void {
+export function subscribeBlockedEvents(onEvent: (event: BlockedEvent) => void): () => void {
   const source = new EventSource("/api/events/blocked/stream", {
     withCredentials: true,
   });

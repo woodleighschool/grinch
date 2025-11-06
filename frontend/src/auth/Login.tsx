@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { ApiUser, getAuthProviders } from "../api";
+import { Icons } from "../components/Icons";
+import { Button } from "../components/Button";
 
 interface LoginProps {
-  onLogin: (user: ApiUser) => void;
+  onLogin: () => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -70,7 +72,7 @@ export default function Login({ onLogin }: LoginProps) {
       }
 
       const user = await response.json();
-      onLogin(user);
+      onLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -83,7 +85,9 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     <div className="center-page">
       <div className="card" style={{ maxWidth: "480px", width: "100%" }}>
-        <h1>🎄 Grinch</h1>
+        <h1>
+          <Icons.Brand /> Grinch
+        </h1>
         <p>Manage Santa rules and monitor blocked executions.</p>
 
         {error && (
@@ -107,9 +111,8 @@ export default function Login({ onLogin }: LoginProps) {
               Sign in with OAuth
             </a>
 
-            <button
-              type="button"
-              className="secondary"
+            <Button
+              variant="secondary"
               onClick={() => setShowLocalLogin(true)}
               style={{
                 width: "100%",
@@ -117,7 +120,7 @@ export default function Login({ onLogin }: LoginProps) {
               }}
             >
               Local Administrator Login
-            </button>
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleLocalLogin} style={{ marginTop: "24px" }}>
@@ -164,19 +167,19 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>
-              <button
+              <Button
                 type="submit"
-                className="primary"
+                variant="primary"
                 disabled={loading || !username.trim() || !password.trim()}
                 style={{ flex: 1 }}
+                loading={loading}
               >
-                {loading ? "Signing in..." : "Sign In"}
-              </button>
+                Sign In
+              </Button>
 
               {oauthEnabled && (
-                <button
-                  type="button"
-                  className="secondary"
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     setShowLocalLogin(false);
                     setError(null);
@@ -186,7 +189,7 @@ export default function Login({ onLogin }: LoginProps) {
                   disabled={loading}
                 >
                   Back
-                </button>
+                </Button>
               )}
             </div>
           </form>
@@ -194,20 +197,11 @@ export default function Login({ onLogin }: LoginProps) {
 
         <div className="panel-footer">
           {showOAuthPanel ? (
-            <>
-              Choose your preferred sign-in method. Local login is available for
-              system administrators.
-            </>
+            <>Choose your preferred sign-in method. Local login is available for system administrators.</>
           ) : oauthEnabled ? (
-            <>
-              Use your local administrator credentials to sign in and configure
-              system settings.
-            </>
+            <>Use your local administrator credentials to sign in and configure system settings.</>
           ) : (
-            <>
-              OAuth sign-in is disabled. Use your local administrator
-              credentials to access Grinch.
-            </>
+            <>OAuth sign-in is disabled. Use your local administrator credentials to access Grinch.</>
           )}
         </div>
       </div>

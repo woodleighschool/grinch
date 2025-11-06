@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { formatDateTime, formatCompactDateTime } from "../utils/dates";
+import { Badge } from "../components/Badge";
+import { Button } from "../components/Button";
 import type { DirectoryUser, UserDetailResponse } from "../api";
 import { getUserDetails } from "../api";
 
@@ -12,31 +15,6 @@ function capitalize(value: string): string {
     return "";
   }
   return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatDateTime(value?: string): string {
-  if (!value) {
-    return "—";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString();
-}
-
-function formatEventTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 interface SummaryProps {
@@ -87,29 +65,11 @@ function UserSummary({ user }: SummaryProps) {
           marginBottom: "16px",
         }}
       >
-        <span className="badge secondary">{capitalize(user.user_type)}</span>
-        {user.user_type === "local" && user.is_protected_local && (
-          <span className="badge secondary">Protected</span>
-        )}
-        {user.role_groups && user.role_groups.length > 0 && (
-          <span className="badge secondary">
-            Roles: {user.role_groups.join(", ")}
-          </span>
-        )}
-        <span className="summary-pill neutral" title="Account created">
-          <span className="summary-pill-label">Created</span>
-          <span className="summary-pill-value">
-            {formatDateTime(user.created_at)}
-          </span>
-        </span>
-        {user.synced_at && (
-          <span className="summary-pill neutral" title="Last sync">
-            <span className="summary-pill-label">Last Synced</span>
-            <span className="summary-pill-value">
-              {formatDateTime(user.synced_at)}
-            </span>
-          </span>
-        )}
+        <Badge variant="secondary">{capitalize(user.user_type)}</Badge>
+        {user.user_type === "local" && user.is_protected_local && <Badge variant="secondary">Protected</Badge>}
+        {user.role_groups && user.role_groups.length > 0 && <Badge variant="secondary">Roles: {user.role_groups.join(", ")}</Badge>}
+        <Badge size="md" variant="neutral" label="Created" value={formatDateTime(user.created_at)} caps />
+        {user.synced_at && <Badge size="md" variant="neutral" label="Last Synced" value={formatDateTime(user.synced_at)} caps />}
       </div>
     </div>
   );
@@ -139,9 +99,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
         </h3>
         {groups.length === 0 ? (
           <div className="empty-state">
-            <p style={{ margin: 0 }}>
-              This user is not assigned to any groups.
-            </p>
+            <p style={{ margin: 0 }}>This user is not assigned to any groups.</p>
           </div>
         ) : (
           <div
@@ -152,9 +110,9 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
             }}
           >
             {groups.map((group) => (
-              <span key={group.id} className="badge secondary">
+              <Badge key={group.id} variant="secondary">
                 {group.display_name}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
@@ -193,11 +151,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                     <td>
                       <span className="principal-box">{device.machine_id}</span>
                     </td>
-                    <td>
-                      {device.last_seen
-                        ? formatDateTime(device.last_seen)
-                        : "—"}
-                    </td>
+                    <td>{device.last_seen ? formatDateTime(device.last_seen) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -218,9 +172,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
         </h3>
         {events.length === 0 ? (
           <div className="empty-state">
-            <p style={{ margin: 0 }}>
-              No recent Santa events recorded for this user.
-            </p>
+            <p style={{ margin: 0 }}>No recent Santa events recorded for this user.</p>
           </div>
         ) : (
           <div
@@ -256,8 +208,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                     marginBottom: "4px",
                   }}
                 >
-                  {event.hostname ? `Host: ${event.hostname}` : "Host: —"} ·{" "}
-                  {formatEventTime(event.occurred_at)}
+                  {event.hostname ? `Host: ${event.hostname}` : "Host: —"} · {formatCompactDateTime(event.occurred_at)}
                 </div>
                 <div
                   style={{
@@ -266,9 +217,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                   }}
                 >
                   Decision: {event.decision || "Unknown"}
-                  {event.blocked_reason
-                    ? ` · Reason: ${event.blocked_reason}`
-                    : ""}
+                  {event.blocked_reason ? ` · Reason: ${event.blocked_reason}` : ""}
                 </div>
               </div>
             ))}
@@ -326,15 +275,9 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                       flexWrap: "wrap",
                     }}
                   >
-                    <span className="badge secondary">{policy.rule_type}</span>
-                    <span className="badge secondary">
-                      {policy.action.toUpperCase()}
-                    </span>
-                    {policy.via_group && (
-                      <span className="badge secondary">
-                        Via group: {policy.target_name || policy.target_id}
-                      </span>
-                    )}
+                    <Badge variant="secondary">{policy.rule_type}</Badge>
+                    <Badge variant="secondary">{policy.action.toUpperCase()}</Badge>
+                    {policy.via_group && <Badge variant="secondary">Via group: {policy.target_name || policy.target_id}</Badge>}
                   </div>
                 </div>
                 <div
@@ -344,8 +287,7 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                     marginBottom: "4px",
                   }}
                 >
-                  Identifier:{" "}
-                  <span className="principal-box">{policy.identifier}</span>
+                  Identifier: <span className="principal-box">{policy.identifier}</span>
                 </div>
                 {!policy.via_group && (
                   <div
@@ -402,11 +344,7 @@ export default function UserDetails() {
         <div className="card">
           <h2>User Details</h2>
           <p className="error-text">{error}</p>
-          <Link
-            to="/users"
-            className="primary"
-            style={{ textDecoration: "none", marginTop: "12px" }}
-          >
+          <Link to="/users" className="primary" style={{ textDecoration: "none", marginTop: "12px" }}>
             Back to users
           </Link>
         </div>
@@ -420,11 +358,7 @@ export default function UserDetails() {
         <div className="card">
           <h2>User Details</h2>
           <p className="muted-text">User not found.</p>
-          <Link
-            to="/users"
-            className="primary"
-            style={{ textDecoration: "none", marginTop: "12px" }}
-          >
+          <Link to="/users" className="primary" style={{ textDecoration: "none", marginTop: "12px" }}>
             Back to users
           </Link>
         </div>
@@ -435,17 +369,12 @@ export default function UserDetails() {
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
       <div style={{ marginBottom: "24px" }}>
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => navigate(-1)}
-        >
+        <Button variant="secondary" onClick={() => navigate(-1)}>
           ← Back
-        </button>
+        </Button>
         <h2 style={{ marginTop: "16px", marginBottom: "8px" }}>User Details</h2>
         <p className="muted-text" style={{ marginBottom: "24px" }}>
-          View user information, group assignments, devices, and recent
-          activity.
+          View user information, group assignments, devices, and recent activity.
         </p>
       </div>
 

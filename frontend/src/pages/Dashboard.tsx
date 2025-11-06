@@ -1,27 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBlockedEvents } from "../hooks/useBlockedEvents";
-import type {
-  BlockedEvent,
-  DirectoryGroup,
-  DirectoryUser,
-  ApplicationScope,
-} from "../api";
+import { useSearch, searchConfigs } from "../hooks/useSearch";
+import { formatDateTime } from "../utils/dates";
+import { Badge } from "../components/Badge";
+import { Button } from "../components/Button";
+import type { BlockedEvent, DirectoryGroup, DirectoryUser, ApplicationScope } from "../api";
 import { listGroups, listUsers, listApplications, listScopes } from "../api";
-
-function formatDate(input: string) {
-  return new Date(input).toLocaleString();
-}
 
 function renderRow(event: BlockedEvent) {
   return (
     <tr key={event.id}>
-      <td>{formatDate(event.occurred_at)}</td>
+      <td>{formatDateTime(event.occurred_at)}</td>
       <td>{event.process_path}</td>
       <td>{event.signer || "Unsigned"}</td>
       <td>
-        <span className="badge danger">
-          {event.blocked_reason || "Blocked"}
-        </span>
+        <Badge variant="danger">{event.blocked_reason || "Blocked"}</Badge>
       </td>
     </tr>
   );
@@ -34,34 +27,28 @@ interface DirectoryStatsProps {
 }
 
 function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "groups" | "users">(
-    "overview",
-  );
-  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "groups" | "users">("overview");
 
-  const filteredGroups = useMemo(
-    () =>
-      groups
-        .filter((g) =>
-          g.display_name.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
-        .slice(0, 20),
-    [groups, searchTerm],
-  );
+  const {
+    searchTerm: groupSearchTerm,
+    setSearchTerm: setGroupSearchTerm,
+    filteredItems: filteredGroups,
+    clearSearch: clearGroupSearch,
+    isSearching: isSearchingGroups,
+  } = useSearch(groups.slice(0, 20), searchConfigs.groups);
 
-  const filteredUsers = useMemo(
-    () =>
-      users
-        .filter(
-          (u) =>
-            (u.display_name || u.principal_name)
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()) ||
-            u.principal_name.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
-        .slice(0, 20),
-    [users, searchTerm],
-  );
+  const {
+    searchTerm: userSearchTerm,
+    setSearchTerm: setUserSearchTerm,
+    filteredItems: filteredUsers,
+    clearSearch: clearUserSearch,
+    isSearching: isSearchingUsers,
+  } = useSearch(users.slice(0, 20), searchConfigs.users);
+
+  // Use the appropriate search state based on active tab
+  const searchTerm = activeTab === "groups" ? groupSearchTerm : userSearchTerm;
+  const setSearchTerm = activeTab === "groups" ? setGroupSearchTerm : setUserSearchTerm;
+  const isSearching = activeTab === "groups" ? isSearchingGroups : isSearchingUsers;
 
   return (
     <div className="card">
@@ -69,43 +56,29 @@ function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
       <p>Manage access to applications through Entra ID groups and users.</p>
 
       <div className="stats-row">
-        <div className="stat-bubble info">
-          <span className="stat-bubble-value">{groups.length}</span>
-          <span className="stat-bubble-label">Groups</span>
-        </div>
-        <div className="stat-bubble success">
-          <span className="stat-bubble-value">{users.length}</span>
-          <span className="stat-bubble-label">Users</span>
-        </div>
-        <div className="stat-bubble warning">
-          <span className="stat-bubble-value">{totalScopes}</span>
-          <span className="stat-bubble-label">Active Rules</span>
-        </div>
+        <Badge size="lg" variant="info" value={groups.length} label="Groups" caps />
+        <Badge size="lg" variant="success" value={users.length} label="Users" caps />
+        <Badge size="lg" variant="warning" value={totalScopes} label="Active Rules" caps />
       </div>
 
       <div className="toolbar" style={{ marginBottom: "16px" }}>
         {(["overview", "groups", "users"] as const).map((tab) => (
-          <button
+          <Button
             key={tab}
-            type="button"
-            className={activeTab === tab ? "primary" : "secondary"}
+            variant={activeTab === tab ? "primary" : "secondary"}
             onClick={() => setActiveTab(tab)}
             style={{ padding: "8px 16px", fontSize: "14px" }}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
+          </Button>
         ))}
       </div>
 
       {activeTab === "overview" && (
         <div className="empty-state">
+          <p>Use the Applications page to assign applications to specific groups or users.</p>
           <p>
-            Use the Applications page to assign applications to specific groups
-            or users.
-          </p>
-          <p>
-            <strong>Tip:</strong> Start with groups for broader access control,
-            then use individual users for exceptions.
+            <strong>Tip:</strong> Start with groups for broader access control, then use individual users for exceptions.
           </p>
         </div>
       )}
@@ -159,26 +132,20 @@ function DirectoryStats({ groups, users, totalScopes }: DirectoryStatsProps) {
                     }}
                   >
                     <div>{user.display_name || user.principal_name}</div>
-                    {user.display_name &&
-                      user.display_name !== user.principal_name && (
-                        <div
-                          className="muted-text"
-                          style={{ fontSize: "12px" }}
-                        >
-                          {user.principal_name}
-                        </div>
-                      )}
+                    {user.display_name && user.display_name !== user.principal_name && (
+                      <div className="muted-text" style={{ fontSize: "12px" }}>
+                        {user.principal_name}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            {searchTerm &&
-              (activeTab === "groups" ? filteredGroups : filteredUsers)
-                .length === 0 && (
-                <div className="empty-state">
-                  No {activeTab} found matching "{searchTerm}"
-                </div>
-              )}
+            {isSearching && (activeTab === "groups" ? filteredGroups : filteredUsers).length === 0 && (
+              <div className="empty-state">
+                No {activeTab} found matching "{searchTerm}"
+              </div>
+            )}
           </div>
         </>
       )}
@@ -195,11 +162,7 @@ export default function Dashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const [groupsData, usersData, appsData] = await Promise.all([
-          listGroups(),
-          listUsers(),
-          listApplications(),
-        ]);
+        const [groupsData, usersData, appsData] = await Promise.all([listGroups(), listUsers(), listApplications()]);
 
         setGroups(Array.isArray(groupsData) ? groupsData : []);
         setUsers(Array.isArray(usersData) ? usersData : []);
@@ -223,11 +186,7 @@ export default function Dashboard() {
   return (
     <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "1fr" }}>
       <div>
-        <DirectoryStats
-          groups={groups}
-          users={users}
-          totalScopes={totalScopes}
-        />
+        <DirectoryStats groups={groups} users={users} totalScopes={totalScopes} />
       </div>
 
       <div className="card">
@@ -235,9 +194,7 @@ export default function Dashboard() {
         <p>Incoming telemetry from Santa agents appears here instantly.</p>
         {loading && <p>Loading events…</p>}
         {error && <p className="error-text">Failed to load: {error}</p>}
-        {!loading && events.length === 0 && (
-          <p>No blocked launches recorded yet.</p>
-        )}
+        {!loading && events.length === 0 && <p>No blocked launches recorded yet.</p>}
         {events.length > 0 && (
           <table className="table">
             <thead>

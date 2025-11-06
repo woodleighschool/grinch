@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { ColumnDef } from "@tanstack/react-table";
+import { Badge, Table, Button } from "../components";
+import { useSearch, searchConfigs } from "../hooks/useSearch";
 import { Device, listDevices } from "../api";
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  const { searchTerm, setSearchTerm, filteredItems: filteredDevices, clearSearch, isSearching } = useSearch(devices, searchConfigs.devices);
 
   useEffect(() => {
     void loadDevices();
@@ -19,26 +23,6 @@ export default function Devices() {
       setError(err instanceof Error ? err.message : "Failed to load devices");
     }
   }
-
-  const filteredDevices = useMemo(() => {
-    return devices.filter((device) => {
-      const term = searchTerm.trim().toLowerCase();
-      if (!term) {
-        return true;
-      }
-      const target = [
-        device.hostname,
-        device.serial_number,
-        device.machine_id,
-        device.primary_user_principal,
-        device.primary_user_display_name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return target.includes(term);
-    });
-  }, [devices, searchTerm]);
 
   function formatLastSeen(isoString: string) {
     const date = new Date(isoString);
@@ -57,9 +41,7 @@ export default function Devices() {
     }
   }
 
-  function getStatusCategory(
-    lastSeen?: string | null,
-  ): "success" | "warning" | "danger" | "muted" {
+  function getStatusCategory(lastSeen?: string | null): "success" | "warning" | "danger" | "muted" {
     if (!lastSeen) {
       return "muted";
     }
@@ -84,19 +66,94 @@ export default function Devices() {
     return { online, warning, offline, total: devices.length };
   }, [devices]);
 
+  const columns = useMemo<ColumnDef<Device>[]>(
+    () => [
+      {
+        accessorKey: "hostname",
+        header: "Hostname",
+        cell: ({ getValue }) => <span className="principal-box">{getValue() as string}</span>,
+      },
+      {
+        accessorKey: "serial_number",
+        header: "Serial",
+        cell: ({ row }) => <code>{row.original.serial_number ?? row.original.machine_id}</code>,
+      },
+      {
+        accessorKey: "last_seen",
+        header: "Status",
+        cell: ({ getValue, row }) => {
+          const lastSeen = getValue() as string | null;
+          const category = getStatusCategory(lastSeen);
+          return (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <span className={`status-dot ${category}`} />
+              <span
+                className={`status-text ${category}`}
+                style={{
+                  fontWeight: 500,
+                }}
+              >
+                {category === "success" ? "Online" : category === "warning" ? "Inactive" : lastSeen ? "Offline" : "Unknown"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "primary_user_display_name",
+        header: "Primary User",
+        cell: ({ row }) => row.original.primary_user_display_name ?? row.original.primary_user_principal ?? "—",
+      },
+      {
+        accessorKey: "os_version",
+        header: "OS Version",
+        cell: ({ row }) => {
+          const { os_version, os_build } = row.original;
+          return os_version ? (
+            <span>
+              {os_version}
+              {os_build ? ` (${os_build})` : ""}
+            </span>
+          ) : (
+            "—"
+          );
+        },
+      },
+      {
+        accessorKey: "santa_version",
+        header: "Santa Version",
+        cell: ({ getValue }) => {
+          const version = getValue() as string | null;
+          return version ? <Badge variant="secondary">{version}</Badge> : "—";
+        },
+      },
+      {
+        accessorKey: "last_seen",
+        header: "Last Seen",
+        cell: ({ getValue }) => {
+          const lastSeen = getValue() as string | null;
+          return lastSeen ? formatLastSeen(lastSeen) : "Never";
+        },
+      },
+    ],
+    [],
+  );
+
   if (error) {
     return (
       <div className="card">
         <h2>Devices</h2>
         <div className="alert error">
           <p style={{ margin: 0 }}>{error}</p>
-          <button
-            className="secondary"
-            style={{ marginTop: "12px" }}
-            onClick={() => void loadDevices()}
-          >
+          <Button variant="secondary" style={{ marginTop: "12px" }} onClick={() => void loadDevices()}>
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -105,24 +162,12 @@ export default function Devices() {
   return (
     <div className="card">
       <h2>Devices</h2>
-      <p>
-        Monitor and manage Santa agents deployed across your organization's
-        devices.
-      </p>
+      <p>Monitor and manage Santa agents deployed across your organization's devices.</p>
 
-      <div className="stat-bubble-row">
-        <div className="stat-bubble success">
-          <span className="stat-bubble-value">{statusCounts.online}</span>
-          <span className="stat-bubble-label">Online</span>
-        </div>
-        <div className="stat-bubble danger">
-          <span className="stat-bubble-value">{statusCounts.offline}</span>
-          <span className="stat-bubble-label">Offline</span>
-        </div>
-        <div className="stat-bubble info">
-          <span className="stat-bubble-value">{statusCounts.total}</span>
-          <span className="stat-bubble-label">Total Devices</span>
-        </div>
+      <div className="badge-row">
+        <Badge size="lg" variant="success" value={statusCounts.online} label="Online" caps />
+        <Badge size="lg" variant="danger" value={statusCounts.offline} label="Offline" caps />
+        <Badge size="lg" variant="info" value={statusCounts.total} label="Total Devices" caps />
       </div>
 
       <div
@@ -143,18 +188,14 @@ export default function Devices() {
             maxWidth: "300px",
           }}
         />
-        <button
-          className="primary"
-          style={{ marginLeft: "16px" }}
-          onClick={() => void loadDevices()}
-        >
+        <Button variant="primary" style={{ marginLeft: "16px" }} onClick={() => void loadDevices()}>
           Refresh
-        </button>
+        </Button>
       </div>
 
       {filteredDevices.length === 0 ? (
         <div className="empty-state">
-          {searchTerm ? (
+          {isSearching ? (
             <>
               <h3>No devices found</h3>
               <p>No devices match the search term "{searchTerm}"</p>
@@ -167,94 +208,15 @@ export default function Devices() {
           )}
         </div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Hostname</th>
-                <th>Serial</th>
-                <th>Status</th>
-                <th>Primary User</th>
-                <th>OS Version</th>
-                <th>Santa Version</th>
-                <th>Last Seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDevices.map((device) => (
-                <tr key={device.id}>
-                  <td>
-                    <span className="principal-box">{device.hostname}</span>
-                  </td>
-                  <td>
-                    <code>{device.serial_number ?? device.machine_id}</code>
-                  </td>
-                  <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      {(() => {
-                        const category = getStatusCategory(device.last_seen);
-                        return (
-                          <>
-                            <span className={`status-dot ${category}`} />
-                            <span
-                              className={`status-text ${category}`}
-                              style={{
-                                fontWeight: 500,
-                              }}
-                            >
-                              {category === "success"
-                                ? "Online"
-                                : category === "warning"
-                                  ? "Inactive"
-                                  : device.last_seen
-                                    ? "Offline"
-                                    : "Unknown"}
-                            </span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                  <td>
-                    {device.primary_user_display_name ??
-                      device.primary_user_principal ??
-                      "—"}
-                  </td>
-                  <td>
-                    {device.os_version ? (
-                      <span>
-                        {device.os_version}
-                        {device.os_build ? ` (${device.os_build})` : ""}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    {device.santa_version ? (
-                      <span className="badge secondary">
-                        {device.santa_version}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    {device.last_seen
-                      ? formatLastSeen(device.last_seen)
-                      : "Never"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          data={filteredDevices}
+          columns={columns}
+          globalFilter={searchTerm}
+          sorting={true}
+          filtering={true}
+          pagination={filteredDevices.length > 10}
+          pageSize={10}
+        />
       )}
     </div>
   );

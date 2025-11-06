@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type {
-  Application,
-  ApplicationScope,
-  DirectoryGroup,
-  DirectoryUser,
-  GroupMembership,
-} from "../api";
+import { Badge } from "../components/Badge";
+import { Icons } from "../components/Icons";
+import { ConfirmDialog, Button } from "../components";
+import { useSearch, searchConfigs } from "../hooks/useSearch";
+import { formatDate } from "../utils/dates";
+import type { Application, ApplicationScope, DirectoryGroup, DirectoryUser, GroupMembership } from "../api";
 import {
   createScope,
   deleteApplication,
@@ -27,21 +26,9 @@ interface ScopeAssignmentRowProps {
   disabled: boolean;
 }
 
-function ScopeAssignmentRow({
-  scope,
-  membersByGroup,
-  usersById,
-  groupsById,
-  onDelete,
-  disabled,
-}: ScopeAssignmentRowProps) {
-  const memberIds =
-    scope.target_type === "group"
-      ? Array.from(new Set(membersByGroup[scope.target_id] ?? []))
-      : [scope.target_id];
-  const memberUsers = memberIds
-    .map((id) => usersById.get(id))
-    .filter((user): user is DirectoryUser => Boolean(user));
+function ScopeAssignmentRow({ scope, membersByGroup, usersById, groupsById, onDelete, disabled }: ScopeAssignmentRowProps) {
+  const memberIds = scope.target_type === "group" ? Array.from(new Set(membersByGroup[scope.target_id] ?? [])) : [scope.target_id];
+  const memberUsers = memberIds.map((id) => usersById.get(id)).filter((user): user is DirectoryUser => Boolean(user));
   const maxDisplayedMembers = 10;
   const displayedMembers = memberUsers.slice(0, maxDisplayedMembers);
   const remainingCount = memberUsers.length - displayedMembers.length;
@@ -62,42 +49,29 @@ function ScopeAssignmentRow({
     <div className="scope-assignment-row">
       <div className="scope-assignment-content">
         <div className="scope-assignment-target">
-          {scope.target_type === "group" ? "👥" : "👤"} {targetName}
+          {scope.target_type === "group" ? <Icons.Group /> : <Icons.User />} {targetName}
         </div>
-        <div className="scope-assignment-date">
-          Added {new Date(scope.created_at).toLocaleDateString()}
-        </div>
+        <div className="scope-assignment-date">Added {formatDate(scope.created_at)}</div>
         {scope.target_type === "group" && (
           <div className="scope-assignment-members">
             {memberUsers.length === 0 ? (
-              <span className="scope-assignment-members-empty">
-                No users in this group
-              </span>
+              <span className="scope-assignment-members-empty">No users in this group</span>
             ) : (
               <div className="scope-assignment-members-list">
                 {displayedMembers.map((user) => (
-                  <span key={user.id} className="badge secondary">
+                  <Badge key={user.id} variant="secondary">
                     {user.display_name || user.principal_name}
-                  </span>
+                  </Badge>
                 ))}
-                {remainingCount > 0 && (
-                  <span className="badge secondary">
-                    +{remainingCount} more
-                  </span>
-                )}
+                {remainingCount > 0 && <Badge variant="secondary">+{remainingCount} more</Badge>}
               </div>
             )}
           </div>
         )}
       </div>
-      <button
-        type="button"
-        className="scope-assignment-remove"
-        onClick={onDelete}
-        disabled={disabled}
-      >
+      <Button variant="danger" size="sm" onClick={onDelete} disabled={disabled}>
         Remove
-      </button>
+      </Button>
     </div>
   );
 }
@@ -130,11 +104,7 @@ function AssignmentSection({
   return (
     <div className={`assignment-group assignment-group-${badgeClass}`}>
       <div className="assignment-group-heading">
-        <span
-          className={`badge ${badgeClass === "allow" ? "success" : "danger"}`}
-        >
-          {label}
-        </span>
+        <span className={`badge ${badgeClass === "allow" ? "success" : "danger"}`}>{label}</span>
         {scopes.length} assignment{scopes.length !== 1 ? "s" : ""}
       </div>
       <div className="assignment-group-list">
@@ -157,45 +127,49 @@ function AssignmentSection({
 interface TargetSelectorProps {
   groups: DirectoryGroup[];
   users: DirectoryUser[];
-  onSelectTarget: (target: {
-    type: "group" | "user";
-    id: string;
-    name: string;
-  }) => void;
+  onSelectTarget: (target: { type: "group" | "user"; id: string; name: string }) => void;
   selectedTarget: { type: "group" | "user"; id: string; name: string } | null;
   onClearSelection: () => void;
   disabled: boolean;
 }
 
-function TargetSelector({
-  groups,
-  users,
-  onSelectTarget,
-  selectedTarget,
-  onClearSelection,
-  disabled,
-}: TargetSelectorProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+function TargetSelector({ groups, users, onSelectTarget, selectedTarget, onClearSelection, disabled }: TargetSelectorProps) {
   const [activeTab, setActiveTab] = useState<"groups" | "users">("groups");
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const {
+    searchTerm: groupSearchTerm,
+    setSearchTerm: setGroupSearchTerm,
+    filteredItems: filteredGroups,
+    clearSearch: clearGroupSearch,
+  } = useSearch(groups, searchConfigs.groups);
+
+  const {
+    searchTerm: userSearchTerm,
+    setSearchTerm: setUserSearchTerm,
+    filteredItems: filteredUsers,
+    clearSearch: clearUserSearch,
+  } = useSearch(users, searchConfigs.users);
+
+  // Use the appropriate search state based on active tab
+  const searchTerm = activeTab === "groups" ? groupSearchTerm : userSearchTerm;
+  const setSearchTerm = activeTab === "groups" ? setGroupSearchTerm : setUserSearchTerm;
+  const clearSearch = activeTab === "groups" ? clearGroupSearch : clearUserSearch;
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setSearchTerm("");
+        clearSearch();
       }
     };
 
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
-        setSearchTerm("");
+        clearSearch();
       }
     };
 
@@ -209,33 +183,11 @@ function TargetSelector({
     }
   }, [isOpen]);
 
-  const filteredGroups = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return groups;
-    return groups.filter((group) =>
-      group.display_name.toLowerCase().includes(term),
-    );
-  }, [groups, searchTerm]);
-
-  const filteredUsers = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return users;
-    return users.filter((user) => {
-      const display = (user.display_name || user.principal_name).toLowerCase();
-      const principal = user.principal_name.toLowerCase();
-      return display.includes(term) || principal.includes(term);
-    });
-  }, [users, searchTerm]);
-
-  const handleSelectItem = (
-    item: DirectoryGroup | DirectoryUser,
-    type: "group" | "user",
-  ) => {
+  const handleSelectItem = (item: DirectoryGroup | DirectoryUser, type: "group" | "user") => {
     const name =
       type === "group"
         ? (item as DirectoryGroup).display_name
-        : (item as DirectoryUser).display_name ||
-        (item as DirectoryUser).principal_name;
+        : (item as DirectoryUser).display_name || (item as DirectoryUser).principal_name;
 
     onSelectTarget({
       type,
@@ -243,7 +195,7 @@ function TargetSelector({
       name,
     });
     setIsOpen(false);
-    setSearchTerm("");
+    clearSearch();
   };
 
   const activeItems = activeTab === "groups" ? filteredGroups : filteredUsers;
@@ -255,27 +207,16 @@ function TargetSelector({
       {selectedTarget ? (
         <div className="target-selector-selected">
           <span>
-            Selected:{" "}
-            <strong>
-              {selectedTarget.type === "group" ? "Group" : "User"}
-            </strong>{" "}
-            → {selectedTarget.name}
+            Selected: <strong>{selectedTarget.type === "group" ? "Group" : "User"}</strong> → {selectedTarget.name}
           </span>
-          <button
-            type="button"
-            onClick={onClearSelection}
-            className="target-selector-clear"
-            title="Clear selection"
-            disabled={disabled}
-          >
+          <Button variant="ghost" size="sm" onClick={onClearSelection} title="Clear selection" disabled={disabled}>
             ✕
-          </button>
+          </Button>
         </div>
       ) : (
         <div style={{ position: "relative" }} ref={dropdownRef}>
-          <button
-            type="button"
-            className="secondary"
+          <Button
+            variant="secondary"
             onClick={() => setIsOpen(!isOpen)}
             disabled={disabled}
             style={{
@@ -287,7 +228,7 @@ function TargetSelector({
           >
             Select Group or User
             <span>{isOpen ? "▲" : "▼"}</span>
-          </button>
+          </Button>
 
           {isOpen && (
             <div
@@ -303,48 +244,32 @@ function TargetSelector({
                   backgroundColor: "var(--bg-secondary)",
                 }}
               >
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => setActiveTab("groups")}
                   style={{
                     flex: 1,
                     padding: "12px",
-                    border: "none",
-                    background:
-                      activeTab === "groups"
-                        ? "var(--bg-primary)"
-                        : "transparent",
-                    color:
-                      activeTab === "groups"
-                        ? "var(--text-primary)"
-                        : "var(--text-muted)",
+                    background: activeTab === "groups" ? "var(--bg-primary)" : "transparent",
+                    color: activeTab === "groups" ? "var(--text-primary)" : "var(--text-muted)",
                     fontWeight: activeTab === "groups" ? 600 : 400,
-                    cursor: "pointer",
                   }}
                 >
-                  👥 Groups ({groups.length})
-                </button>
-                <button
-                  type="button"
+                  <Icons.Group /> Groups ({groups.length})
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => setActiveTab("users")}
                   style={{
                     flex: 1,
                     padding: "12px",
-                    border: "none",
-                    background:
-                      activeTab === "users"
-                        ? "var(--bg-primary)"
-                        : "transparent",
-                    color:
-                      activeTab === "users"
-                        ? "var(--text-primary)"
-                        : "var(--text-muted)",
+                    background: activeTab === "users" ? "var(--bg-primary)" : "transparent",
+                    color: activeTab === "users" ? "var(--text-primary)" : "var(--text-muted)",
                     fontWeight: activeTab === "users" ? 600 : 400,
-                    cursor: "pointer",
                   }}
                 >
-                  👤 Users ({users.length})
-                </button>
+                  <Icons.User /> Users ({users.length})
+                </Button>
               </div>
 
               <div style={{ padding: "12px" }}>
@@ -361,7 +286,7 @@ function TargetSelector({
                   onKeyDown={(e) => {
                     if (e.key === "Escape") {
                       setIsOpen(false);
-                      setSearchTerm("");
+                      clearSearch();
                     }
                   }}
                 />
@@ -369,40 +294,29 @@ function TargetSelector({
 
               <div
                 style={{
-                  maxHeight: "500px", // Increased height for the scrollable area
+                  maxHeight: "500px",
                   overflowY: "auto",
                 }}
               >
                 {activeItems.length === 0 ? (
                   <div className="target-selector-empty">
-                    {searchTerm
-                      ? `No ${activeTab} found matching "${searchTerm}"`
-                      : `No ${activeTab} available`}
+                    {searchTerm ? `No ${activeTab} found matching "${searchTerm}"` : `No ${activeTab} available`}
                   </div>
                 ) : (
                   activeItems.map((item) => (
                     <div
                       key={item.id}
                       className="target-selector-item"
-                      onClick={() =>
-                        handleSelectItem(
-                          item,
-                          activeTab === "groups" ? "group" : "user",
-                        )
-                      }
+                      onClick={() => handleSelectItem(item, activeTab === "groups" ? "group" : "user")}
                     >
                       <div className="target-selector-item-name">
                         {activeTab === "groups"
                           ? (item as DirectoryGroup).display_name
-                          : (item as DirectoryUser).display_name ||
-                          (item as DirectoryUser).principal_name}
+                          : (item as DirectoryUser).display_name || (item as DirectoryUser).principal_name}
                       </div>
-                      {activeTab === "users" &&
-                        (item as DirectoryUser).display_name && (
-                          <div className="target-selector-item-subtitle">
-                            {(item as DirectoryUser).principal_name}
-                          </div>
-                        )}
+                      {activeTab === "users" && (item as DirectoryUser).display_name && (
+                        <div className="target-selector-item-subtitle">{(item as DirectoryUser).principal_name}</div>
+                      )}
                     </div>
                   ))
                 )}
@@ -429,13 +343,12 @@ export default function ApplicationDetails() {
     id: string;
     name: string;
   } | null>(null);
-  const [selectedAction, setSelectedAction] = useState<"allow" | "block">(
-    "allow",
-  );
+  const [selectedAction, setSelectedAction] = useState<"allow" | "block">("allow");
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [deletingScopeId, setDeletingScopeId] = useState<string | null>(null);
   const [deletingApp, setDeletingApp] = useState(false);
+  const [confirmDeleteApp, setConfirmDeleteApp] = useState<{ appId: string; appName: string } | null>(null);
 
   useEffect(() => {
     if (!appId) {
@@ -445,14 +358,13 @@ export default function ApplicationDetails() {
 
     (async () => {
       try {
-        const [appsData, scopesData, groupsData, usersData, membershipData] =
-          await Promise.all([
-            listApplications(),
-            listScopes(appId),
-            listGroups(),
-            listUsers(),
-            listGroupMemberships(),
-          ]);
+        const [appsData, scopesData, groupsData, usersData, membershipData] = await Promise.all([
+          listApplications(),
+          listScopes(appId),
+          listGroups(),
+          listUsers(),
+          listGroupMemberships(),
+        ]);
 
         const allApps = Array.isArray(appsData) ? appsData : [];
         const matchedApp = allApps.find((item) => item.id === appId) ?? null;
@@ -469,11 +381,7 @@ export default function ApplicationDetails() {
         setUsers(Array.isArray(usersData) ? usersData : []);
         setMemberships(Array.isArray(membershipData) ? membershipData : []);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load application details.",
-        );
+        setError(err instanceof Error ? err.message : "Failed to load application details.");
       }
     })();
   }, [appId]);
@@ -512,14 +420,8 @@ export default function ApplicationDetails() {
     return map;
   }, [groups]);
 
-  const allowScopes = useMemo(
-    () => scopes.filter((scope) => scope.action === "allow"),
-    [scopes],
-  );
-  const blockScopes = useMemo(
-    () => scopes.filter((scope) => scope.action === "block"),
-    [scopes],
-  );
+  const allowScopes = useMemo(() => scopes.filter((scope) => scope.action === "allow"), [scopes]);
+  const blockScopes = useMemo(() => scopes.filter((scope) => scope.action === "block"), [scopes]);
 
   const totalAssignments = scopes.length;
 
@@ -529,15 +431,12 @@ export default function ApplicationDetails() {
       return;
     }
 
-    const existingScope = scopes.find(
-      (scope) =>
-        scope.target_type === selectedTarget.type &&
-        scope.target_id === selectedTarget.id,
-    );
+    const existingScope = scopes.find((scope) => scope.target_type === selectedTarget.type && scope.target_id === selectedTarget.id);
 
     if (existingScope) {
       setAssignmentError(
-        `${selectedTarget.type === "group" ? "Group" : "User"} "${selectedTarget.name}" already has a ${existingScope.action
+        `${selectedTarget.type === "group" ? "Group" : "User"} "${selectedTarget.name}" already has a ${
+          existingScope.action
         } rule assigned. Remove the existing assignment first.`,
       );
       return;
@@ -553,9 +452,7 @@ export default function ApplicationDetails() {
       setScopes((current) => [created, ...current]);
       setSelectedTarget(null);
     } catch (err) {
-      setAssignmentError(
-        err instanceof Error ? err.message : "Failed to assign rule.",
-      );
+      setAssignmentError(err instanceof Error ? err.message : "Failed to assign rule.");
     } finally {
       setAssignmentBusy(false);
     }
@@ -570,21 +467,19 @@ export default function ApplicationDetails() {
       await deleteScope(appId, scopeId);
       setScopes((current) => current.filter((scope) => scope.id !== scopeId));
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to remove assignment.",
-      );
+      alert(err instanceof Error ? err.message : "Failed to remove assignment.");
     } finally {
       setDeletingScopeId(null);
     }
   };
 
+  const requestDeleteApplication = () => {
+    if (!appId || !app) return;
+    setConfirmDeleteApp({ appId, appName: app.name });
+  };
+
   const handleDeleteApplication = async () => {
     if (!appId) {
-      return;
-    }
-    if (
-      !window.confirm("Delete this application rule? This cannot be undone.")
-    ) {
       return;
     }
     setDeletingApp(true);
@@ -592,10 +487,10 @@ export default function ApplicationDetails() {
       await deleteApplication(appId);
       navigate("/applications", { replace: true });
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to delete application.",
-      );
+      alert(err instanceof Error ? err.message : "Failed to delete application.");
       setDeletingApp(false);
+    } finally {
+      setConfirmDeleteApp(null);
     }
   };
 
@@ -610,11 +505,7 @@ export default function ApplicationDetails() {
         <div className="card">
           <h2>Application Details</h2>
           <p className="error-text">{error}</p>
-          <Link
-            to="/applications"
-            className="primary"
-            style={{ textDecoration: "none", marginTop: "12px" }}
-          >
+          <Link to="/applications" className="primary" style={{ textDecoration: "none", marginTop: "12px" }}>
             Back to applications
           </Link>
         </div>
@@ -628,11 +519,7 @@ export default function ApplicationDetails() {
         <div className="card">
           <h2>Application Details</h2>
           <p className="muted-text">Application not found.</p>
-          <Link
-            to="/applications"
-            className="primary"
-            style={{ textDecoration: "none", marginTop: "12px" }}
-          >
+          <Link to="/applications" className="primary" style={{ textDecoration: "none", marginTop: "12px" }}>
             Back to applications
           </Link>
         </div>
@@ -653,29 +540,17 @@ export default function ApplicationDetails() {
           }}
         >
           <div>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => navigate(-1)}
-            >
+            <Button variant="secondary" onClick={() => navigate(-1)}>
               ← Back
-            </button>
-            <h2 style={{ marginTop: "16px", marginBottom: "8px" }}>
-              {app.name}
-            </h2>
+            </Button>
+            <h2 style={{ marginTop: "16px", marginBottom: "8px" }}>{app.name}</h2>
             <p className="muted-text" style={{ marginBottom: "16px" }}>
-              Manage assignments, view current scopes, and adjust access for
-              this application.
+              Manage assignments, view current scopes, and adjust access for this application.
             </p>
           </div>
-          <button
-            type="button"
-            className="assignment-card-delete"
-            onClick={handleDeleteApplication}
-            disabled={deletingApp}
-          >
-            {deletingApp ? "Deleting…" : "Delete Application"}
-          </button>
+          <Button type="button" variant="danger" onClick={requestDeleteApplication} loading={deletingApp}>
+            Delete Application
+          </Button>
         </div>
 
         <div
@@ -686,28 +561,17 @@ export default function ApplicationDetails() {
             alignItems: "center",
           }}
         >
-          <span
-            className={`rule-chip rule-chip-${app.rule_type.toLowerCase()}`}
-          >
+          <Badge size="sm" variant={app.rule_type.toLowerCase() as any} caps>
             {app.rule_type}
-          </span>
-          <code
-            className="assignment-card-summary-identifier"
-            title={app.identifier}
-          >
+          </Badge>
+          <code className="assignment-card-summary-identifier" title={app.identifier}>
             {app.identifier}
           </code>
-          <span className="summary-pill neutral" title="Total assignments">
-            <span className="summary-pill-label">Assignments</span>
-            <span className="summary-pill-value">{totalAssignments}</span>
-          </span>
+          <Badge size="md" variant="neutral" label="Assignments" value={totalAssignments} caps />
         </div>
 
         {app.description && (
-          <p
-            className="assignment-card-description"
-            style={{ marginTop: "16px" }}
-          >
+          <p className="assignment-card-description" style={{ marginTop: "16px" }}>
             {app.description}
           </p>
         )}
@@ -718,10 +582,7 @@ export default function ApplicationDetails() {
           Assign to Groups or Users
         </div>
         {assignmentError && (
-          <div
-            className="assignment-validation-error"
-            style={{ marginBottom: "16px" }}
-          >
+          <div className="assignment-validation-error" style={{ marginBottom: "16px" }}>
             {assignmentError}
           </div>
         )}
@@ -737,40 +598,34 @@ export default function ApplicationDetails() {
           <div className="assignment-form-action">
             <label className="assignment-form-label">Action</label>
             <div className="action-button-group">
-              <button
-                type="button"
-                className={`action-button ${selectedAction === "allow" ? "active allow" : "inactive"}`}
+              <Button
+                variant="ghost"
+                active={selectedAction === "allow"}
+                activeVariant="allow"
                 onClick={() => setSelectedAction("allow")}
                 disabled={assignmentBusy}
               >
                 Allow
-              </button>
-              <button
-                type="button"
-                className={`action-button ${selectedAction === "block" ? "active block" : "inactive"}`}
+              </Button>
+              <Button
+                variant="ghost"
+                active={selectedAction === "block"}
+                activeVariant="block"
                 onClick={() => setSelectedAction("block")}
                 disabled={assignmentBusy}
               >
                 Block
-              </button>
+              </Button>
             </div>
           </div>
-          <button
-            type="button"
-            className="primary assignment-form-submit"
-            onClick={handleAssignRule}
-            disabled={assignmentBusy || !selectedTarget}
-          >
-            {assignmentBusy ? "Assigning…" : "Assign Rule"}
-          </button>
+          <Button variant="primary" onClick={handleAssignRule} disabled={assignmentBusy || !selectedTarget} loading={assignmentBusy}>
+            Assign Rule
+          </Button>
         </div>
       </div>
 
       <div className="card">
-        <h3
-          className="assignment-section-title"
-          style={{ marginBottom: "24px" }}
-        >
+        <h3 className="assignment-section-title" style={{ marginBottom: "24px" }}>
           Current Assignments
         </h3>
         <div className="assignment-groups">
@@ -797,14 +652,21 @@ export default function ApplicationDetails() {
           {allowScopes.length === 0 && blockScopes.length === 0 && (
             <div className="empty-state" style={{ marginTop: "16px" }}>
               <h4>No assignments yet</h4>
-              <p>
-                Use the controls above to assign this application to groups or
-                individual users.
-              </p>
+              <p>Use the controls above to assign this application to groups or individual users.</p>
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmDeleteApp}
+        onOpenChange={(open) => !open && setConfirmDeleteApp(null)}
+        title="Delete Application"
+        description={`Are you sure you want to delete "${confirmDeleteApp?.appName}"? This action cannot be undone.`}
+        onConfirm={() => confirmDeleteApp && handleDeleteApplication()}
+        confirmText="Delete"
+        destructive
+      />
     </div>
   );
 }

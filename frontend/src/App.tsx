@@ -1,33 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, lazy } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
-import {
-  Dashboard,
-  Applications,
-  Users,
-  Devices,
-  Settings,
-  ApplicationDetails,
-  UserDetails,
-} from "./pages";
+import { Toaster } from "react-hot-toast";
 import { Login } from "./auth";
-import { ApiUser, getCurrentUser } from "./api";
+import { ApiUser } from "./api";
+import { useCurrentUser } from "./hooks/useQueries";
+import { showErrorToast } from "./utils/toast";
+import { Icons } from "./components/Icons";
+import { Button } from "./components/Button";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Applications = lazy(() => import("./pages/Applications"));
+const Users = lazy(() => import("./pages/Users"));
+const Devices = lazy(() => import("./pages/Devices"));
+const Settings = lazy(() => import("./pages/Settings"));
+const ApplicationDetails = lazy(() => import("./pages/ApplicationDetails"));
+const UserDetails = lazy(() => import("./pages/UserDetails"));
 
 export default function App() {
-  const [user, setUser] = useState<ApiUser | null>();
-  const [loading, setLoading] = useState(true);
+  const { data: user, isLoading, error } = useCurrentUser();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const me = await getCurrentUser();
-        setUser(me);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (error) {
+      console.error("Failed to load user:", error);
+      showErrorToast("Failed to load user information");
+    }
+  }, [error]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="center-page">
         <p className="muted-text">Loading…</p>
@@ -36,7 +35,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login onLogin={setUser} />;
+    return <Login onLogin={() => window.location.reload()} />;
   }
 
   async function handleLogout() {
@@ -52,55 +51,62 @@ export default function App() {
       <nav className="navbar">
         <div className="navbar-brand">
           <Link to="/" className="brand-link">
-            <span className="brand-icon">🎄</span>
+            <Icons.Brand />
             <span className="brand-text">Grinch</span>
           </Link>
         </div>
         <div className="nav-links">
           <NavLink to="/" end className="nav-link">
-            <span className="nav-icon">📊</span>
+            <Icons.Dashboard />
             <span>Dashboard</span>
           </NavLink>
           <NavLink to="/applications" className="nav-link">
-            <span className="nav-icon">📱</span>
+            <Icons.Applications />
             <span>Applications</span>
           </NavLink>
           <NavLink to="/users" className="nav-link">
-            <span className="nav-icon">👥</span>
+            <Icons.Users />
             <span>Users</span>
           </NavLink>
           <NavLink to="/devices" className="nav-link">
-            <span className="nav-icon">💻</span>
+            <Icons.Devices />
             <span>Devices</span>
           </NavLink>
         </div>
         <div className="navbar-actions">
           <NavLink to="/settings" className="settings-link" title="Settings">
-            <span className="settings-icon">⚙️</span>
+            <Icons.Settings />
           </NavLink>
           <div className="user-info">
-            <div className="user-avatar">
-              {(user.display_name ?? user.principal_name)?.[0]?.toUpperCase() ?? 'U'}
-            </div>
+            <div className="user-avatar">{(user.display_name ?? user.principal_name)?.[0]?.toUpperCase() ?? "U"}</div>
             <span className="user-name">{user.display_name ?? user.principal_name}</span>
           </div>
-          <button className="logout-btn" onClick={handleLogout}>
-            <span className="logout-icon">🚪</span>
+          <Button variant="ghost" onClick={handleLogout}>
+            <Icons.Logout />
             <span>Logout</span>
-          </button>
+          </Button>
         </div>
       </nav>
       <main className="main-content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/applications" element={<Applications />} />
-          <Route path="/applications/:appId" element={<ApplicationDetails />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/users/:userId" element={<UserDetails />} />
-          <Route path="/devices" element={<Devices />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div className="center-page">
+              <p className="muted-text">Loading page…</p>
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/applications" element={<Applications />} />
+            <Route path="/applications/:appId" element={<ApplicationDetails />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/users/:userId" element={<UserDetails />} />
+            <Route path="/devices" element={<Devices />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Suspense>
       </main>
+      <Toaster />
     </div>
   );
 }
