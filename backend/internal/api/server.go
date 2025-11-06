@@ -855,7 +855,7 @@ func (s *Server) handleSantaRuleDownload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Decompress the request body if needed (Santa supports deflate, gzip, or none)
+	// Decompress the request body
 	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
@@ -914,7 +914,7 @@ func (s *Server) handleSantaPostflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decompress the request body if needed (Santa supports deflate, gzip, or none)
+	// Decompress the request body
 	bodyReader, err := s.decompressRequestBody(bodyBytes, logger)
 	if err != nil {
 		logger.Warn("failed to decompress request body", "error", err)
