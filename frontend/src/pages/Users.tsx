@@ -9,13 +9,11 @@ function getDisplayName(user: DirectoryUser): string {
 
 export default function Users() {
     const [users, setUsers] = useState<DirectoryUser[]>([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         (async () => {
-            setLoading(true);
             try {
                 const usersData = await listUsers();
                 setUsers(Array.isArray(usersData) ? usersData : []);
@@ -25,8 +23,6 @@ export default function Users() {
                 } else {
                     setError("Failed to load users");
                 }
-            } finally {
-                setLoading(false);
             }
         })();
     }, []);
@@ -42,15 +38,6 @@ export default function Users() {
             return display.includes(term) || principal.includes(term);
         });
     }, [users, searchTerm]);
-
-    if (loading) {
-        return (
-            <div className="card">
-                <h2>Users</h2>
-                <p>Loading users...</p>
-            </div>
-        );
-    }
 
     if (error) {
         return (
@@ -92,9 +79,7 @@ export default function Users() {
                             type="search"
                             placeholder="Search users..."
                             value={searchTerm}
-                            onChange={(event) =>
-                                setSearchTerm(event.target.value)
-                            }
+                            onChange={(event) => setSearchTerm(event.target.value)}
                             style={{ flex: 1 }}
                             aria-label="Search users"
                         />
@@ -162,24 +147,17 @@ export default function Users() {
                                         className="assignment-card-summary"
                                         style={{ cursor: "pointer" }}
                                     >
-                                        <span
-                                            className="assignment-card-icon"
-                                            aria-hidden="true"
-                                        >
+                                        <span className="assignment-card-icon" aria-hidden="true">
                                             👤
                                         </span>
                                         <div className="assignment-card-summary-main">
                                             <div className="assignment-card-summary-title">
-                                                <h3 className="assignment-card-title">
-                                                    {displayName}
-                                                </h3>
+                                                <h3 className="assignment-card-title">{displayName}</h3>
                                                 <span
                                                     className={`rule-chip rule-chip-${user.user_type === "cloud" ? "cloud" : "local"}`}
                                                     title={`${user.user_type === "cloud" ? "Cloud" : "Local"} user`}
                                                 >
-                                                    {user.user_type === "cloud"
-                                                        ? "CLOUD"
-                                                        : "LOCAL"}
+                                                    {user.user_type === "cloud" ? "CLOUD" : "LOCAL"}
                                                 </span>
                                             </div>
                                             <div className="assignment-card-summary-meta">

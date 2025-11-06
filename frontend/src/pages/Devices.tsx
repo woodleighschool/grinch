@@ -3,7 +3,6 @@ import { Device, listDevices } from "../api";
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -12,15 +11,12 @@ export default function Devices() {
   }, []);
 
   async function loadDevices() {
-    setLoading(true);
     setError(null);
     try {
       const result = await listDevices();
       setDevices(Array.isArray(result) ? result : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load devices");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -87,15 +83,6 @@ export default function Devices() {
     });
     return { online, warning, offline, total: devices.length };
   }, [devices]);
-
-  if (loading) {
-    return (
-      <div className="card">
-        <h2>Devices</h2>
-        <p>Loading devices…</p>
-      </div>
-    );
-  }
 
   if (error) {
     return (

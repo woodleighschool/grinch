@@ -62,9 +62,7 @@ function SettingsModule({
                         <div className="assignment-card-summary-title">
                             <div className="assignment-card-icon">{icon}</div>
                             <div>
-                                <h3 className="assignment-card-title">
-                                    {title}
-                                </h3>
+                                <h3 className="assignment-card-title">{title}</h3>
                             </div>
                         </div>
                         <div className="assignment-card-summary-meta">
@@ -129,53 +127,14 @@ interface SantaConfigModuleProps {
 }
 
 function SantaConfigModule({ config }: SantaConfigModuleProps) {
-    const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
-        "idle"
-    );
-
     if (!config) {
-        return (
-            <div>
-                <p>Loading Santa configuration...</p>
-            </div>
-        );
+        return null;
     }
-
-    const copyButtonLabel =
-        copyStatus === "copied"
-            ? "Copied!"
-            : copyStatus === "error"
-                ? "Copy failed"
-                : "Copy XML";
-
-    const handleCopy = async () => {
-        if (!config.xml) {
-            return;
-        }
-
-        if (typeof navigator === "undefined" || !navigator.clipboard) {
-            setCopyStatus("error");
-            window.setTimeout(() => setCopyStatus("idle"), 2000);
-            return;
-        }
-
-        try {
-            await navigator.clipboard.writeText(config.xml);
-            setCopyStatus("copied");
-        } catch {
-            setCopyStatus("error");
-        } finally {
-            window.setTimeout(() => setCopyStatus("idle"), 2000);
-        }
-    };
 
     return (
         <div>
             <div className="grid two-column">
-                <section
-                    className="settings-form-section"
-                    style={{ marginBottom: 0 }}
-                >
+                <section className="settings-form-section" style={{ marginBottom: 0 }}>
                     <p
                         style={{
                             margin: "0 0 16px 0",
@@ -183,8 +142,8 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                             lineHeight: 1.6,
                         }}
                     >
-                        Deploy this XML via MDM to preconfigure Santa&apos;s
-                        sync URLs, baseline telemetry, and ownership metadata.
+                        Deploy this XML via MDM to preconfigure Santa&apos;s sync URLs,
+                        baseline telemetry, and ownership metadata.
                     </p>
                     <div
                         style={{
@@ -198,29 +157,19 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                         <button
                             type="button"
                             className="secondary"
-                            onClick={handleCopy}
-                            title="Copy XML to clipboard"
-                        >
-                            {copyButtonLabel}
-                        </button>
-                        <button
-                            type="button"
-                            className="secondary"
                             onClick={() =>
                                 window.open(
                                     "https://northpole.dev/configuration/keys/",
                                     "_blank",
-                                    "noopener,noreferrer"
+                                    "noopener,noreferrer",
                                 )
                             }
-                            title="Open Santa Keys configuration reference"
+                            title="Keys Help"
                         >
-                            📖 Configuration Help
+                            📖 Help!
                         </button>
                     </div>
-                    <label htmlFor="santa-config-xml">
-                        Santa Configuration XML
-                    </label>
+                    <label htmlFor="santa-config-xml">Santa Configuration XML</label>
                     <div>
                         <textarea
                             id="santa-config-xml"
@@ -236,24 +185,18 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                         />
                     </div>
                     <small className="settings-field-help">
-                        Paste this payload into a preferences file and upload to
-                        your MDM. Curly-brace <code>{"{{ }}"}</code>{" "}
-                        placeholders should be expanded by your provider.
+                        Paste this payload into a preferences file and upload to your MDM.
+                        Curly-brace <code>{"{{ }}"}</code> placeholders should be expanded
+                        by your provider.
                     </small>
                 </section>
 
-                <aside
-                    className="settings-form-section"
-                    style={{ marginBottom: 0 }}
-                >
+                <aside className="settings-form-section" style={{ marginBottom: 0 }}>
                     <div
                         className="settings-advanced-section"
                         style={{ marginBottom: "16px" }}
                     >
-                        <h4
-                            className="settings-section-header"
-                            style={{ marginTop: 0 }}
-                        >
+                        <h4 className="settings-section-header" style={{ marginTop: 0 }}>
                             Deployment checklist
                         </h4>
                         <ul
@@ -270,12 +213,11 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                                 <code>com.northpolesec.santa</code>.
                             </li>
                             <li>
-                                Sync server URLs should already point at this
-                                Grinch instance.
+                                Sync server URLs should already point at this Grinch instance.
                             </li>
                             <li>
-                                Defaults keep Santa in Monitor mode; raise the
-                                enforcement level when you're ready.
+                                Defaults keep Santa in Monitor mode; raise the enforcement level
+                                when you're ready.
                             </li>
                         </ul>
                     </div>
@@ -284,10 +226,7 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                         className="settings-advanced-section"
                         style={{ marginBottom: 0 }}
                     >
-                        <h4
-                            className="settings-section-header"
-                            style={{ marginTop: 0 }}
-                        >
+                        <h4 className="settings-section-header" style={{ marginTop: 0 }}>
                             Template placeholders
                         </h4>
                         <ul
@@ -300,8 +239,8 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
                             }}
                         >
                             <li>
-                                Adjust <code>{"{{username}}"}</code> to your MDM
-                                provider's placeholder expectations.
+                                Adjust <code>{"{{username}}"}</code> to your MDM provider's
+                                placeholder expectations.
                                 {/* TO:DO - Grinch expects email, do we use email or mail alias (username)? */}
                             </li>
                         </ul>
@@ -314,13 +253,10 @@ function SantaConfigModule({ config }: SantaConfigModuleProps) {
 
 export default function Settings() {
     const [santaConfig, setSantaConfig] = useState<SantaConfig | null>(null);
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [expandedModuleId, setExpandedModuleId] = useState<string | null>(
-        null
-    );
+    const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
 
     useEffect(() => {
         loadSettings();
@@ -328,7 +264,6 @@ export default function Settings() {
 
     const loadSettings = async () => {
         try {
-            setLoading(true);
             const [santaResponse] = await Promise.all([
                 fetch("/api/settings/santa-config", { credentials: "include" }),
             ]);
@@ -341,41 +276,26 @@ export default function Settings() {
 
             setSantaConfig(santaConfigData);
         } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Failed to load settings"
-            );
-        } finally {
-            setLoading(false);
+            setError(err instanceof Error ? err.message : "Failed to load settings");
         }
     };
-
-    if (loading) {
-        return <div className="settings-loading">Loading settings...</div>;
-    }
 
     return (
         <div>
             <div className="card">
                 <h2>Settings</h2>
                 <p>
-                    Configure system settings and authentication providers for
-                    Grinch.
+                    Configure system settings and authentication providers for Grinch.
                 </p>
 
                 {error && (
-                    <div
-                        className="stat-bubble danger"
-                        style={{ marginBottom: "16px" }}
-                    >
+                    <div className="stat-bubble danger" style={{ marginBottom: "16px" }}>
                         {error}
                     </div>
                 )}
 
                 {successMessage && (
-                    <div
-                        className="stat-bubble success"
-                        style={{ marginBottom: "16px" }}
-                    >
+                    <div className="stat-bubble success" style={{ marginBottom: "16px" }}>
                         {successMessage}
                     </div>
                 )}
@@ -388,9 +308,7 @@ export default function Settings() {
                 moduleId="santa"
                 isExpanded={expandedModuleId === "santa"}
                 onToggleExpand={(moduleId) => {
-                    setExpandedModuleId(
-                        expandedModuleId === moduleId ? null : moduleId
-                    );
+                    setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId);
                 }}
                 showToggle={false}
                 enabled={undefined}

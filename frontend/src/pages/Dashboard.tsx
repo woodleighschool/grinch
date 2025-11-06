@@ -191,11 +191,9 @@ export default function Dashboard() {
   const [groups, setGroups] = useState<DirectoryGroup[]>([]);
   const [users, setUsers] = useState<DirectoryUser[]>([]);
   const [totalScopes, setTotalScopes] = useState(0);
-  const [directoryLoading, setDirectoryLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      setDirectoryLoading(true);
       try {
         const [groupsData, usersData, appsData] = await Promise.all([
           listGroups(),
@@ -218,8 +216,6 @@ export default function Dashboard() {
         setTotalScopes(scopeCounts.reduce((sum, count) => sum + count, 0));
       } catch (err) {
         console.error("Failed to load directory data:", err);
-      } finally {
-        setDirectoryLoading(false);
       }
     })();
   }, []);
@@ -227,18 +223,11 @@ export default function Dashboard() {
   return (
     <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "1fr" }}>
       <div>
-        {directoryLoading ? (
-          <div className="card">
-            <h2>Directory Overview</h2>
-            <p>Loading directory data...</p>
-          </div>
-        ) : (
-          <DirectoryStats
-            groups={groups}
-            users={users}
-            totalScopes={totalScopes}
-          />
-        )}
+        <DirectoryStats
+          groups={groups}
+          users={users}
+          totalScopes={totalScopes}
+        />
       </div>
 
       <div className="card">

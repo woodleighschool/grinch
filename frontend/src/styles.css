@@ -888,11 +888,10 @@ button.secondary {
 
 .assignment-card-summary-identifier {
     font-size: 12px;
-    background: rgba(15, 23, 42, 0.08);
+    background: var(--bg-tertiary);
     color: var(--text-secondary);
     padding: 4px 8px;
     border-radius: 8px;
-    flex: 1;
     min-width: 0;
     word-wrap: break-word;
     hyphens: auto;
@@ -988,6 +987,36 @@ button.secondary {
     border-radius: 999px;
     font-weight: 600;
     border: 1px solid transparent;
+}
+
+.rule-chip-binary {
+    color: #1d4ed8;
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.25);
+}
+
+.rule-chip-certificate {
+    color: #0f766e;
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(13, 148, 136, 0.25);
+}
+
+.rule-chip-signingid {
+    color: #9333ea;
+    background: rgba(168, 85, 247, 0.16);
+    border-color: rgba(147, 51, 234, 0.25);
+}
+
+.rule-chip-teamid {
+    color: #ea580c;
+    background: rgba(249, 115, 22, 0.16);
+    border-color: rgba(234, 88, 12, 0.25);
+}
+
+.rule-chip-cdhash {
+    color: #6366f1;
+    background: rgba(99, 102, 241, 0.16);
+    border-color: rgba(99, 102, 241, 0.25);
 }
 
 .assignment-card-expanded-content {
@@ -1203,6 +1232,56 @@ button.secondary {
     min-width: 140px;
 }
 
+/* Action button group */
+.action-button-group {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-secondary);
+}
+
+.action-button {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-right: 1px solid var(--border-primary);
+}
+
+.action-button:last-child {
+    border-right: none;
+}
+
+.action-button:hover:not(:disabled) {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.action-button.active.allow {
+    background: var(--stat-success-bg);
+    color: var(--stat-success-text);
+    border-color: var(--stat-success-border);
+    font-weight: 600;
+}
+
+.action-button.active.block {
+    background: var(--stat-danger-bg);
+    color: var(--stat-danger-text);
+    border-color: var(--stat-danger-border);
+    font-weight: 600;
+}
+
+.action-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .assignment-groups {
     display: flex;
     flex-direction: column;
@@ -1416,6 +1495,7 @@ button:disabled {
     padding: 16px 0;
 }
 
+/* Settings toggle button */
 .settings-toggle-btn {
     position: relative;
     width: 44px;

@@ -411,15 +411,6 @@ function TargetSelector({
           )}
         </div>
       )}
-
-      {!selectedTarget && (
-        <p
-          className="muted-text"
-          style={{ fontSize: "13px", marginTop: "8px" }}
-        >
-          Choose whether to apply this rule to a group or an individual user.
-        </p>
-      )}
     </div>
   );
 }
@@ -428,7 +419,6 @@ export default function ApplicationDetails() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
   const [app, setApp] = useState<Application | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scopes, setScopes] = useState<ApplicationScope[]>([]);
   const [groups, setGroups] = useState<DirectoryGroup[]>([]);
@@ -450,12 +440,10 @@ export default function ApplicationDetails() {
   useEffect(() => {
     if (!appId) {
       setError("Missing application identifier.");
-      setLoading(false);
       return;
     }
 
     (async () => {
-      setLoading(true);
       try {
         const [appsData, scopesData, groupsData, usersData, membershipData] =
           await Promise.all([
@@ -486,8 +474,6 @@ export default function ApplicationDetails() {
             ? err.message
             : "Failed to load application details.",
         );
-      } finally {
-        setLoading(false);
       }
     })();
   }, [appId]);
@@ -617,17 +603,6 @@ export default function ApplicationDetails() {
     setSelectedTarget(null);
     setAssignmentError(null);
   };
-
-  if (loading) {
-    return (
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <div className="card">
-          <h2>Application Details</h2>
-          <p>Loading application details…</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -761,52 +736,23 @@ export default function ApplicationDetails() {
           />
           <div className="assignment-form-action">
             <label className="assignment-form-label">Action</label>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  color:
-                    selectedAction === "allow"
-                      ? "var(--text-primary)"
-                      : "var(--text-muted)",
-                }}
-              >
-                Allow
-              </span>
+            <div className="action-button-group">
               <button
                 type="button"
-                className={`settings-toggle-btn ${selectedAction === "allow" ? "enabled" : selectedAction === "block" ? "block" : "disabled"}`}
-                onClick={() =>
-                  setSelectedAction(
-                    selectedAction === "allow" ? "block" : "allow",
-                  )
-                }
+                className={`action-button ${selectedAction === "allow" ? "active allow" : "inactive"}`}
+                onClick={() => setSelectedAction("allow")}
                 disabled={assignmentBusy}
-                aria-label={`Toggle action: currently ${selectedAction}`}
               >
-                <span className="settings-toggle-slider"></span>
+                Allow
               </button>
-              <span
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  color:
-                    selectedAction === "block"
-                      ? "var(--text-primary)"
-                      : "var(--text-muted)",
-                }}
+              <button
+                type="button"
+                className={`action-button ${selectedAction === "block" ? "active block" : "inactive"}`}
+                onClick={() => setSelectedAction("block")}
+                disabled={assignmentBusy}
               >
                 Block
-              </span>
+              </button>
             </div>
           </div>
           <button

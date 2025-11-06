@@ -111,14 +111,12 @@ export default function Applications() {
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [appSearch, setAppSearch] = useState("");
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
   const [updatingAppId, setUpdatingAppId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
       try {
         const [appsData, groupsData, usersData, membershipData] =
           await Promise.all([
@@ -149,8 +147,6 @@ export default function Applications() {
         } else {
           setError("Failed to load applications");
         }
-      } finally {
-        setLoading(false);
       }
     })();
   }, []);
@@ -347,22 +343,14 @@ export default function Applications() {
     };
   }
 
-  if (loading) {
-    return (
-      <div className="card">
-        <h2>Application Rules</h2>
-        <p>Loading application data…</p>
-      </div>
-    );
-  }
-
   return (
     <div className="grid equal-split">
       <div className="card">
         <h2>Add Application Rule</h2>
         <p>
-          Define application rules using reference-compatible identifiers. Rules can
-          then be assigned to groups or users from the application detail page.
+          Define application rules using reference-compatible identifiers. Rules
+          can then be assigned to groups or users from the application detail
+          page.
         </p>
         {error && (
           <div className="alert error" style={{ marginBottom: "16px" }}>
@@ -471,6 +459,20 @@ export default function Applications() {
 
       <div className="card">
         <h2>Field Reference Guide</h2>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() =>
+            window.open(
+              "https://northpole.dev/features/binary-authorization/",
+              "_blank",
+              "noopener,noreferrer",
+            )
+          }
+          title="Binary Authorization Help"
+        >
+          📖 Help!
+        </button>
         <p>
           Use <code>santactl fileinfo /path/to/app</code> to get these values:
         </p>
