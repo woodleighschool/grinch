@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"compress/flate"
 	"compress/gzip"
 	"context"
@@ -91,27 +92,34 @@ func NewServer(ctx context.Context, cfg *config.Config, store *store.Store, sant
 // Santa clients can send data compressed with deflate, gzip, or uncompressed
 func (s *Server) decompressRequestBody(bodyBytes []byte, logger *slog.Logger) (io.Reader, error) {
 	if len(bodyBytes) == 0 {
-		return strings.NewReader(""), nil
+		return bytes.NewReader(nil), nil
 	}
 
+	br := bytes.NewReader(bodyBytes)
+
 	// Check for gzip compression
-	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x1f && bodyBytes[1] == 0x8b {
-		gzReader, err := gzip.NewReader(strings.NewReader(string(bodyBytes)))
+	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x1F && bodyBytes[1] == 0x8B {
+		gz, err := gzip.NewReader(br)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+			return nil, fmt.Errorf("gzip decode failed: %w", err)
 		}
-		return gzReader, nil
+		return gz, nil
 	}
 
 	// Check for deflate compression
-	if len(bodyBytes) >= 2 && bodyBytes[0] == 0x78 &&
-		(bodyBytes[1] == 0x01 || bodyBytes[1] == 0x5e || bodyBytes[1] == 0x9c || bodyBytes[1] == 0xda) {
-		flateReader := flate.NewReader(strings.NewReader(string(bodyBytes)))
-		return flateReader, nil
+	{
+		defBr := bytes.NewReader(bodyBytes)
+		fr := flate.NewReader(defBr)
+		buf := make([]byte, 1)
+		if _, err := fr.Read(buf); err == nil {
+			fr.Close()
+			return flate.NewReader(bytes.NewReader(bodyBytes)), nil
+		}
+		fr.Close()
 	}
 
 	// No compression
-	return strings.NewReader(string(bodyBytes)), nil
+	return bytes.NewReader(bodyBytes), nil
 }
 
 func (s *Server) Routes() http.Handler {
