@@ -213,7 +213,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "session save", http.StatusInternalServerError)
 		return
 	}
-	authURL, err := oauthSvc.BuildAuthURL(state)
+	authURL, err := oauthSvc.BuildAuthURL(r, state)
 	if err != nil {
 		logger.Error("failed to build OAuth auth URL", "error", err)
 		http.Error(w, "oauth redirect", http.StatusInternalServerError)
@@ -265,7 +265,7 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange code for token
-	tokenResp, err := oauthSvc.ExchangeCodeForToken(ctx, code)
+	tokenResp, err := oauthSvc.ExchangeCodeForToken(ctx, r, code)
 	if err != nil {
 		logger.Error("failed to exchange OAuth code for token", "error", err)
 		http.Error(w, "token exchange failed", http.StatusInternalServerError)

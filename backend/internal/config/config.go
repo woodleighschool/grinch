@@ -29,14 +29,12 @@ type Config struct {
 	AzureTenantID            string
 	AzureClientID            string
 	AzureClientSecret        string
-	OAuthRedirectURL         string // Optional OAuth redirect URL override (defaults to http://[server]/api/auth/oauth/callback)
 	SyncInterval             time.Duration
 	SSEBufferSize            int
 	AllowedOrigins           []string
 	EnableMetrics            bool
 	LogLevel                 string
-	// Initial admin user configuration
-	InitialAdminPassword string
+	InitialAdminPassword     string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -55,7 +53,6 @@ func Load() (*Config, error) {
 		AzureTenantID:        os.Getenv("AZURE_TENANT_ID"),
 		AzureClientID:        os.Getenv("AZURE_CLIENT_ID"),
 		AzureClientSecret:    os.Getenv("AZURE_CLIENT_SECRET"),
-		OAuthRedirectURL:     getEnv("OAUTH_REDIRECT_URL", ""),
 		SSEBufferSize:        getEnvInt("EVENT_SSE_BUFFER", 64),
 		EnableMetrics:        getEnvBool("ENABLE_METRICS", true),
 		LogLevel:             getEnv("LOG_LEVEL", "info"),

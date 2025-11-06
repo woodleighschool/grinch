@@ -66,14 +66,14 @@ func NewOAuthService(cfg *config.Config) (*OAuthService, error) {
 }
 
 // BuildAuthURL creates the authorization URL for Microsoft OAuth flow
-func (s *OAuthService) BuildAuthURL(state string) (string, error) {
+func (s *OAuthService) BuildAuthURL(req *http.Request, state string) (string, error) {
 	authorizeURL := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/authorize", s.cfg.AzureTenantID)
 
 	params := url.Values{}
 	params.Set("client_id", s.cfg.AzureClientID)
 	params.Set("response_type", "code")
 	params.Set("scope", "openid profile email User.Read")
-	params.Set("redirect_uri", s.getRedirectURL())
+	params.Set("redirect_uri", s.getRedirectURL(req))
 	params.Set("state", state)
 	params.Set("response_mode", "query")
 
@@ -82,7 +82,7 @@ func (s *OAuthService) BuildAuthURL(state string) (string, error) {
 }
 
 // ExchangeCodeForToken exchanges authorization code for access token
-func (s *OAuthService) ExchangeCodeForToken(ctx context.Context, code string) (*OAuthTokenResponse, error) {
+func (s *OAuthService) ExchangeCodeForToken(ctx context.Context, req *http.Request, code string) (*OAuthTokenResponse, error) {
 	tokenURL := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", s.cfg.AzureTenantID)
 
 	data := url.Values{}
@@ -90,7 +90,7 @@ func (s *OAuthService) ExchangeCodeForToken(ctx context.Context, code string) (*
 	data.Set("client_id", s.cfg.AzureClientID)
 	data.Set("client_secret", s.cfg.AzureClientSecret)
 	data.Set("code", code)
-	data.Set("redirect_uri", s.getRedirectURL())
+	data.Set("redirect_uri", s.getRedirectURL(req))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -153,11 +153,14 @@ func (s *OAuthService) GetUserInfo(ctx context.Context, accessToken string) (*OA
 }
 
 // getRedirectURL returns the configured OAuth redirect URL
-func (s *OAuthService) getRedirectURL() string {
-	if s.cfg.OAuthRedirectURL == "" {
-		return fmt.Sprintf("http://localhost%s/api/auth/oauth/callback", s.cfg.ServerAddress)
+func (s *OAuthService) getRedirectURL(req *http.Request) string {
+	forwardedHost := req.Header.Get("X-Forwarded-Host")
+	host := req.Host
+	if forwardedHost != "" {
+		host = forwardedHost
 	}
-	return s.cfg.OAuthRedirectURL
+
+	return fmt.Sprintf("https://%s/api/auth/oauth/callback", strings.TrimSpace(host))
 }
 
 // GenerateOAuthState generates a random state parameter for OAuth flow
