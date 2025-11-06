@@ -262,7 +262,6 @@ type User struct {
 	UserType         UserType   `json:"user_type"`
 	PasswordHash     *string    `json:"-"` // Never expose password hash in JSON
 	IsProtectedLocal bool       `json:"is_protected_local"`
-	IsAdmin          bool       `json:"is_admin"`
 	RoleGroups       []string   `json:"role_groups,omitempty"`
 	SyncedAt         *time.Time `json:"synced_at,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
@@ -285,21 +284,6 @@ type ApplicationSetting struct {
 	Description string          `json:"description,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
-}
-
-// SAMLSettings represents SAML configuration settings
-type SAMLSettings struct {
-	Enabled              bool   `json:"enabled"`
-	MetadataURL          string `json:"metadata_url,omitempty"`
-	EntityID             string `json:"entity_id,omitempty"`
-	ACSURL               string `json:"acs_url,omitempty"`
-	SPPrivateKey         string `json:"sp_private_key,omitempty"`
-	SPCertificate        string `json:"sp_certificate,omitempty"`
-	NameIDFormat         string `json:"name_id_format,omitempty"`
-	ObjectIDAttribute    string `json:"object_id_attribute,omitempty"`
-	UPNAttribute         string `json:"upn_attribute,omitempty"`
-	EmailAttribute       string `json:"email_attribute,omitempty"`
-	DisplayNameAttribute string `json:"display_name_attribute,omitempty"`
 }
 
 // UserRoleAssignment represents a user's assignment to a role group

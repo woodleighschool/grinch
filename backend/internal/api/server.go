@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,39 +34,35 @@ type Server struct {
 	santa       *santa.Service
 	sessions    *auth.SessionManager
 	broadcaster *events.Broadcaster
-	saml        *auth.SAMLService
-	samlMu      sync.RWMutex
+	oauth       *auth.OAuthService
+	oauthMu     sync.RWMutex
 	logger      *slog.Logger
 }
 
-func (s *Server) samlService() *auth.SAMLService {
-	s.samlMu.RLock()
-	defer s.samlMu.RUnlock()
-	return s.saml
+func (s *Server) oauthService() *auth.OAuthService {
+	s.oauthMu.RLock()
+	defer s.oauthMu.RUnlock()
+	return s.oauth
 }
 
-func (s *Server) setSAMLService(service *auth.SAMLService) {
-	s.samlMu.Lock()
-	s.saml = service
-	s.samlMu.Unlock()
+func (s *Server) setOAuthService(service *auth.OAuthService) {
+	s.oauthMu.Lock()
+	s.oauth = service
+	s.oauthMu.Unlock()
 }
 
-func (s *Server) samlEnabled() bool {
-	return s.samlService() != nil
+func (s *Server) oauthEnabled() bool {
+	return s.oauthService() != nil
 }
 
 func NewServer(ctx context.Context, cfg *config.Config, store *store.Store, santa *santa.Service, sessions *auth.SessionManager, broadcaster *events.Broadcaster, logger *slog.Logger) (*Server, error) {
-	// Check if SAML is enabled before trying to initialise SAML service
-	samlSettings, err := store.GetSAMLSettings(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get SAML settings: %w", err)
-	}
-
-	var samlService *auth.SAMLService
-	if samlSettings.Enabled {
-		samlService, err = auth.NewSAMLServiceFromSettings(ctx, cfg, samlSettings)
+	// Check if OAuth is enabled (Azure config available)
+	var oauthService *auth.OAuthService
+	if cfg.AzureTenantID != "" && cfg.AzureClientID != "" && cfg.AzureClientSecret != "" {
+		var err error
+		oauthService, err = auth.NewOAuthService(cfg)
 		if err != nil {
-			return nil, fmt.Errorf("init saml: %w", err)
+			return nil, fmt.Errorf("initialize OAuth service: %w", err)
 		}
 	}
 
@@ -83,7 +78,7 @@ func NewServer(ctx context.Context, cfg *config.Config, store *store.Store, sant
 		broadcaster: broadcaster,
 		logger:      logger.With("component", "api"),
 	}
-	srv.setSAMLService(samlService)
+	srv.setOAuthService(oauthService)
 	return srv, nil
 }
 
@@ -139,15 +134,14 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/login", s.handleLogin)
 		r.Get("/providers", s.handleAuthProviders)
 		r.Post("/login/local", s.handleLocalLogin)
-		r.Get("/callback", s.handleCallback)
-		r.Post("/callback", s.handleCallback)
+		r.Get("/oauth/callback", s.handleCallback)
+		r.Post("/oauth/callback", s.handleCallback)
 		r.Post("/logout", s.handleLogout)
-		r.Get("/metadata", s.handleMetadata)
 		r.With(s.sessions.RequireAuth).Get("/me", s.handleMe)
 	})
 
 	r.Route("/santa", func(r chi.Router) {
-		// Santa sync protocol endpoints - no authentication required as per protocol
+		// Santa sync protocol endpoints
 		r.Post("/preflight/{machine_id}", s.handleSantaPreflight)
 		r.Post("/eventupload/{machine_id}", s.handleSantaEventUpload)
 		r.Post("/ruledownload/{machine_id}", s.handleSantaRuleDownload)
@@ -157,29 +151,24 @@ func (s *Server) Routes() http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Use(s.sessions.RequireAuth)
 
-		// Admin-only routes
-		r.Group(func(r chi.Router) {
-			r.Use(s.sessions.RequireAdmin)
-			r.Get("/apps", s.handleListApplications)
-			r.Get("/apps/check", s.handleCheckApplicationExists)
-			r.Post("/apps", s.handleCreateApplication)
-			r.Patch("/apps/{id}", s.handleUpdateApplication)
-			r.Delete("/apps/{id}", s.handleDeleteApplication)
-			r.Get("/apps/{id}/scopes", s.handleListApplicationScopes)
-			r.Post("/apps/{id}/scopes", s.handleCreateScope)
-			r.Delete("/apps/{id}/scopes/{scopeID}", s.handleDeleteScope)
-			r.Get("/groups", s.handleListGroups)
-			r.Get("/groups/memberships", s.handleListGroupMemberships)
-			r.Get("/users", s.handleListUsers)
-			r.Get("/users/{id}", s.handleGetUserDetails)
-			r.Get("/devices", s.handleListDevices)
-			r.Get("/events/blocked", s.handleListBlocked)
-			r.Get("/events/blocked/stream", s.handleEventStream)
-			// Settings endpoints
-			r.Get("/settings/saml", s.handleGetSAMLSettings)
-			r.Put("/settings/saml", s.handleUpdateSAMLSettings)
-			r.Get("/settings/santa-config", s.handleGetSantaConfig)
-		})
+		// All authenticated routes
+		r.Get("/apps", s.handleListApplications)
+		r.Get("/apps/check", s.handleCheckApplicationExists)
+		r.Post("/apps", s.handleCreateApplication)
+		r.Patch("/apps/{id}", s.handleUpdateApplication)
+		r.Delete("/apps/{id}", s.handleDeleteApplication)
+		r.Get("/apps/{id}/scopes", s.handleListApplicationScopes)
+		r.Post("/apps/{id}/scopes", s.handleCreateScope)
+		r.Delete("/apps/{id}/scopes/{scopeID}", s.handleDeleteScope)
+		r.Get("/groups", s.handleListGroups)
+		r.Get("/groups/memberships", s.handleListGroupMemberships)
+		r.Get("/users", s.handleListUsers)
+		r.Get("/users/{id}", s.handleGetUserDetails)
+		r.Get("/devices", s.handleListDevices)
+		r.Get("/events/blocked", s.handleListBlocked)
+		r.Get("/events/blocked/stream", s.handleEventStream)
+		// Settings endpoints
+		r.Get("/settings/santa-config", s.handleGetSantaConfig)
 	})
 
 	return r
@@ -188,102 +177,123 @@ func (s *Server) Routes() http.Handler {
 func (s *Server) handleAuthProviders(w http.ResponseWriter, r *http.Request) {
 	logger := s.logOperation(r, "auth_providers")
 	resp := struct {
-		SAML  bool `json:"saml"`
+		OAuth bool `json:"oauth"`
 		Local bool `json:"local"`
 	}{
-		SAML:  s.samlEnabled(),
+		OAuth: s.oauthEnabled(),
 		Local: true,
 	}
-	logger.Debug("reporting authentication providers", "saml_enabled", resp.SAML, "local_enabled", resp.Local)
+	logger.Debug("reporting authentication providers", "oauth_enabled", resp.OAuth, "local_enabled", resp.Local)
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	logger := s.logOperation(r, "saml_login")
-	samlSvc := s.samlService()
-	if samlSvc == nil {
-		logger.Warn("SAML login requested but service is not configured")
-		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
+	logger := s.logOperation(r, "oauth_login")
+	oauthSvc := s.oauthService()
+	if oauthSvc == nil {
+		logger.Warn("OAuth login requested but service is not configured")
+		http.Error(w, "oauth not configured", http.StatusServiceUnavailable)
 		return
 	}
 	sess, err := s.sessions.Session(r)
 	if err != nil {
-		logger.Error("failed to obtain session for SAML login", "error", err)
+		logger.Error("failed to obtain session for OAuth login", "error", err)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
-	state := randomString()
-	sess.Values["saml_relay"] = state
+	state, err := auth.GenerateOAuthState()
+	if err != nil {
+		logger.Error("failed to generate OAuth state", "error", err)
+		http.Error(w, "state generation error", http.StatusInternalServerError)
+		return
+	}
+	sess.Values["oauth_state"] = state
 	if err := sess.Save(r, w); err != nil {
-		logger.Error("failed to persist SAML relay state", "error", err)
+		logger.Error("failed to persist OAuth state", "error", err)
 		http.Error(w, "session save", http.StatusInternalServerError)
 		return
 	}
-	authURL, err := samlSvc.BuildAuthURL(state)
+	authURL, err := oauthSvc.BuildAuthURL(state)
 	if err != nil {
-		logger.Error("failed to build SAML auth URL", "error", err)
-		http.Error(w, "saml redirect", http.StatusInternalServerError)
+		logger.Error("failed to build OAuth auth URL", "error", err)
+		http.Error(w, "oauth redirect", http.StatusInternalServerError)
 		return
 	}
-	logger.Info("redirecting to SAML identity provider")
+	logger.Info("redirecting to OAuth identity provider")
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
 func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
-	logger := s.logOperation(r, "saml_callback")
-	samlSvc := s.samlService()
-	if samlSvc == nil {
-		logger.Warn("SAML callback invoked but service is not configured")
-		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
+	logger := s.logOperation(r, "oauth_callback")
+	oauthSvc := s.oauthService()
+	if oauthSvc == nil {
+		logger.Warn("OAuth callback invoked but service is not configured")
+		http.Error(w, "oauth not configured", http.StatusServiceUnavailable)
 		return
 	}
 	ctx := r.Context()
 	sess, err := s.sessions.Session(r)
 	if err != nil {
-		logger.Error("failed to load session for SAML callback", "error", err)
+		logger.Error("failed to load session for OAuth callback", "error", err)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		logger.Warn("failed to parse SAML response form", "error", err)
-		http.Error(w, "invalid response", http.StatusBadRequest)
+
+	// Check for OAuth error
+	if errParam := r.URL.Query().Get("error"); errParam != "" {
+		errDesc := r.URL.Query().Get("error_description")
+		logger.Warn("OAuth authorization error", "error", errParam, "description", errDesc)
+		http.Error(w, "authorization denied", http.StatusForbidden)
 		return
 	}
 
-	expectedRelay, _ := sess.Values["saml_relay"].(string)
-	relayState := r.FormValue("RelayState")
-	if expectedRelay != "" && relayState != expectedRelay {
-		logger.Warn("SAML relay state mismatch", "expected", expectedRelay, "received", relayState)
-		http.Error(w, "invalid relay state", http.StatusBadRequest)
-		return
-	}
-	samlResponse := r.FormValue("SAMLResponse")
-	if samlResponse == "" {
-		logger.Warn("SAML response missing from callback")
-		http.Error(w, "missing saml response", http.StatusBadRequest)
+	// Verify state parameter
+	expectedState, _ := sess.Values["oauth_state"].(string)
+	receivedState := r.URL.Query().Get("state")
+	if expectedState != "" && receivedState != expectedState {
+		logger.Warn("OAuth state mismatch", "expected", expectedState, "received", receivedState)
+		http.Error(w, "invalid state parameter", http.StatusBadRequest)
 		return
 	}
 
-	assertion, err := samlSvc.ParseAssertion(samlResponse)
+	// Get authorization code
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		logger.Warn("OAuth authorization code missing from callback")
+		http.Error(w, "missing authorization code", http.StatusBadRequest)
+		return
+	}
+
+	// Exchange code for token
+	tokenResp, err := oauthSvc.ExchangeCodeForToken(ctx, code)
 	if err != nil {
-		logger.Warn("invalid SAML assertion", "error", err)
-		http.Error(w, "invalid saml assertion", http.StatusUnauthorized)
+		logger.Error("failed to exchange OAuth code for token", "error", err)
+		http.Error(w, "token exchange failed", http.StatusInternalServerError)
 		return
 	}
 
-	identity := samlSvc.ExtractIdentity(assertion)
-	if identity.ExternalID == "" {
-		logger.Warn("SAML assertion missing external identifier")
-		http.Error(w, "missing object identifier", http.StatusForbidden)
+	// Get user info
+	userInfo, err := oauthSvc.GetUserInfo(ctx, tokenResp.AccessToken)
+	if err != nil {
+		logger.Error("failed to get user info from OAuth provider", "error", err)
+		http.Error(w, "user info failed", http.StatusInternalServerError)
 		return
 	}
-	principal := firstNonEmpty(identity.Principal, identity.Email, identity.RawNameID)
+
+	// Extract identity
+	identity := oauthSvc.ExtractIdentity(userInfo)
+	if identity.ExternalID == "" {
+		logger.Warn("OAuth user info missing external identifier")
+		http.Error(w, "missing user identifier", http.StatusForbidden)
+		return
+	}
+	principal := firstNonEmpty(identity.Principal, identity.Email, identity.Sub)
 	if principal == "" {
-		logger.Warn("SAML assertion missing principal attributes", "external_id", identity.ExternalID)
+		logger.Warn("OAuth user info missing principal attributes", "external_id", identity.ExternalID)
 		http.Error(w, "missing principal", http.StatusForbidden)
 		return
 	}
-	displayName := firstNonEmpty(identity.DisplayName, identity.RawNameID, principal)
+	displayName := firstNonEmpty(identity.DisplayName, principal)
 	email := identity.Email
 	if email == "" {
 		email = principal
@@ -291,23 +301,23 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.store.UpsertCloudUserByExternal(ctx, identity.ExternalID, principal, displayName, email)
 	if err != nil {
-		logger.Error("failed to upsert SAML user", "error", err, "principal", principal)
+		logger.Error("failed to upsert OAuth user", "error", err, "principal", principal)
 		http.Error(w, "user upsert failed", http.StatusInternalServerError)
 		return
 	}
 
 	if err := s.sessions.SetUser(w, r, user.ID); err != nil {
-		logger.Error("failed to establish session after SAML login", "error", err, "user_id", user.ID)
+		logger.Error("failed to establish session after OAuth login", "error", err, "user_id", user.ID)
 		http.Error(w, "set session", http.StatusInternalServerError)
 		return
 	}
-	delete(sess.Values, "saml_relay")
+	delete(sess.Values, "oauth_state")
 	if err := sess.Save(r, w); err != nil {
-		logger.Error("failed to persist session after SAML login", "error", err, "user_id", user.ID)
+		logger.Error("failed to persist session after OAuth login", "error", err, "user_id", user.ID)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
-	logger.Info("SAML login completed", "user_id", user.ID, "principal", principal)
+	logger.Info("OAuth login completed", "user_id", user.ID, "principal", principal)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
@@ -338,20 +348,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("returning authenticated user details", "user_id", userID)
 	s.writeJSON(w, http.StatusOK, user)
-}
-
-func (s *Server) handleMetadata(w http.ResponseWriter, r *http.Request) {
-	logger := s.logOperation(r, "saml_metadata")
-	samlSvc := s.samlService()
-	if samlSvc == nil {
-		logger.Warn("metadata requested but SAML service not configured")
-		http.Error(w, "saml not configured", http.StatusServiceUnavailable)
-		return
-	}
-	w.Header().Set("Content-Type", "application/xml")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(samlSvc.Metadata())
-	logger.Debug("served SAML metadata document")
 }
 
 func (s *Server) handleListApplications(w http.ResponseWriter, r *http.Request) {
@@ -434,7 +430,9 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(errorResponse)
+		if err := json.NewEncoder(w).Encode(errorResponse); err != nil {
+			logger.Error("failed to encode error response", "error", err)
+		}
 		return
 	}
 
@@ -719,7 +717,9 @@ func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", msg)
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+				return
+			}
 			flusher.Flush()
 		}
 	}
@@ -758,7 +758,11 @@ func (s *Server) handleSantaPreflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if closer, ok := bodyReader.(io.Closer); ok {
-		defer closer.Close()
+		defer func() {
+			if err := closer.Close(); err != nil {
+				logger.Warn("failed to close body reader", "error", err)
+			}
+		}()
 	}
 
 	var req models.PreflightRequest
@@ -817,7 +821,11 @@ func (s *Server) handleSantaEventUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if closer, ok := bodyReader.(io.Closer); ok {
-		defer closer.Close()
+		defer func() {
+			if err := closer.Close(); err != nil {
+				logger.Warn("failed to close body reader", "error", err)
+			}
+		}()
 	}
 
 	var req models.EventUploadRequest
@@ -889,7 +897,11 @@ func (s *Server) handleSantaRuleDownload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if closer, ok := bodyReader.(io.Closer); ok {
-		defer closer.Close()
+		defer func() {
+			if err := closer.Close(); err != nil {
+				logger.Warn("failed to close body reader", "error", err)
+			}
+		}()
 	}
 
 	var req models.RuleDownloadRequest
@@ -948,7 +960,11 @@ func (s *Server) handleSantaPostflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if closer, ok := bodyReader.(io.Closer); ok {
-		defer closer.Close()
+		defer func() {
+			if err := closer.Close(); err != nil {
+				logger.Warn("failed to close body reader", "error", err)
+			}
+		}()
 	}
 
 	var req models.PostflightRequest
@@ -1083,14 +1099,6 @@ func (s *Server) writeJSONError(r *http.Request, w http.ResponseWriter, status i
 	}
 }
 
-func randomString() string {
-	b := make([]byte, 24)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("%d", time.Now().UnixNano())
-	}
-	return fmt.Sprintf("%x", b)
-}
-
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if v != "" {
@@ -1101,53 +1109,6 @@ func firstNonEmpty(values ...string) string {
 }
 
 // Settings handlers
-
-func (s *Server) handleGetSAMLSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := s.store.GetSAMLSettings(r.Context())
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to get SAML settings: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(settings); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Server) handleUpdateSAMLSettings(w http.ResponseWriter, r *http.Request) {
-	var settings models.SAMLSettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	ctx := r.Context()
-
-	if settings.Enabled {
-		newService, err := auth.NewSAMLServiceFromSettings(ctx, s.cfg, &settings)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to validate SAML settings: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		if err := s.store.UpdateSAMLSettings(ctx, &settings); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update SAML settings: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		s.setSAMLService(newService)
-	} else {
-		if err := s.store.UpdateSAMLSettings(ctx, &settings); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update SAML settings: %v", err), http.StatusInternalServerError)
-			return
-		}
-		s.setSAMLService(nil)
-	}
-
-	s.writeJSON(w, http.StatusOK, settings)
-}
 
 func (s *Server) handleGetSantaConfig(w http.ResponseWriter, r *http.Request) {
 	// Generate Santa client configuration XML

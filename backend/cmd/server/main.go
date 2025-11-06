@@ -149,15 +149,12 @@ func runServer(ctx context.Context, cfg *config.Config, logger *slog.Logger) err
 	logger.Debug("store initialised")
 
 	// Initialise admin user if configured
-	if cfg.InitialAdminPrincipal != "" {
-		logger.Debug("ensuring configured initial admin user",
-			"principal", cfg.InitialAdminPrincipal,
-			"display_name", cfg.InitialAdminDisplayName,
-		)
-		if err := store.EnsureInitialAdminUser(ctx, cfg.InitialAdminPrincipal, cfg.InitialAdminDisplayName, cfg.InitialAdminEmail, cfg.InitialAdminPassword); err != nil {
+	if cfg.InitialAdminPassword != "" {
+		logger.Debug("ensuring configured initial admin user")
+		if err := store.EnsureInitialAdminUser(ctx, cfg.InitialAdminPassword); err != nil {
 			logger.Warn("failed to initialise admin user", "error", err)
 		} else {
-			logger.Info("initial admin user ensured", "principal", cfg.InitialAdminPrincipal)
+			logger.Info("initial admin user ensured", "principal", "admin")
 		}
 	}
 

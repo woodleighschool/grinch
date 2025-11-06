@@ -90,7 +90,6 @@ function UserSummary({ user }: SummaryProps) {
                 <span className="badge secondary">
                     {capitalize(user.user_type)}
                 </span>
-                {user.is_admin && <span className="badge primary">Admin</span>}
                 {user.user_type === "local" && user.is_protected_local && (
                     <span className="badge secondary">Protected</span>
                 )}

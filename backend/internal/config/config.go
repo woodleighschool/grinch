@@ -29,41 +29,37 @@ type Config struct {
 	AzureTenantID            string
 	AzureClientID            string
 	AzureClientSecret        string
+	OAuthRedirectURL         string // Optional OAuth redirect URL override (defaults to http://[server]/api/auth/oauth/callback)
 	SyncInterval             time.Duration
 	SSEBufferSize            int
 	AllowedOrigins           []string
 	EnableMetrics            bool
 	LogLevel                 string
 	// Initial admin user configuration
-	InitialAdminEmail       string
-	InitialAdminPrincipal   string
-	InitialAdminDisplayName string
-	InitialAdminPassword    string
+	InitialAdminPassword string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		ServerAddress:           getEnv("SERVER_ADDRESS", ":8080"),
-		FrontendDistDir:         getEnv("FRONTEND_DIST", "/frontend"),
-		DatabaseHost:            os.Getenv("DATABASE_HOST"),
-		DatabasePort:            getEnv("DATABASE_PORT", "5432"),
-		DatabaseName:            os.Getenv("DATABASE_NAME"),
-		DatabaseUser:            os.Getenv("DATABASE_USER"),
-		DatabasePassword:        os.Getenv("DATABASE_PASSWORD"),
-		DatabaseSSLMode:         getEnv("DATABASE_SSLMODE", "disable"),
-		CookieName:              getEnv("SESSION_COOKIE_NAME", "grinch_session"),
-		CookieSecret:            os.Getenv("SESSION_COOKIE_SECRET"),
-		AzureTenantID:           os.Getenv("AZURE_TENANT_ID"),
-		AzureClientID:           os.Getenv("AZURE_CLIENT_ID"),
-		AzureClientSecret:       os.Getenv("AZURE_CLIENT_SECRET"),
-		SSEBufferSize:           getEnvInt("EVENT_SSE_BUFFER", 64),
-		EnableMetrics:           getEnvBool("ENABLE_METRICS", true),
-		LogLevel:                getEnv("LOG_LEVEL", "info"),
-		InitialAdminEmail:       os.Getenv("INITIAL_ADMIN_EMAIL"),
-		InitialAdminPrincipal:   os.Getenv("INITIAL_ADMIN_PRINCIPAL_NAME"),
-		InitialAdminDisplayName: os.Getenv("INITIAL_ADMIN_DISPLAY_NAME"),
-		InitialAdminPassword:    os.Getenv("INITIAL_ADMIN_PASSWORD"),
+		ServerAddress:        getEnv("SERVER_ADDRESS", ":8080"),
+		FrontendDistDir:      getEnv("FRONTEND_DIST", "/frontend"),
+		DatabaseHost:         os.Getenv("DATABASE_HOST"),
+		DatabasePort:         getEnv("DATABASE_PORT", "5432"),
+		DatabaseName:         os.Getenv("DATABASE_NAME"),
+		DatabaseUser:         os.Getenv("DATABASE_USER"),
+		DatabasePassword:     os.Getenv("DATABASE_PASSWORD"),
+		DatabaseSSLMode:      getEnv("DATABASE_SSLMODE", "disable"),
+		CookieName:           getEnv("SESSION_COOKIE_NAME", "grinch_session"),
+		CookieSecret:         os.Getenv("SESSION_COOKIE_SECRET"),
+		AzureTenantID:        os.Getenv("AZURE_TENANT_ID"),
+		AzureClientID:        os.Getenv("AZURE_CLIENT_ID"),
+		AzureClientSecret:    os.Getenv("AZURE_CLIENT_SECRET"),
+		OAuthRedirectURL:     getEnv("OAUTH_REDIRECT_URL", ""),
+		SSEBufferSize:        getEnvInt("EVENT_SSE_BUFFER", 64),
+		EnableMetrics:        getEnvBool("ENABLE_METRICS", true),
+		LogLevel:             getEnv("LOG_LEVEL", "info"),
+		InitialAdminPassword: os.Getenv("INITIAL_ADMIN_PASSWORD"),
 	}
 
 	if raw := os.Getenv("SYNC_INTERVAL"); raw != "" {
@@ -113,7 +109,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("SESSION_COOKIE_SECRET not set")
 	}
 	if cfg.AzureTenantID == "" || cfg.AzureClientID == "" || cfg.AzureClientSecret == "" {
-		return nil, fmt.Errorf("azure entra variables missing")
+		return nil, fmt.Errorf("azure Entra ID variables (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET) are required for both user syncing and OAuth authentication")
 	}
 
 	return cfg, nil

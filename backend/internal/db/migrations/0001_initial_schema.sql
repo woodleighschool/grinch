@@ -228,31 +228,6 @@ CREATE TABLE user_role_assignments (
 CREATE INDEX idx_user_role_assignments_user ON user_role_assignments (user_id);
 CREATE INDEX idx_user_role_assignments_role ON user_role_assignments (role_group_id);
 
-CREATE TABLE application_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    key TEXT NOT NULL UNIQUE,
-    value JSONB NOT NULL DEFAULT 'null'::jsonb,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_application_settings_key ON application_settings (key);
-
-INSERT INTO application_settings (key, value, description) VALUES
-    ('saml.enabled', 'false'::jsonb, 'Whether SAML authentication is enabled'),
-    ('saml.metadata_url', 'null'::jsonb, 'SAML Identity Provider metadata URL'),
-    ('saml.entity_id', 'null'::jsonb, 'SAML Service Provider entity ID'),
-    ('saml.acs_url', 'null'::jsonb, 'SAML Assertion Consumer Service URL'),
-    ('saml.sp_private_key', 'null'::jsonb, 'SAML Service Provider private key (PEM format)'),
-    ('saml.sp_certificate', 'null'::jsonb, 'SAML Service Provider certificate (PEM format)'),
-    ('saml.name_id_format', 'null'::jsonb, 'SAML NameID format'),
-    ('saml.object_id_attribute', '"http://schemas.microsoft.com/identity/claims/objectidentifier"'::jsonb, 'SAML attribute for object ID'),
-    ('saml.upn_attribute', '"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn"'::jsonb, 'SAML attribute for UPN'),
-    ('saml.email_attribute', '"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"'::jsonb, 'SAML attribute for email'),
-    ('saml.display_name_attribute', '"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"'::jsonb, 'SAML attribute for display name')
-ON CONFLICT (key) DO NOTHING;
-
 CREATE OR REPLACE FUNCTION cleanup_orphaned_local_users()
 RETURNS void AS $$
 BEGIN

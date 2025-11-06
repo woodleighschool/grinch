@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -49,13 +48,6 @@ func (s *Store) UpsertCloudUserByExternal(ctx context.Context, externalID, princ
 		          display_name,
 		          email,
 		          user_type,
-		          EXISTS (
-		              SELECT 1
-		              FROM user_role_assignments ura
-		              JOIN role_groups rg ON ura.role_group_id = rg.id
-		              WHERE ura.user_id = users.id
-		                AND rg.name = 'admin'
-		          ) AS is_admin,
 		          synced_at,
 		          created_at,
 		          updated_at;
@@ -75,7 +67,6 @@ func (s *Store) UpsertCloudUserByExternal(ctx context.Context, externalID, princ
 		&dbDisplay,
 		&dbEmail,
 		&userTypeStr,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -103,13 +94,6 @@ func (s *Store) UpsertLocalUser(ctx context.Context, principal, displayName, mac
 		          display_name,
 		          email,
 		          user_type,
-		          EXISTS (
-		              SELECT 1
-		              FROM user_role_assignments ura
-		              JOIN role_groups rg ON ura.role_group_id = rg.id
-		              WHERE ura.user_id = users.id
-		                AND rg.name = 'admin'
-		          ) AS is_admin,
 		          synced_at,
 		          created_at,
 		          updated_at;
@@ -129,7 +113,6 @@ func (s *Store) UpsertLocalUser(ctx context.Context, principal, displayName, mac
 		&dbDisplay,
 		&dbEmail,
 		&userTypeStr,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -173,13 +156,6 @@ func (s *Store) GetUser(ctx context.Context, id uuid.UUID) (*models.User, error)
 		       email,
 		       user_type,
 		       is_protected_local,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -201,7 +177,6 @@ func (s *Store) GetUser(ctx context.Context, id uuid.UUID) (*models.User, error)
 		&dbEmail,
 		&userTypeStr,
 		&user.IsProtectedLocal,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -224,13 +199,6 @@ func (s *Store) UserByExternalID(ctx context.Context, externalID string) (*model
 		       display_name,
 		       email,
 		       user_type,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -251,7 +219,6 @@ func (s *Store) UserByExternalID(ctx context.Context, externalID string) (*model
 		&dbDisplay,
 		&dbEmail,
 		&userTypeStr,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -274,13 +241,6 @@ func (s *Store) UserByPrincipalName(ctx context.Context, principal string) (*mod
 		       display_name,
 		       email,
 		       user_type,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -301,7 +261,6 @@ func (s *Store) UserByPrincipalName(ctx context.Context, principal string) (*mod
 		&dbDisplay,
 		&dbEmail,
 		&userTypeStr,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -324,13 +283,6 @@ func (s *Store) ListLocalUsers(ctx context.Context) ([]*models.User, error) {
 		       display_name,
 		       email,
 		       user_type,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -359,7 +311,6 @@ func (s *Store) ListLocalUsers(ctx context.Context) ([]*models.User, error) {
 			&dbDisplay,
 			&dbEmail,
 			&userTypeStr,
-			&user.IsAdmin,
 			&user.SyncedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
@@ -414,13 +365,6 @@ func (s *Store) GetCloudUsersNotSyncedSince(ctx context.Context, since time.Time
 		       display_name,
 		       email,
 		       user_type,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -450,7 +394,6 @@ func (s *Store) GetCloudUsersNotSyncedSince(ctx context.Context, since time.Time
 			&dbDisplay,
 			&dbEmail,
 			&userTypeStr,
-			&user.IsAdmin,
 			&user.SyncedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
@@ -545,13 +488,6 @@ func (s *Store) ListUsers(ctx context.Context, limit int) ([]models.User, error)
 		       display_name,
 		       email,
 		       user_type,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -588,7 +524,6 @@ func (s *Store) ListUsers(ctx context.Context, limit int) ([]models.User, error)
 			&dbDisplay,
 			&dbEmail,
 			&userTypeStr,
-			&user.IsAdmin,
 			&user.SyncedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
@@ -927,7 +862,9 @@ func (s *Store) ReplaceGroupMemberships(ctx context.Context, groupID uuid.UUID, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx) // Ignore rollback errors; transaction may be committed
+	}()
 
 	if _, err := tx.Exec(ctx, `DELETE FROM group_memberships WHERE group_id = $1`, groupID); err != nil {
 		return err
@@ -1521,13 +1458,13 @@ func (s *Store) RemoveUserRole(ctx context.Context, userID uuid.UUID, roleName s
 }
 
 // EnsureInitialAdminUser creates or updates an initial admin user based on provided configuration
-func (s *Store) EnsureInitialAdminUser(ctx context.Context, principal, displayName, email, password string) error {
-	if principal == "" {
-		return fmt.Errorf("principal name is required for initial admin user")
-	}
+func (s *Store) EnsureInitialAdminUser(ctx context.Context, password string) error {
 	if password == "" {
 		return fmt.Errorf("password is required for initial admin user")
 	}
+
+	const adminPrincipal = "admin"
+	const adminDisplayName = "Master Claus"
 
 	// Hash the password
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -1538,10 +1475,10 @@ func (s *Store) EnsureInitialAdminUser(ctx context.Context, principal, displayNa
 	// Create or update the user as a protected local user with password
 	const upsertUserQuery = `
 		INSERT INTO users (principal_name, display_name, email, user_type, password_hash, is_protected_local, created_at, updated_at)
-		VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), 'local', $4, true, NOW(), NOW())
+		VALUES ($1, $2, NULL, 'local', $3, true, NOW(), NOW())
 		ON CONFLICT (principal_name) DO UPDATE
-			SET display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), users.display_name),
-			    email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
+			SET display_name = EXCLUDED.display_name,
+			    email = NULL,
 			    password_hash = EXCLUDED.password_hash,
 			    user_type = 'local',
 			    is_protected_local = true,
@@ -1551,7 +1488,7 @@ func (s *Store) EnsureInitialAdminUser(ctx context.Context, principal, displayNa
 	`
 
 	var userID uuid.UUID
-	err = s.pool.QueryRow(ctx, upsertUserQuery, principal, displayName, email, string(passwordHash)).Scan(&userID)
+	err = s.pool.QueryRow(ctx, upsertUserQuery, adminPrincipal, adminDisplayName, string(passwordHash)).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("failed to create/update initial admin user: %w", err)
 	}
@@ -1575,13 +1512,6 @@ func (s *Store) AuthenticateLocalUser(ctx context.Context, principal, password s
 		       user_type,
 		       password_hash,
 		       is_protected_local,
-		       EXISTS (
-		           SELECT 1
-		           FROM user_role_assignments ura
-		           JOIN role_groups rg ON ura.role_group_id = rg.id
-		           WHERE ura.user_id = users.id
-		             AND rg.name = 'admin'
-		       ) AS is_admin,
 		       synced_at,
 		       created_at,
 		       updated_at
@@ -1607,7 +1537,6 @@ func (s *Store) AuthenticateLocalUser(ctx context.Context, principal, password s
 		&userTypeStr,
 		&passwordHash,
 		&user.IsProtectedLocal,
-		&user.IsAdmin,
 		&user.SyncedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -1626,146 +1555,4 @@ func (s *Store) AuthenticateLocalUser(ctx context.Context, principal, password s
 	user.UserType = models.UserType(userTypeStr)
 	setUserStrings(&user, dbDisplay, dbEmail)
 	return &user, nil
-}
-
-// Settings management methods
-
-// GetSetting retrieves a setting by key
-func (s *Store) GetSetting(ctx context.Context, key string) (*models.ApplicationSetting, error) {
-	const q = `
-		SELECT id, key, value, description, created_at, updated_at
-		FROM application_settings
-		WHERE key = $1;
-	`
-	row := s.pool.QueryRow(ctx, q, key)
-
-	var setting models.ApplicationSetting
-	if err := row.Scan(
-		&setting.ID,
-		&setting.Key,
-		&setting.Value,
-		&setting.Description,
-		&setting.CreatedAt,
-		&setting.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &setting, nil
-}
-
-// SetSetting updates or creates a setting
-func (s *Store) SetSetting(ctx context.Context, key string, value interface{}) error {
-	valueJSON, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("marshal setting value: %w", err)
-	}
-
-	const q = `
-		UPDATE application_settings 
-		SET value = $2, updated_at = NOW()
-		WHERE key = $1;
-	`
-	result, err := s.pool.Exec(ctx, q, key, valueJSON)
-	if err != nil {
-		return err
-	}
-
-	if result.RowsAffected() == 0 {
-		return fmt.Errorf("setting with key %s not found", key)
-	}
-	return nil
-}
-
-// GetSAMLSettings retrieves all SAML-related settings
-func (s *Store) GetSAMLSettings(ctx context.Context) (*models.SAMLSettings, error) {
-	const q = `
-		SELECT key, value
-		FROM application_settings
-		WHERE key LIKE 'saml.%'
-		ORDER BY key;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	settings := &models.SAMLSettings{}
-	for rows.Next() {
-		var key string
-		var value json.RawMessage
-		if err := rows.Scan(&key, &value); err != nil {
-			return nil, err
-		}
-
-		switch key {
-		case "saml.enabled":
-			json.Unmarshal(value, &settings.Enabled)
-		case "saml.metadata_url":
-			json.Unmarshal(value, &settings.MetadataURL)
-		case "saml.entity_id":
-			json.Unmarshal(value, &settings.EntityID)
-		case "saml.acs_url":
-			json.Unmarshal(value, &settings.ACSURL)
-		case "saml.sp_private_key":
-			json.Unmarshal(value, &settings.SPPrivateKey)
-		case "saml.sp_certificate":
-			json.Unmarshal(value, &settings.SPCertificate)
-		case "saml.name_id_format":
-			json.Unmarshal(value, &settings.NameIDFormat)
-		case "saml.object_id_attribute":
-			json.Unmarshal(value, &settings.ObjectIDAttribute)
-		case "saml.upn_attribute":
-			json.Unmarshal(value, &settings.UPNAttribute)
-		case "saml.email_attribute":
-			json.Unmarshal(value, &settings.EmailAttribute)
-		case "saml.display_name_attribute":
-			json.Unmarshal(value, &settings.DisplayNameAttribute)
-		}
-	}
-	return settings, rows.Err()
-}
-
-// UpdateSAMLSettings updates SAML-related settings
-func (s *Store) UpdateSAMLSettings(ctx context.Context, settings *models.SAMLSettings) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	settingsMap := map[string]interface{}{
-		"saml.enabled":                settings.Enabled,
-		"saml.metadata_url":           settings.MetadataURL,
-		"saml.entity_id":              settings.EntityID,
-		"saml.acs_url":                settings.ACSURL,
-		"saml.sp_private_key":         settings.SPPrivateKey,
-		"saml.sp_certificate":         settings.SPCertificate,
-		"saml.name_id_format":         settings.NameIDFormat,
-		"saml.object_id_attribute":    settings.ObjectIDAttribute,
-		"saml.upn_attribute":          settings.UPNAttribute,
-		"saml.email_attribute":        settings.EmailAttribute,
-		"saml.display_name_attribute": settings.DisplayNameAttribute,
-	}
-
-	const q = `
-		UPDATE application_settings 
-		SET value = $2, updated_at = NOW()
-		WHERE key = $1;
-	`
-
-	for key, value := range settingsMap {
-		valueJSON, err := json.Marshal(value)
-		if err != nil {
-			return fmt.Errorf("marshal setting %s: %w", key, err)
-		}
-		if _, err := tx.Exec(ctx, q, key, valueJSON); err != nil {
-			return fmt.Errorf("update setting %s: %w", key, err)
-		}
-	}
-
-	return tx.Commit(ctx)
 }

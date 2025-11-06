@@ -96,7 +96,9 @@ func (s *Store) GetSantaSyncState(ctx context.Context, machineID string) (*model
 func (s *Store) CreateSantaRuleCursor(ctx context.Context, machineID string, lastRuleID *uuid.UUID) (string, error) {
 	// Create a unique cursor token
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%s:%d", machineID, time.Now().UnixNano())))
+	if _, err := fmt.Fprintf(h, "%s:%d", machineID, time.Now().UnixNano()); err != nil {
+		return "", fmt.Errorf("failed to write cursor data: %w", err)
+	}
 	cursorToken := fmt.Sprintf("%x", h.Sum(nil))[:32]
 
 	const q = `
@@ -319,7 +321,9 @@ func (s *Store) InsertSantaEvent(ctx context.Context, machineID string, event mo
 func (s *Store) RecordSantaRuleDelivery(ctx context.Context, machineID string, rule models.SantaRule) error {
 	// Create hash of rule for deduplication
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%s:%s:%s", rule.RuleType, rule.Identifier, rule.Policy)))
+	if _, err := fmt.Fprintf(h, "%s:%s:%s", rule.RuleType, rule.Identifier, rule.Policy); err != nil {
+		return fmt.Errorf("failed to write rule data for hash: %w", err)
+	}
 	ruleHash := fmt.Sprintf("%x", h.Sum(nil))
 
 	const q = `

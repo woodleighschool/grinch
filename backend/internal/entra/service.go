@@ -266,7 +266,11 @@ func (s *Service) doGraphRequest(ctx context.Context, token, url string) ([]byte
 		s.logger.Error("graph request failed", "url", url, "error", err)
 		return nil, "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			s.logger.Warn("failed to close response body", "error", err)
+		}
+	}()
 	duration := time.Since(start)
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
