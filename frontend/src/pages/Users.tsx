@@ -147,7 +147,7 @@ export default function Users() {
           sorting={true}
           filtering={true}
           pagination={users.length > 10}
-          pageSize={10}
+          pageSize={100}
         />
       )}
     </div>

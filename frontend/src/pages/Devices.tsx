@@ -215,7 +215,7 @@ export default function Devices() {
           sorting={true}
           filtering={true}
           pagination={devices.length > 10}
-          pageSize={10}
+          pageSize={100}
         />
       )}
     </div>

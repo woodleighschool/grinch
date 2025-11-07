@@ -54,8 +54,14 @@ function UserSummary({ user }: SummaryProps) {
           marginBottom: "16px",
         }}
       >
-        <Badge variant="secondary" caps>{user.user_type}</Badge>
-        {user.user_type === "local" && user.is_protected_local && <Badge variant="secondary" caps>Protected</Badge>}
+        <Badge variant="secondary" caps>
+          {user.user_type}
+        </Badge>
+        {user.user_type === "local" && user.is_protected_local && (
+          <Badge variant="secondary" caps>
+            Protected
+          </Badge>
+        )}
         <Badge size="md" variant="neutral" label="Created" value={formatDateTime(user.created_at)} caps />
         {user.synced_at && <Badge size="md" variant="neutral" label="Last Synced" value={formatDateTime(user.synced_at)} caps />}
       </div>

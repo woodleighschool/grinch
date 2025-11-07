@@ -925,30 +925,9 @@ label {
   z-index: 0;
 }
 
-.assignment-card.expanded {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow:
-    0 12px 24px rgba(15, 23, 42, 0.08),
-    0 0 0 1px rgba(59, 130, 246, 0.2),
-    0 0 30px rgba(59, 130, 246, 0.35),
-    0 0 60px rgba(59, 130, 246, 0.15);
-  z-index: 10;
-}
-
 .assignment-card:hover {
   border-color: rgba(59, 130, 246, 0.45);
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
-}
-
-.assignment-card.expanded:hover {
-  border-color: rgba(59, 130, 246, 0.6);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.12),
-    0 0 0 1px rgba(59, 130, 246, 0.25),
-    0 0 35px rgba(59, 130, 246, 0.4),
-    0 0 70px rgba(59, 130, 246, 0.2);
-  transform: translateY(-2px);
-  z-index: 15;
 }
 
 .assignment-card.disabled {
@@ -1043,15 +1022,6 @@ label {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.assignment-card.expanded .assignment-card-chevron {
-  transform: rotate(90deg);
-  color: rgba(59, 130, 246, 0.8);
-}
-
-.assignment-card-header:hover .assignment-card-chevron {
-  color: rgba(59, 130, 246, 0.9);
 }
 
 .assignment-card-expanded-content {
