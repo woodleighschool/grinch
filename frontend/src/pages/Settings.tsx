@@ -69,7 +69,9 @@ function SettingsModule({
               </div>
             </div>
             <div className="assignment-card-summary-meta">
-              <div className="assignment-card-summary-identifier">{description}</div>
+              <Badge size="md" variant="secondary">
+                {description}
+              </Badge>
               <div className="assignment-card-summary-stats">
                 {enabled !== undefined && (
                   <Badge size="md" variant={enabled ? "success" : "neutral"}>

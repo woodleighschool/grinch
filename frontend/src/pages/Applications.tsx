@@ -525,14 +525,14 @@ export default function Applications() {
                       <div className="assignment-card-summary-main">
                         <div className="assignment-card-summary-title">
                           <h3 className="assignment-card-title">{app.name}</h3>
-                          <Badge size="sm" variant={app.rule_type.toLowerCase() as any} caps>
+                          <Badge size="md" variant={app.rule_type.toLowerCase() as any} caps>
                             {app.rule_type}
                           </Badge>
                         </div>
                         <div className="assignment-card-summary-meta">
-                          <code className="assignment-card-summary-identifier" title={app.identifier}>
+                          <Badge size="md" variant="secondary">
                             {app.identifier}
-                          </code>
+                          </Badge>
                           <div className="assignment-card-summary-stats">
                             <Badge size="md" variant="success" label="Allow" value={stats.allowCount} caps />
                             <Badge size="md" variant="danger" label="Block" value={stats.blockCount} caps />

@@ -234,7 +234,7 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, onClear
             <div
               className="target-selector-dropdown"
               style={{
-                maxHeight: "600px", // Increased from 300px
+                maxHeight: "600px",
               }}
             >
               <div
@@ -561,12 +561,12 @@ export default function ApplicationDetails() {
             alignItems: "center",
           }}
         >
-          <Badge size="sm" variant={app.rule_type.toLowerCase() as any} caps>
+          <Badge size="md" variant={app.rule_type.toLowerCase() as any} caps>
             {app.rule_type}
           </Badge>
-          <code className="assignment-card-summary-identifier" title={app.identifier}>
+          <Badge size="md" variant="secondary">
             {app.identifier}
-          </code>
+          </Badge>
           <Badge size="md" variant="neutral" label="Assignments" value={totalAssignments} caps />
         </div>
 

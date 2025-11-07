@@ -1029,17 +1029,6 @@ label {
   justify-content: space-between;
 }
 
-.assignment-card-summary-identifier {
-  font-size: 12px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  padding: 4px 8px;
-  border-radius: 8px;
-  min-width: 0;
-  word-wrap: break-word;
-  hyphens: auto;
-}
-
 .assignment-card-summary-stats {
   display: flex;
   gap: 6px;
