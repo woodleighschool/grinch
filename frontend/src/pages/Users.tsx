@@ -146,7 +146,7 @@ export default function Users() {
           onGlobalFilterChange={setSearchTerm}
           sorting={true}
           filtering={true}
-          pagination={filteredUsers.length > 10}
+          pagination={users.length > 10}
           pageSize={10}
         />
       )}

@@ -214,7 +214,7 @@ export default function Devices() {
           globalFilter={searchTerm}
           sorting={true}
           filtering={true}
-          pagination={filteredDevices.length > 10}
+          pagination={devices.length > 10}
           pageSize={10}
         />
       )}
