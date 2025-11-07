@@ -32,6 +32,46 @@ func (s *Store) UpsertUserByExternal(ctx context.Context, externalID, principal,
 }
 
 func (s *Store) UpsertCloudUserByExternal(ctx context.Context, externalID, principal, displayName, email string) (*models.User, error) {
+	// First, handle potential conflicts with local users that have the same principal name
+	const checkConflictQ = `
+		UPDATE users 
+		SET external_id = $1,
+		    display_name = $2,
+		    email = $3,
+		    user_type = 'cloud',
+		    synced_at = NOW(),
+		    updated_at = NOW()
+		WHERE principal_name = $4 AND user_type = 'local' AND is_protected_local = false
+		RETURNING id, external_id, principal_name, display_name, email, user_type, synced_at, created_at, updated_at;
+	`
+
+	row := s.pool.QueryRow(ctx, checkConflictQ, externalID, displayName, email, principal)
+	var (
+		user        models.User
+		userTypeStr string
+		dbDisplay   sql.NullString
+		dbEmail     sql.NullString
+	)
+
+	// Try to convert existing local user first
+	if err := row.Scan(
+		&user.ID,
+		&user.ExternalID,
+		&user.PrincipalName,
+		&dbDisplay,
+		&dbEmail,
+		&userTypeStr,
+		&user.SyncedAt,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	); err == nil {
+		// Successfully converted local user to cloud user
+		user.UserType = models.UserType(userTypeStr)
+		setUserStrings(&user, dbDisplay, dbEmail)
+		return &user, nil
+	}
+
+	// No local user to convert, proceed with normal upsert
 	const q = `
 		INSERT INTO users (external_id, principal_name, display_name, email, user_type, synced_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'cloud', NOW(), NOW())
@@ -53,13 +93,7 @@ func (s *Store) UpsertCloudUserByExternal(ctx context.Context, externalID, princ
 		          updated_at;
 	`
 
-	row := s.pool.QueryRow(ctx, q, externalID, principal, displayName, email)
-	var (
-		user        models.User
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
+	row = s.pool.QueryRow(ctx, q, externalID, principal, displayName, email)
 	if err := row.Scan(
 		&user.ID,
 		&user.ExternalID,
