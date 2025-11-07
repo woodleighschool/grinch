@@ -191,8 +191,9 @@ func (s *Store) GetSantaRulesForMachine(ctx context.Context, machineID string, l
 			SELECT a.id, a.identifier, a.rule_type, s.action, a.description, a.created_at
 			FROM applications a
 			JOIN application_scopes s ON a.id = s.application_id
-			WHERE (s.target_type = 'user' AND s.target_id = ANY($1))
-			   OR (s.target_type = 'group' AND s.target_id = ANY($1))
+			WHERE a.enabled = TRUE
+			  AND ((s.target_type = 'user' AND s.target_id = ANY($1))
+			   OR (s.target_type = 'group' AND s.target_id = ANY($1)))
 			ORDER BY a.id
 			LIMIT $2;
 		`
@@ -202,7 +203,8 @@ func (s *Store) GetSantaRulesForMachine(ctx context.Context, machineID string, l
 			SELECT a.id, a.identifier, a.rule_type, s.action, a.description, a.created_at
 			FROM applications a
 			JOIN application_scopes s ON a.id = s.application_id
-			WHERE ((s.target_type = 'user' AND s.target_id = ANY($1))
+			WHERE a.enabled = TRUE
+			  AND ((s.target_type = 'user' AND s.target_id = ANY($1))
 			    OR (s.target_type = 'group' AND s.target_id = ANY($1)))
 			  AND a.id > $2
 			ORDER BY a.id
