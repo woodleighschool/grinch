@@ -269,8 +269,10 @@ function UserDetailsPanel({ details }: UserDetailsPanelProps) {
                       flexWrap: "wrap",
                     }}
                   >
-                    <Badge variant="secondary">{policy.rule_type}</Badge>
-                    <Badge variant="secondary">{policy.action.toUpperCase()}</Badge>
+                    <Badge size="md" variant={policy.rule_type.toLowerCase() as any} caps>
+                      {policy.rule_type}
+                    </Badge>
+                    <Badge variant={policy.action === "allow" ? "success" : "danger"}>{policy.action.toUpperCase()}</Badge>
                     {policy.via_group && <Badge variant="secondary">Via group: {policy.target_name || policy.target_id}</Badge>}
                   </div>
                 </div>
