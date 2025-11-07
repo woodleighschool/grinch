@@ -30,7 +30,7 @@ func (s *Service) Preflight(ctx context.Context, machineID string, req models.Pr
 	// Find primary user - create as local user if not found
 	var primaryUserID *uuid.UUID
 	if req.PrimaryUser != "" {
-		user, err := s.store.UserByPrincipalName(ctx, req.PrimaryUser)
+		user, err := s.store.UserByUsername(ctx, req.PrimaryUser)
 		if err != nil {
 			return nil, fmt.Errorf("lookup primary user: %w", err)
 		}

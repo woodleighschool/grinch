@@ -29,6 +29,7 @@ type Config struct {
 	AzureTenantID            string
 	AzureClientID            string
 	AzureClientSecret        string
+	AzureRegisteredDomains   []string
 	SyncInterval             time.Duration
 	SSEBufferSize            int
 	AllowedOrigins           []string

@@ -145,7 +145,7 @@ func runServer(ctx context.Context, cfg *config.Config, logger *slog.Logger) err
 	}
 	logger.Info("database migrations completed")
 
-	store := store.New(pool)
+	store := store.New(pool, cfg)
 	logger.Debug("store initialised")
 
 	// Initialise admin user if configured

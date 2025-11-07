@@ -260,7 +260,7 @@ func (s *Store) InsertSantaEvent(ctx context.Context, machineID string, event mo
 	// Try to find user by executing_user, create as local if not found
 	var userID *uuid.UUID
 	if event.ExecutingUser != "" {
-		user, err := s.UserByPrincipalName(ctx, event.ExecutingUser)
+		user, err := s.UserByUsername(ctx, event.ExecutingUser)
 		if err == nil && user != nil {
 			userID = &user.ID
 		} else {

@@ -90,6 +90,7 @@ func (s *Service) Sync(ctx context.Context) error {
 		usersEvaluatedForRemoval    int
 		groupsProcessed             int
 		membershipsUpdated          int
+		azureDomainsChanged         bool
 	}{}
 
 	// Sync all users from the tenant
@@ -160,6 +161,19 @@ func (s *Service) Sync(ctx context.Context) error {
 		s.logger.Debug("replaced group memberships", "group_id", g.ID, "member_count", len(memberIDs))
 	}
 
+	// Finally check the default domain for the tenant
+	domains, err := s.fetchAzureDomains(ctx, token.Token)
+	if err != nil {
+		return err
+	}
+	if domainsEqual(domains, s.cfg.AzureRegisteredDomains) {
+		s.cfg.AzureRegisteredDomains = domains
+		stats.azureDomainsChanged = true
+		s.logger.Debug("updated Azure registered domains", "domains", domains)
+	} else {
+		s.logger.Debug("domains already up to date", "domains", domains)
+	}
+
 	s.logger.Info("Entra sync cycle completed",
 		"duration", time.Since(start),
 		"users_synced", stats.usersSynced,
@@ -170,6 +184,7 @@ func (s *Service) Sync(ctx context.Context) error {
 		"users_evaluated_for_removal", stats.usersEvaluatedForRemoval,
 		"groups_processed", stats.groupsProcessed,
 		"memberships_updated", stats.membershipsUpdated,
+		"default_domain_changed", stats.azureDomainsChanged,
 	)
 
 	return nil
@@ -189,6 +204,17 @@ type graphMember struct {
 	Mail              string         `json:"mail"`
 	AccountEnabled    bool           `json:"accountEnabled"`
 	AdditionalData    map[string]any `json:"-"`
+}
+
+type graphDomain struct {
+	AuthenticationType string   `json:"authenticationType"`
+	AvailabilityStatus string   `json:"availabilityStatus"`
+	IsAdminManaged     bool     `json:"isAdminManaged"`
+	IsDefault          bool     `json:"isDefault"`
+	IsInitial          bool     `json:"isInitial"`
+	IsRoot             bool     `json:"isRoot"`
+	ID                 string   `json:"id"`
+	SupportedServices  []string `json:"supportedServices"`
 }
 
 func (m graphMember) PrincipalName() string {
@@ -252,6 +278,25 @@ func (s *Service) fetchGroupMembers(ctx context.Context, token, groupID string) 
 		nextURL = next
 	}
 	return members, nil
+}
+
+func (s *Service) fetchAzureDomains(ctx context.Context, token string) ([]string, error) {
+	var domains []string
+	URL := fmt.Sprintf("%s/domains", graphBase)
+	body, _, err := s.doGraphRequest(ctx, token, URL)
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Value []graphDomain `json:"value"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("decode domains: %w", err)
+	}
+	for _, domain := range payload.Value {
+		domains = append(domains, domain.ID)
+	}
+	return domains, nil
 }
 
 func (s *Service) doGraphRequest(ctx context.Context, token, url string) ([]byte, string, error) {
@@ -448,4 +493,16 @@ func (s *Service) verifyUserExistsInEntra(ctx context.Context, token, externalID
 
 	// User exists, but check if they should be included
 	return user.shouldIncludeUser(), nil
+}
+
+func domainsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

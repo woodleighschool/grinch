@@ -12,15 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/woodleighschool/grinch/backend/internal/config"
 	"github.com/woodleighschool/grinch/backend/internal/models"
 )
 
 type Store struct {
 	pool *pgxpool.Pool
+	cfg  *config.Config
 }
 
-func New(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool}
+func New(pool *pgxpool.Pool, config *config.Config) *Store {
+	return &Store{pool: pool, cfg: config}
 }
 
 func (s *Store) Pool() *pgxpool.Pool {
@@ -152,7 +154,7 @@ func (s *Store) UpsertLocalUser(ctx context.Context, principal, displayName, mac
 		&user.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			existing, lookupErr := s.UserByPrincipalName(ctx, principal)
+			existing, lookupErr := s.UserByUsername(ctx, principal)
 			if lookupErr != nil {
 				return nil, lookupErr
 			}
@@ -267,42 +269,59 @@ func (s *Store) UserByExternalID(ctx context.Context, externalID string) (*model
 	return &user, nil
 }
 
-func (s *Store) UserByPrincipalName(ctx context.Context, principal string) (*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE principal_name = $1;
-	`
-	row := s.pool.QueryRow(ctx, q, principal)
+func (s *Store) UserByUsername(ctx context.Context, username string) (*models.User, error) {
 	var (
 		user        models.User
+		userMatched bool
+		principal   string
 		userTypeStr string
 		dbDisplay   sql.NullString
 		dbEmail     sql.NullString
 	)
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+	const q = `
+		SELECT id,
+			external_id,
+			principal_name,
+			display_name,
+			email,
+			user_type,
+			synced_at,
+			created_at,
+			updated_at
+		FROM users
+		WHERE principal_name = $1
+	`
+	// Iterate over stored domains
+	i := 0
+	for !userMatched {
+		if i > len(s.cfg.AzureRegisteredDomains) {
+			principal = username
+		} else {
+			domain := s.cfg.AzureRegisteredDomains[i]
+			principal = fmt.Sprintf("%s@%s", principal, domain)
 		}
-		return nil, err
+		row := s.pool.QueryRow(ctx, q, principal)
+		if err := row.Scan(
+			&user.ID,
+			&user.ExternalID,
+			&user.PrincipalName,
+			&dbDisplay,
+			&dbEmail,
+			&userTypeStr,
+			&userTypeStr,
+			&user.SyncedAt,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			return nil, err
+		}
+		i++
+	}
+	if !userMatched {
+		return nil, nil
 	}
 	user.UserType = models.UserType(userTypeStr)
 	setUserStrings(&user, dbDisplay, dbEmail)
