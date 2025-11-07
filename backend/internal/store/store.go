@@ -309,7 +309,6 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (*models.Us
 			&dbDisplay,
 			&dbEmail,
 			&userTypeStr,
-			&userTypeStr,
 			&user.SyncedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
