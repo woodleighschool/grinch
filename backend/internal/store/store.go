@@ -1408,89 +1408,6 @@ func setUserStrings(user *models.User, display, email sql.NullString) {
 	}
 }
 
-// Role management methods
-func (s *Store) EnsureUserHasRole(ctx context.Context, userID uuid.UUID, roleName string) error {
-	// Get role group ID
-	roleGroupID, err := s.getRoleGroupID(ctx, roleName)
-	if err != nil {
-		return fmt.Errorf("get role group: %w", err)
-	}
-
-	const q = `
-		INSERT INTO user_role_assignments (user_id, role_group_id)
-		VALUES ($1, $2)
-		ON CONFLICT (user_id, role_group_id) DO NOTHING;
-	`
-	_, err = s.pool.Exec(ctx, q, userID, roleGroupID)
-	return err
-}
-
-func (s *Store) getRoleGroupID(ctx context.Context, roleName string) (uuid.UUID, error) {
-	const q = `SELECT id FROM role_groups WHERE name = $1;`
-	var id uuid.UUID
-	err := s.pool.QueryRow(ctx, q, roleName).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, fmt.Errorf("role group %s not found", roleName)
-	}
-	return id, err
-}
-
-func (s *Store) UserHasRole(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
-	roleGroupID, err := s.getRoleGroupID(ctx, roleName)
-	if err != nil {
-		return false, err
-	}
-
-	const q = `
-		SELECT EXISTS(
-			SELECT 1 FROM user_role_assignments 
-			WHERE user_id = $1 AND role_group_id = $2
-		);
-	`
-	var exists bool
-	err = s.pool.QueryRow(ctx, q, userID, roleGroupID).Scan(&exists)
-	return exists, err
-}
-
-func (s *Store) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	const q = `
-		SELECT rg.name
-		FROM user_role_assignments ura
-		JOIN role_groups rg ON ura.role_group_id = rg.id
-		WHERE ura.user_id = $1
-		ORDER BY rg.name;
-	`
-	rows, err := s.pool.Query(ctx, q, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var roles []string
-	for rows.Next() {
-		var role string
-		if err := rows.Scan(&role); err != nil {
-			return nil, err
-		}
-		roles = append(roles, role)
-	}
-	return roles, rows.Err()
-}
-
-func (s *Store) RemoveUserRole(ctx context.Context, userID uuid.UUID, roleName string) error {
-	roleGroupID, err := s.getRoleGroupID(ctx, roleName)
-	if err != nil {
-		return err
-	}
-
-	const q = `
-		DELETE FROM user_role_assignments 
-		WHERE user_id = $1 AND role_group_id = $2;
-	`
-	_, err = s.pool.Exec(ctx, q, userID, roleGroupID)
-	return err
-}
-
 // EnsureInitialAdminUser creates or updates an initial admin user based on provided configuration
 func (s *Store) EnsureInitialAdminUser(ctx context.Context, password string) error {
 	if password == "" {
@@ -1525,11 +1442,6 @@ func (s *Store) EnsureInitialAdminUser(ctx context.Context, password string) err
 	err = s.pool.QueryRow(ctx, upsertUserQuery, adminPrincipal, adminDisplayName, string(passwordHash)).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("failed to create/update initial admin user: %w", err)
-	}
-
-	// Ensure the user has admin role
-	if err := s.EnsureUserHasRole(ctx, userID, "admin"); err != nil {
-		return fmt.Errorf("failed to assign admin role to initial user: %w", err)
 	}
 
 	return nil

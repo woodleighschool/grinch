@@ -43,17 +43,6 @@ function UserSummary({ user }: SummaryProps) {
         >
           {user.principal_name}
         </div>
-        {user.email && (
-          <div
-            style={{
-              fontSize: "14px",
-              color: "var(--text-primary)",
-              marginBottom: "8px",
-            }}
-          >
-            <strong>Email:</strong> {user.email}
-          </div>
-        )}
       </div>
 
       <div
@@ -65,9 +54,8 @@ function UserSummary({ user }: SummaryProps) {
           marginBottom: "16px",
         }}
       >
-        <Badge variant="secondary">{capitalize(user.user_type)}</Badge>
-        {user.user_type === "local" && user.is_protected_local && <Badge variant="secondary">Protected</Badge>}
-        {user.role_groups && user.role_groups.length > 0 && <Badge variant="secondary">Roles: {user.role_groups.join(", ")}</Badge>}
+        <Badge variant="secondary" caps>{user.user_type}</Badge>
+        {user.user_type === "local" && user.is_protected_local && <Badge variant="secondary" caps>Protected</Badge>}
         <Badge size="md" variant="neutral" label="Created" value={formatDateTime(user.created_at)} caps />
         {user.synced_at && <Badge size="md" variant="neutral" label="Last Synced" value={formatDateTime(user.synced_at)} caps />}
       </div>

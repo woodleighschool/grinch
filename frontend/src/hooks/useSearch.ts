@@ -16,7 +16,7 @@ export function useSearch<T>(items: T[], config: SearchConfig<T>, initialSearchT
   const fuse = useMemo(() => {
     const options: IFuseOptions<T> = {
       keys: config.keys,
-      threshold: config.threshold ?? 0.3, // 0.0 = exact match, 1.0 = match anything
+      threshold: config.threshold ?? 0.3,
       includeScore: config.includeScore ?? false,
       includeMatches: config.includeMatches ?? false,
       minMatchCharLength: config.minMatchCharLength ?? 1,

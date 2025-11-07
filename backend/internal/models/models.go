@@ -262,18 +262,9 @@ type User struct {
 	UserType         UserType   `json:"user_type"`
 	PasswordHash     *string    `json:"-"` // Never expose password hash in JSON
 	IsProtectedLocal bool       `json:"is_protected_local"`
-	RoleGroups       []string   `json:"role_groups,omitempty"`
 	SyncedAt         *time.Time `json:"synced_at,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
-}
-
-// RoleGroup represents a role group that can be assigned to users
-type RoleGroup struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
 }
 
 // ApplicationSetting represents a configurable application setting
@@ -284,15 +275,6 @@ type ApplicationSetting struct {
 	Description string          `json:"description,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
-}
-
-// UserRoleAssignment represents a user's assignment to a role group
-type UserRoleAssignment struct {
-	ID          uuid.UUID  `json:"id"`
-	UserID      uuid.UUID  `json:"user_id"`
-	RoleGroupID uuid.UUID  `json:"role_group_id"`
-	AssignedAt  time.Time  `json:"assigned_at"`
-	AssignedBy  *uuid.UUID `json:"assigned_by,omitempty"`
 }
 
 // LocalUserMetadata contains metadata specific to local users

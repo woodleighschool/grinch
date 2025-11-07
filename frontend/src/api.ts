@@ -73,7 +73,6 @@ export interface DirectoryUser {
   email?: string;
   user_type: "local" | "cloud";
   is_protected_local: boolean;
-  role_groups?: string[];
   synced_at?: string;
   created_at: string;
   updated_at: string;

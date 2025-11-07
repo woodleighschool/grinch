@@ -631,13 +631,6 @@ func (s *Server) handleGetUserDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roles, err := s.store.GetUserRoles(ctx, userID)
-	if err != nil {
-		http.Error(w, "get user roles", http.StatusInternalServerError)
-		return
-	}
-	user.RoleGroups = roles
-
 	groups, err := s.store.GroupsForUser(ctx, userID)
 	if err != nil {
 		http.Error(w, "get user groups", http.StatusInternalServerError)

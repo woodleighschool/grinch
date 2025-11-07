@@ -204,30 +204,6 @@ CREATE TABLE santa_rule_deliveries (
 
 CREATE INDEX idx_santa_rule_deliveries_machine ON santa_rule_deliveries (machine_id);
 
-CREATE TABLE role_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO role_groups (name, description)
-VALUES ('admin', 'Administrative access to the system')
-ON CONFLICT (name) DO NOTHING;
-
-CREATE TABLE user_role_assignments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_group_id UUID NOT NULL REFERENCES role_groups(id) ON DELETE CASCADE,
-    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    assigned_by UUID REFERENCES users(id),
-    CONSTRAINT user_role_assignments_unique UNIQUE (user_id, role_group_id)
-);
-
-CREATE INDEX idx_user_role_assignments_user ON user_role_assignments (user_id);
-CREATE INDEX idx_user_role_assignments_role ON user_role_assignments (role_group_id);
-
 CREATE OR REPLACE FUNCTION cleanup_orphaned_local_users()
 RETURNS void AS $$
 BEGIN
