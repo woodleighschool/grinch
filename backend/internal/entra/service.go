@@ -166,7 +166,7 @@ func (s *Service) Sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if domainsEqual(domains, s.cfg.AzureRegisteredDomains) {
+	if !domainsEqual(domains, s.cfg.AzureRegisteredDomains) {
 		s.cfg.AzureRegisteredDomains = domains
 		stats.azureDomainsChanged = true
 		s.logger.Debug("updated Azure registered domains", "domains", domains)

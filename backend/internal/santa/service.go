@@ -51,28 +51,30 @@ func (s *Service) Preflight(ctx context.Context, machineID string, req models.Pr
 		return nil, fmt.Errorf("update host info: %w", err)
 	}
 
-	// Get or create sync state
-	syncState, err := s.store.GetSantaSyncState(ctx, machineID)
-	if err != nil {
-		return nil, fmt.Errorf("get sync state: %w", err)
-	}
+	// TODO: Implement some nicer logic here for different sync types with a user override optional
+	// // Get or create sync state
+	// syncState, err := s.store.GetSantaSyncState(ctx, machineID)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("get sync state: %w", err)
+	// }
 
-	// Determine sync type
-	syncType := models.SyncTypeNormal
-	if syncState == nil {
-		// First sync for this machine should be a clean sync
-		syncType = models.SyncTypeClean
-	} else if req.RequestCleanSync {
-		// Client has requested a clean sync
-		syncType = models.SyncTypeClean
-	}
+	// // Determine sync type
+	// syncType := models.SyncTypeNormal
+	// if syncState == nil {
+	// 	// First sync for this machine should be a clean sync
+	// 	syncType = models.SyncTypeClean
+	// } else if req.RequestCleanSync {
+	// 	// Client has requested a clean sync
+	// 	syncType = models.SyncTypeClean
+	// }
 
-	// Check for rule drift (if hashes are provided)
-	if syncState != nil && req.RuleCountHash != "" {
-		if syncState.RuleCountHash != req.RuleCountHash {
-			syncType = models.SyncTypeClean
-		}
-	}
+	// // Check for rule drift (if hashes are provided)
+	// if syncState != nil && req.RuleCountHash != "" {
+	// 	if syncState.RuleCountHash != req.RuleCountHash {
+	// 		syncType = models.SyncTypeClean
+	// 	}
+	// }
+	syncType := models.SyncTypeCleanAll
 
 	// Configure response
 	enableBundles := true
