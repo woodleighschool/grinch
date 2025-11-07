@@ -294,11 +294,12 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (*models.Us
 	// Iterate over stored domains
 	i := 0
 	for !userMatched {
-		if i > len(s.cfg.AzureRegisteredDomains) {
+		if i >= len(s.cfg.AzureRegisteredDomains) {
+			// Try with the username as-is if no domains or we've tried all domains
 			principal = username
 		} else {
 			domain := s.cfg.AzureRegisteredDomains[i]
-			principal = fmt.Sprintf("%s@%s", principal, domain)
+			principal = fmt.Sprintf("%s@%s", username, domain)
 		}
 		row := s.pool.QueryRow(ctx, q, principal)
 		if err := row.Scan(
@@ -314,11 +315,16 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (*models.Us
 			&user.UpdatedAt,
 		); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				i++
+				// If we've tried all domains and the username as-is, break
+				if i > len(s.cfg.AzureRegisteredDomains) {
+					break
+				}
 				continue
 			}
 			return nil, err
 		}
-		i++
+		userMatched = true
 	}
 	if !userMatched {
 		return nil, nil
