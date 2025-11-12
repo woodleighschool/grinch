@@ -74,8 +74,8 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload := h.compiler.BuildPayload(machine, ruleRows, assignments)
-	if req.GetCursor() != "" && req.GetCursor() == payload.Cursor {
-		respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{Cursor: payload.Cursor})
+	if machine.RuleCursor.Valid && machine.RuleCursor.String == payload.Cursor {
+		respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{})
 		return
 	}
 	wireRules := make([]*syncv1.Rule, 0, len(payload.Rules))
@@ -85,7 +85,7 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.store.TouchMachine(ctx, machine.ID, machine.ClientVersion.String, machine.SyncCursor.String, payload.Cursor); err != nil {
 		h.logger.Warn("touch machine", "err", err)
 	}
-	respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{Cursor: payload.Cursor, Rules: wireRules})
+	respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{Rules: wireRules})
 }
 
 func convertRule(rule rules.SyncRule) *syncv1.Rule {

@@ -179,9 +179,6 @@ func uuidToPgtype(id uuid.UUID) pgtype.UUID {
 }
 
 func ComputeCursor(rules []sqlc.Rule) string {
-	if len(rules) == 0 {
-		return ""
-	}
 	type tuple struct {
 		ID    string
 		Stamp string
