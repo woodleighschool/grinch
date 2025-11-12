@@ -28,8 +28,6 @@ func (h Handler) getSantaConfig(w http.ResponseWriter, r *http.Request) {
 	var config strings.Builder
 	config.WriteString(fmt.Sprintf("<key>SyncBaseURL</key>\n<string>%s</string>\n", syncURL))
 	config.WriteString("<key>MachineOwner</key>\n<string>{{username}}</string>\n")
-	config.WriteString("<key>EnableAllEventUpload</key>\n<true/>\n")
-	config.WriteString("<key>DisableUnknownEventUpload</key>\n<false/>\n")
 	config.WriteString("<key>SyncClientContentEncoding</key>\n<string>gzip</string>\n")
 
 	respondJSON(w, http.StatusOK, santaConfigResponse{XML: config.String()})

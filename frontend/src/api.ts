@@ -126,9 +126,17 @@ export interface SantaConfig {
 
 export interface Device {
   id: string;
+  machineIdentifier: string;
   serial: string;
   hostname: string;
+  primaryUser?: string;
+  clientMode?: string;
+  cleanSyncRequested?: boolean;
   lastSeen?: string;
+  lastPreflightAt?: string;
+  lastPostflightAt?: string;
+  lastRulesReceived?: number;
+  lastRulesProcessed?: number;
   ruleCursor?: string;
   syncCursor?: string;
 }

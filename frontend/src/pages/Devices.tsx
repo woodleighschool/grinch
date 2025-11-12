@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useDevices } from "../hooks/useQueries";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { formatTimeAgo } from "../utils/dates";
-import { Alert, Button, Card, CardContent, CardHeader, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography, Snackbar } from "@mui/material";
+import { Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography, Snackbar, Box } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -12,7 +12,7 @@ export default function Devices() {
   const trimmedSearch = searchTerm.trim();
   const hasSearchTerm = trimmedSearch.length > 0;
 
-  const { data: devices = [], isLoading, isFetching, error, refetch } = useDevices({ search: debouncedSearch });
+  const { data: devices = [], isLoading, isFetching, error } = useDevices({ search: debouncedSearch });
 
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
@@ -45,17 +45,6 @@ export default function Devices() {
     return { online, warning, offline, total: devices.length };
   }, [devices]);
 
-  const statusChip = (cat: Status, label?: string) => {
-    const map: Record<Status, { color: "success" | "warning" | "error" | "default"; text: string }> = {
-      success: { color: "success", text: "Online" },
-      warning: { color: "warning", text: "Inactive" },
-      danger: { color: "error", text: "Offline" },
-      muted: { color: "default", text: "Unknown" },
-    };
-    const { color, text } = map[cat];
-    return <Chip size="small" color={color} variant={color === "default" ? "outlined" : "filled"} label={label ?? text} />;
-  };
-
   const columns = useMemo<GridColDef[]>(
     () => [
       {
@@ -77,34 +66,81 @@ export default function Devices() {
         renderCell: (p) => <Typography component="code">{p.value || "—"}</Typography>,
       },
       {
+        field: "primaryUser",
+        headerName: "Primary User",
+        flex: 1.5,
+        minWidth: 200,
+        renderCell: (p) => <Typography variant="body2">{p.value || "—"}</Typography>,
+      },
+      {
+        field: "clientMode",
+        headerName: "Mode",
+        flex: 0.8,
+        minWidth: 100,
+        renderCell: (p) => (
+          <Chip
+            size="small"
+            label={p.value || "Unknown"}
+            color={p.value === "MONITOR" ? "primary" : p.value === "LOCKDOWN" ? "error" : "default"}
+            variant="outlined"
+          />
+        ),
+      },
+      {
         field: "status",
         headerName: "Status",
         flex: 1,
-        minWidth: 140,
+        minWidth: 100,
         sortable: false,
         valueGetter: (_value, row) => getStatusCategory(row.lastSeen as string | null),
-        renderCell: (p) => statusChip(p.value as Status),
-      },
-      {
-        field: "ruleCursor",
-        headerName: "Rule Cursor",
-        flex: 1,
-        minWidth: 140,
-        renderCell: (p) => <Typography variant="body2">{p.value || "—"}</Typography>,
-      },
-      {
-        field: "syncCursor",
-        headerName: "Sync Cursor",
-        flex: 1,
-        minWidth: 140,
-        renderCell: (p) => <Typography variant="body2">{p.value || "—"}</Typography>,
+        renderCell: (p) => {
+          const status = p.value as Status;
+          const colorMap = {
+            success: "success" as const,
+            warning: "warning" as const,
+            danger: "error" as const,
+            muted: "default" as const,
+          };
+          const textMap = {
+            success: "Online",
+            warning: "Inactive",
+            danger: "Offline",
+            muted: "Unknown",
+          };
+          return <Chip size="small" color={colorMap[status]} variant={colorMap[status] === "default" ? "outlined" : "filled"} label={textMap[status]} />;
+        },
       },
       {
         field: "lastSeen",
         headerName: "Last Seen",
-        flex: 0.8,
+        flex: 1,
         minWidth: 120,
         valueFormatter: (value) => (value ? formatTimeAgo(value as string) : "Never"),
+      },
+      {
+        field: "lastPreflightAt",
+        headerName: "Last Preflight",
+        flex: 1,
+        minWidth: 130,
+        valueFormatter: (value) => (value ? formatTimeAgo(value as string) : "Never"),
+      },
+      {
+        field: "cleanSyncRequested",
+        headerName: "Clean Sync",
+        flex: 0.8,
+        minWidth: 100,
+        renderCell: (p) => <Chip size="small" label={p.value ? "Yes" : "No"} color={p.value ? "warning" : "default"} variant="outlined" />,
+      },
+      {
+        field: "machineIdentifier",
+        headerName: "Machine ID",
+        flex: 1.2,
+        minWidth: 200,
+        renderCell: (p) => (
+          <Typography component="code" variant="body2" fontSize="0.75rem">
+            {p.value || "—"}
+          </Typography>
+        ),
       },
     ],
     [],
@@ -116,9 +152,12 @@ export default function Devices() {
         id: d.serial || d.hostname || crypto.randomUUID(),
         hostname: d.hostname,
         serial: d.serial,
+        primaryUser: d.primaryUser,
+        clientMode: d.clientMode,
         lastSeen: d.lastSeen,
-        ruleCursor: d.ruleCursor,
-        syncCursor: d.syncCursor,
+        lastPreflightAt: d.lastPreflightAt,
+        cleanSyncRequested: d.cleanSyncRequested,
+        machineIdentifier: d.machineIdentifier,
       })),
     [devices],
   );
@@ -129,38 +168,31 @@ export default function Devices() {
       <CardContent>
         <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            {statusChip("success", `Online: ${statusCounts.online}`)}
-            {statusChip("warning", `Inactive: ${statusCounts.warning}`)}
-            {statusChip("danger", `Offline: ${statusCounts.offline}`)}
+            <Chip size="small" color="success" variant="filled" label={`Online: ${statusCounts.online}`} />
+            <Chip size="small" color="warning" variant="filled" label={`Inactive: ${statusCounts.warning}`} />
+            <Chip size="small" color="error" variant="filled" label={`Offline: ${statusCounts.offline}`} />
             <Chip label={`Total: ${statusCounts.total}`} size="small" />
-            {isFetching && <CircularProgress size={16} />}
           </Stack>
 
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button size="small" variant="outlined" onClick={() => void refetch()}>
-              Refresh
-            </Button>
-            <TextField
-              type="search"
-              size="small"
-              label="Search devices..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              inputProps={{ "aria-label": "Search devices" }}
-            />
-          </Stack>
+          <TextField
+            type="search"
+            size="small"
+            label="Search devices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
         </Stack>
 
-        <div style={{ height: 600, width: "100%", marginTop: 16 }}>
+        <Box sx={{ height: 600, width: "100%", mt: 2 }}>
           <DataGrid
             rows={rows}
             columns={columns}
@@ -182,7 +214,7 @@ export default function Devices() {
               ),
             }}
           />
-        </div>
+        </Box>
 
         <Snackbar
           open={toast.open}
