@@ -4,6 +4,9 @@
     "gomod": {
         "enabled": true
     },
+    "npm": {
+        "enabled": true
+    },
     "packageRules": [
         {
             "matchCategories": ["golang"],
@@ -17,6 +20,19 @@
             "matchManagers": ["gomod"],
             "matchDepTypes": ["indirect"],
             "groupName": "Go indirect dependencies"
+        },
+        {
+            "matchCategories": ["js"],
+            "enabled": true
+        },
+        {
+            "matchManagers": ["npm"],
+            "groupName": "npm dependencies"
+        },
+        {
+            "matchManagers": ["npm"],
+            "matchDepTypes": ["devDependencies"],
+            "groupName": "npm dev dependencies"
         }
     ]
 }
