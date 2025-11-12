@@ -27,12 +27,18 @@ func (h *postflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "machine id required")
 		return
 	}
+	body, err := decodeBody(r)
+	if err != nil {
+		h.logger.Error("decode postflight body", "err", err)
+		respondError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
 	defer func() {
-		if closeErr := r.Body.Close(); closeErr != nil {
+		if closeErr := body.Close(); closeErr != nil {
 			h.logger.Warn("failed to close request body", "err", closeErr)
 		}
 	}()
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	bodyBytes, err := io.ReadAll(io.LimitReader(body, 1<<20))
 	if err != nil {
 		h.logger.Error("read postflight payload", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid payload")

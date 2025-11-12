@@ -1,8 +1,6 @@
 package santa
 
 import (
-	"compress/flate"
-	"compress/gzip"
 	"errors"
 	"io"
 	"log/slog"
@@ -104,19 +102,4 @@ func timestampFromFloat(value float64) time.Time {
 	sec := int64(integer)
 	nsec := int64(frac * float64(time.Second))
 	return time.Unix(sec, nsec).UTC()
-}
-
-func decodeBody(r *http.Request) (io.ReadCloser, error) {
-	switch strings.ToLower(r.Header.Get("Content-Encoding")) {
-	case "gzip":
-		reader, err := gzip.NewReader(r.Body)
-		if err != nil {
-			return nil, err
-		}
-		return reader, nil
-	case "deflate":
-		return flate.NewReader(r.Body), nil
-	default:
-		return r.Body, nil
-	}
 }

@@ -27,17 +27,23 @@ type preflightHandler struct {
 }
 
 func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if closeErr := r.Body.Close(); closeErr != nil {
-			h.logger.Warn("failed to close request body", "err", closeErr)
-		}
-	}()
 	machineIdentifier := strings.TrimSpace(chi.URLParam(r, "machineID"))
 	if machineIdentifier == "" {
 		respondError(w, http.StatusBadRequest, "machine id required")
 		return
 	}
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	body, err := decodeBody(r)
+	if err != nil {
+		h.logger.Error("decode preflight body", "err", err)
+		respondError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	defer func() {
+		if closeErr := body.Close(); closeErr != nil {
+			h.logger.Warn("failed to close request body", "err", closeErr)
+		}
+	}()
+	bodyBytes, err := io.ReadAll(io.LimitReader(body, 1<<20))
 	if err != nil {
 		h.logger.Error("read preflight payload", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid payload")
