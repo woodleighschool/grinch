@@ -16,6 +16,7 @@ vendor/
 # Go workspace files
 go.work
 go.work.sum
+.gocache
 
 # Go module cache
 bin/
@@ -26,6 +27,12 @@ dist/
 build/
 tmp/
 /jcdssync
+.env
+*.tsbuildinfo
+node_modules
+vite.config.d.ts
+vite.config.js
+.gitignore
 
 # macOS
 .DS_Store
@@ -40,5 +47,3 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-
-node_modules

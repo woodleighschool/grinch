@@ -1,8 +1,6 @@
 import { format, formatDistanceToNow, parseISO, isValid } from "date-fns";
 
-/**
- * Format a date string to a localized date and time
- */
+// Format a date string to a localized date and time
 export function formatDateTime(input: string | undefined): string {
   if (!input) return "Never";
 
@@ -16,9 +14,7 @@ export function formatDateTime(input: string | undefined): string {
   }
 }
 
-/**
- * Format a date string to just the date part
- */
+// Format a date string to just the date part
 export function formatDate(input: string | undefined): string {
   if (!input) return "Never";
 
@@ -32,9 +28,7 @@ export function formatDate(input: string | undefined): string {
   }
 }
 
-/**
- * Format a date as "time ago"
- */
+// Format a date as "time ago"
 export function formatTimeAgo(input: string | undefined): string {
   if (!input) return "Never";
 
@@ -48,9 +42,7 @@ export function formatTimeAgo(input: string | undefined): string {
   }
 }
 
-/**
- * Format a date in compact format for tables
- */
+//Format a date in compact format for tables
 export function formatCompactDateTime(input: string | undefined): string {
   if (!input) return "Never";
 

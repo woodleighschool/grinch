@@ -1,38 +1,43 @@
 export interface ApiUser {
-  id: string;
-  principal_name: string;
-  display_name?: string;
-  email?: string;
+  display_name: string;
 }
 
-export interface ApiError {
-  error: string;
-  message: string;
+export interface ApiErrorResponse {
+  error?: string;
+  message?: string;
+  field_errors?: Record<string, string>;
   existing_application?: {
     id: string;
     name: string;
   };
 }
 
-export class ApplicationDuplicateError extends Error {
+export class ApiValidationError extends Error {
   constructor(
     message: string,
-    public existingApplication: { id: string; name: string },
+    public code: string,
+    public fieldErrors: Record<string, string>,
+    public status: number,
+    public existingApplication?: { id: string; name: string },
   ) {
     super(message);
-    this.name = "ApplicationDuplicateError";
+    this.name = "ApiValidationError";
   }
 }
 
-export interface BlockedEvent {
+export interface EventRecord {
   id: number;
-  process_path: string;
-  process_hash?: string;
-  signer?: string;
-  blocked_reason?: string;
-  occurred_at: string;
-  ingested_at: string;
-  application_id?: string;
+  machineId: string;
+  userId?: string;
+  kind: string;
+  occurredAt?: string;
+  payload: Record<string, unknown>;
+}
+
+export interface EventStat {
+  bucket: string;
+  kind: string;
+  total: number;
 }
 
 export interface Application {
@@ -42,6 +47,23 @@ export interface Application {
   identifier: string;
   description?: string;
   enabled: boolean;
+  assignment_stats?: ApplicationAssignmentStats;
+}
+
+export interface ApplicationAssignmentStats {
+  allow_scopes: number;
+  block_scopes: number;
+  total_scopes: number;
+  allow_users: number;
+  block_users: number;
+  total_users: number;
+}
+
+export interface ApplicationFilters {
+  search?: string;
+  rule_type?: string;
+  identifier?: string;
+  enabled?: boolean;
 }
 
 export interface ApplicationScope {
@@ -51,31 +73,51 @@ export interface ApplicationScope {
   target_id: string;
   action: "allow" | "block";
   created_at: string;
+  target_display_name?: string;
+  target_description?: string;
+  target_upn?: string;
+  effective_member_ids: string[];
+  effective_member_count: number;
+  effective_members?: DirectoryUser[];
+}
+
+export interface ApplicationDetailResponse {
+  application: Application;
+  scopes: ApplicationScope[];
 }
 
 export interface DirectoryGroup {
   id: string;
-  external_id: string;
-  display_name: string;
+  displayName: string;
   description?: string;
 }
 
-export interface GroupMembership {
-  group_id: string;
-  user_id: string;
+export interface GroupQueryParams {
+  search?: string;
+}
+
+export interface GroupEffectiveMembersResponse {
+  group: DirectoryGroup;
+  members: DirectoryUser[];
+  member_ids: string[];
+  count: number;
 }
 
 export interface DirectoryUser {
   id: string;
-  external_id?: string;
-  display_name?: string;
-  principal_name: string;
-  email?: string;
-  user_type: "local" | "cloud";
-  is_protected_local: boolean;
-  synced_at?: string;
-  created_at: string;
-  updated_at: string;
+  upn: string;
+  displayName: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UserQueryParams {
+  search?: string;
+}
+
+export interface UserEffectivePoliciesResponse {
+  user: DirectoryUser;
+  policies: UserPolicy[];
 }
 
 export interface SantaConfig {
@@ -84,20 +126,17 @@ export interface SantaConfig {
 
 export interface Device {
   id: string;
+  serial: string;
   hostname: string;
-  serial_number?: string;
-  machine_id: string;
-  primary_user_id?: string;
-  primary_user_principal?: string;
-  primary_user_display_name?: string;
-  last_seen?: string;
-  os_version?: string;
-  os_build?: string;
-  model_identifier?: string;
-  santa_version?: string;
-  client_mode?: string;
-  created_at: string;
-  updated_at: string;
+  lastSeen?: string;
+  ruleCursor?: string;
+  syncCursor?: string;
+}
+
+export interface DeviceQueryParams {
+  search?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface UserEvent {
@@ -138,28 +177,56 @@ export interface AuthProviders {
   local: boolean;
 }
 
+export interface ValidationSuccess<T> {
+  valid: true;
+  normalized: T;
+}
+
+export interface ScopeValidationRequest {
+  application_id: string;
+  target_type: "group" | "user";
+  target_id: string;
+  action: "allow" | "block";
+}
+
+export interface ScopeValidationResponse {
+  application_id: string;
+  target_type: "group" | "user";
+  target_id: string;
+  action: "allow" | "block";
+}
+
+export interface ApplicationValidationPayload {
+  name: string;
+  rule_type: string;
+  identifier: string;
+  description?: string;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
-
-    // Try to parse as JSON for structured error responses
     try {
-      const errorData: ApiError = JSON.parse(text);
-
-      // Handle duplicate identifier error specifically
-      if (errorData.error === "DUPLICATE_IDENTIFIER" && errorData.existing_application) {
-        throw new ApplicationDuplicateError(errorData.message, errorData.existing_application);
+      const errorData: ApiErrorResponse = JSON.parse(text);
+      if (errorData.field_errors) {
+        throw new ApiValidationError(
+          errorData.message || "Validation failed",
+          errorData.error || "VALIDATION_FAILED",
+          errorData.field_errors,
+          res.status,
+          errorData.existing_application,
+        );
       }
-
-      // For other structured errors, throw with the message
-      throw new Error(errorData.message || text || res.statusText);
+      throw new Error(errorData.message || errorData.error || text || res.statusText);
     } catch (parseError) {
-      // If it's not JSON or parsing fails, fall back to text
-      if (parseError instanceof ApplicationDuplicateError) {
+      if (parseError instanceof ApiValidationError) {
         throw parseError;
       }
       throw new Error(text || res.statusText);
     }
+  }
+  if (res.status === 204) {
+    return undefined as T;
   }
   return res.json() as Promise<T>;
 }
@@ -181,27 +248,28 @@ export async function getAuthProviders(): Promise<AuthProviders> {
   return handleResponse<AuthProviders>(res);
 }
 
-export async function listApplications(): Promise<Application[]> {
-  const res = await fetch("/api/apps", { credentials: "include" });
+export async function listApplications(filters: ApplicationFilters = {}): Promise<Application[]> {
+  const params = new URLSearchParams();
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.rule_type?.trim()) params.set("rule_type", filters.rule_type.trim());
+  if (filters.identifier?.trim()) params.set("identifier", filters.identifier.trim());
+  if (filters.enabled !== undefined) params.set("enabled", String(filters.enabled));
+  const query = params.toString();
+  const res = await fetch(`/api/apps${query ? `?${query}` : ""}`, { credentials: "include" });
   return handleResponse<Application[]>(res);
 }
 
-export async function checkApplicationExists(identifier: string): Promise<Application | null> {
-  const res = await fetch(`/api/apps/check?identifier=${encodeURIComponent(identifier)}`, {
+export async function validateApplication(payload: ApplicationValidationPayload): Promise<ValidationSuccess<ApplicationValidationPayload>> {
+  const res = await fetch("/api/apps/validate", {
+    method: "POST",
     credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  if (res.status === 404) {
-    return null;
-  }
-  return handleResponse<Application>(res);
+  return handleResponse<ValidationSuccess<ApplicationValidationPayload>>(res);
 }
 
-export async function createApplication(payload: {
-  name: string;
-  rule_type: string;
-  identifier: string;
-  description?: string;
-}): Promise<Application> {
+export async function createApplication(payload: { name: string; rule_type: string; identifier: string; description?: string }): Promise<Application> {
   const res = await fetch("/api/apps", {
     method: "POST",
     credentials: "include",
@@ -231,11 +299,24 @@ export async function updateApplication(appId: string, payload: { enabled: boole
   return handleResponse<Application>(res);
 }
 
-export async function listScopes(appId: string): Promise<ApplicationScope[]> {
-  const res = await fetch(`/api/apps/${appId}/scopes`, {
+export async function listScopes(appId: string, options?: { includeMembers?: boolean }): Promise<ApplicationScope[]> {
+  const params = new URLSearchParams();
+  if (options?.includeMembers) params.set("include_members", "true");
+  const query = params.toString();
+  const res = await fetch(`/api/apps/${appId}/scopes${query ? `?${query}` : ""}`, {
     credentials: "include",
   });
   return handleResponse<ApplicationScope[]>(res);
+}
+
+export async function getApplicationDetail(appId: string, options?: { includeMembers?: boolean }): Promise<ApplicationDetailResponse> {
+  const params = new URLSearchParams();
+  if (options?.includeMembers) params.set("include_members", "true");
+  const query = params.toString();
+  const res = await fetch(`/api/apps/${appId}${query ? `?${query}` : ""}`, {
+    credentials: "include",
+  });
+  return handleResponse<ApplicationDetailResponse>(res);
 }
 
 export async function createScope(
@@ -255,6 +336,16 @@ export async function createScope(
   return handleResponse<ApplicationScope>(res);
 }
 
+export async function validateScope(payload: ScopeValidationRequest): Promise<ValidationSuccess<ScopeValidationResponse>> {
+  const res = await fetch("/api/scopes/validate", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ValidationSuccess<ScopeValidationResponse>>(res);
+}
+
 export async function deleteScope(appId: string, scopeId: string): Promise<void> {
   const res = await fetch(`/api/apps/${appId}/scopes/${scopeId}`, {
     method: "DELETE",
@@ -265,21 +356,30 @@ export async function deleteScope(appId: string, scopeId: string): Promise<void>
   }
 }
 
-export async function listGroups(): Promise<DirectoryGroup[]> {
-  const res = await fetch("/api/groups", { credentials: "include" });
+export async function listGroups(params: GroupQueryParams = {}): Promise<DirectoryGroup[]> {
+  const search = params.search?.trim();
+  const url = search ? `/api/groups?search=${encodeURIComponent(search)}` : "/api/groups";
+  const res = await fetch(url, { credentials: "include" });
   return handleResponse<DirectoryGroup[]>(res);
 }
 
-export async function listGroupMemberships(): Promise<GroupMembership[]> {
-  const res = await fetch("/api/groups/memberships", {
+export async function getGroupEffectiveMembers(groupId: string): Promise<GroupEffectiveMembersResponse> {
+  const res = await fetch(`/api/groups/${groupId}/effective-members`, {
     credentials: "include",
   });
-  return handleResponse<GroupMembership[]>(res);
+  return handleResponse<GroupEffectiveMembersResponse>(res);
 }
 
-export async function listUsers(): Promise<DirectoryUser[]> {
-  const res = await fetch("/api/users", { credentials: "include" });
+export async function listUsers(params: UserQueryParams = {}): Promise<DirectoryUser[]> {
+  const search = params.search?.trim();
+  const url = search ? `/api/users?search=${encodeURIComponent(search)}` : "/api/users";
+  const res = await fetch(url, { credentials: "include" });
   return handleResponse<DirectoryUser[]>(res);
+}
+
+export async function getUserEffectivePolicies(userId: string): Promise<UserEffectivePoliciesResponse> {
+  const res = await fetch(`/api/users/${userId}/effective-policies`, { credentials: "include" });
+  return handleResponse<UserEffectivePoliciesResponse>(res);
 }
 
 export async function getUserDetails(userId: string): Promise<UserDetailResponse> {
@@ -287,35 +387,27 @@ export async function getUserDetails(userId: string): Promise<UserDetailResponse
   return handleResponse<UserDetailResponse>(res);
 }
 
-export async function listDevices(): Promise<Device[]> {
-  const res = await fetch("/api/devices", { credentials: "include" });
+export async function listDevices(params: DeviceQueryParams = {}): Promise<Device[]> {
+  const query = new URLSearchParams();
+  if (typeof params.limit === "number") query.set("limit", `${params.limit}`);
+  if (typeof params.offset === "number") query.set("offset", `${params.offset}`);
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  const qs = query.toString();
+  const res = await fetch(`/api/machines${qs ? `?${qs}` : ""}`, { credentials: "include" });
   return handleResponse<Device[]>(res);
 }
 
-export async function listBlocked(): Promise<BlockedEvent[]> {
-  const res = await fetch("/api/events/blocked", { credentials: "include" });
-  return handleResponse<BlockedEvent[]>(res);
+export async function listEvents(limit = 50, offset = 0): Promise<EventRecord[]> {
+  const params = new URLSearchParams({ limit: `${limit}`, offset: `${offset}` });
+  const res = await fetch(`/api/events?${params.toString()}`, { credentials: "include" });
+  return handleResponse<EventRecord[]>(res);
 }
 
-export function subscribeBlockedEvents(onEvent: (event: BlockedEvent) => void): () => void {
-  const source = new EventSource("/api/events/blocked/stream", {
-    withCredentials: true,
-  });
-  source.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data) as BlockedEvent;
-      onEvent(data);
-    } catch (err) {
-      console.error("failed to parse event", err);
-    }
-  };
-  source.onerror = () => {
-    source.close();
-  };
-  return () => source.close();
+export async function getEventStats(days = 14): Promise<EventStat[]> {
+  const params = new URLSearchParams({ days: `${days}` });
+  const res = await fetch(`/api/events/stats?${params.toString()}`, { credentials: "include" });
+  return handleResponse<EventStat[]>(res);
 }
-
-// Settings API functions
 
 export async function getSantaConfig(): Promise<SantaConfig> {
   const res = await fetch("/api/settings/santa-config", {

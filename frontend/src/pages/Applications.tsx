@@ -1,79 +1,110 @@
-import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, type MouseEvent } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Icons } from "../components/Icons";
-import { Badge } from "../components/Badge";
-import { ConfirmDialog, SelectRoot, Button } from "../components";
-import { applicationFormSchema, type ApplicationFormData } from "../utils/validation";
-import { showSuccessToast, showErrorToast } from "../utils/toast";
-import type { Application, ApplicationScope, DirectoryGroup, DirectoryUser, GroupMembership } from "../api";
-import { ApplicationDuplicateError, listGroupMemberships, listScopes } from "../api";
+import { ApiValidationError, validateApplication } from "../api";
+import { useApplications, useCreateApplication, useUpdateApplication, useDeleteApplication } from "../hooks/useQueries";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import {
-  useApplications,
-  useGroups,
-  useUsers,
-  useCreateApplication,
-  useUpdateApplication,
-  useDeleteApplication,
-} from "../hooks/useQueries";
+  Avatar,
+  Button,
+  Card,
+  CardActionArea,
+  CardContent,
+  CardHeader,
+  Chip,
+  Dialog,
+  DialogActions,
+  CardActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+  LinearProgress,
+  Snackbar,
+  Alert,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import HelpIcon from "@mui/icons-material/Help";
+import ShieldIcon from "@mui/icons-material/Shield";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import DeleteIcon from "@mui/icons-material/Delete";
 
-export interface SelectedTarget {
-  type: "group" | "user";
-  id: string;
+const applicationRuleTypes = ["BINARY", "CERTIFICATE", "SIGNINGID", "TEAMID", "CDHASH"] as const;
+type ApplicationRuleType = (typeof applicationRuleTypes)[number];
+
+type ApplicationRuleTypeMetadata = {
+  label: string;
+  placeholder: string;
+  example: string;
+  description: string;
+  referenceGroup?: "signingChain";
+};
+
+const applicationRuleTypeMetadata: Record<ApplicationRuleType, ApplicationRuleTypeMetadata> = {
+  BINARY: {
+    label: "SHA-256",
+    placeholder: "f820d4f4ed9aade09e1810314f21e4152988c54e489245670cc9de5639bc14ef",
+    example: "f820d4f4ed9aade09e1810314f21e4152988c54e489245670cc9de5639bc14ef",
+    description: "Matches one exact copy of a program using its full file hash, so nothing else counts as that app.",
+  },
+  CERTIFICATE: {
+    label: "SHA-256",
+    placeholder: "1afd16f5b920f0d3b5f841aace6e948d6190ea8b5156b02deb36572d1d082f64",
+    example: "1afd16f5b920f0d3b5f841aace6e948d6190ea8b5156b02deb36572d1d082f64",
+    referenceGroup: "signingChain",
+    description: "Covers every app signed with this certificate, so trusting or blocking it affects all software that uses that signer.",
+  },
+  SIGNINGID: {
+    label: "Signing ID",
+    placeholder: "ZMCG7MLDV9:com.northpolesec.santa",
+    example: "ZMCG7MLDV9:com.northpolesec.santa",
+    description: "Groups every version of the same app when its bundle ID and team stay the same, letting you treat that app together across updates.",
+  },
+  TEAMID: {
+    label: "Team ID",
+    placeholder: "ZMCG7MLDV9",
+    example: "ZMCG7MLDV9",
+    description: "Applies to every app from one developer team, useful when you want to trust or block that entire publisher.",
+  },
+  CDHASH: {
+    label: "CDHash",
+    placeholder: "a9fdcbc0427a0a585f91bbc7342c261c8ead1942",
+    example: "a9fdcbc0427a0a585f91bbc7342c261c8ead1942",
+    description: "Matches the internal hash stored in the code signature so it points to one specific build of the app.",
+  },
+};
+
+type ApplicationFormData = {
   name: string;
-}
+  rule_type: ApplicationRuleType;
+  identifier: string;
+  description?: string;
+};
 
-export function getIdentifierPlaceholder(ruleType: string): string {
-  switch (ruleType) {
-    case "BINARY":
-      return "f820d4f4ed9aade09e1810314f21e4152988c54e489245670cc9de5639bc14ef";
-    case "CERTIFICATE":
-      return "1afd16f5b920f0d3b5f841aace6e948d6190ea8b5156b02deb36572d1d082f64";
-    case "SIGNINGID":
-      return "ZMCG7MLDV9:com.northpolesec.santa";
-    case "TEAMID":
-      return "ZMCG7MLDV9";
-    case "CDHASH":
-      return "a9fdcbc0427a0a585f91bbc7342c261c8ead1942";
-    default:
-      return "Enter identifier...";
-  }
-}
+const applicationFormDefaultValues: ApplicationFormData = {
+  name: "",
+  rule_type: "BINARY",
+  identifier: "",
+  description: "",
+};
 
-export function validateIdentifier(ruleType: string, identifier: string): string | null {
-  if (!identifier.trim()) {
-    return "Identifier is required";
-  }
+type RuleTypeEntry = { type: ApplicationRuleType; meta: ApplicationRuleTypeMetadata };
 
-  switch (ruleType) {
-    case "BINARY":
-    case "CERTIFICATE":
-      if (!/^[a-fA-F0-9]{64}$/.test(identifier)) {
-        return "Must be a valid 64-character SHA-256 hash";
-      }
-      break;
-    case "SIGNINGID":
-      if (!/^[A-Z0-9]{10}:[a-zA-Z0-9.-]+$/.test(identifier)) {
-        return "Must be in format: TEAMID:bundle.identifier";
-      }
-      break;
-    case "TEAMID":
-      if (!/^[A-Z0-9]{10}$/.test(identifier)) {
-        return "Must be a 10-character Apple Developer Team ID";
-      }
-      break;
-    case "CDHASH":
-      if (!/^[a-fA-F0-9]{40}$/.test(identifier)) {
-        return "Must be a 40-character CDHash";
-      }
-      break;
-    default:
-      return "Invalid rule type";
-  }
-
-  return null;
-}
+const signingChainReference = applicationRuleTypeMetadata.CERTIFICATE;
+const primaryRuleTypeEntries: RuleTypeEntry[] = applicationRuleTypes
+  .filter((t) => applicationRuleTypeMetadata[t].referenceGroup !== "signingChain")
+  .map((t) => ({ type: t, meta: applicationRuleTypeMetadata[t] }));
 
 interface AssignmentStats {
   allowCount: number;
@@ -82,125 +113,72 @@ interface AssignmentStats {
 }
 
 export default function Applications() {
-  // TanStack Query hooks
-  const { data: apps = [], isLoading: appsLoading, error: appsError } = useApplications();
-  const { data: groups = [], isLoading: groupsLoading } = useGroups();
-  const { data: users = [], isLoading: usersLoading } = useUsers();
-  const createApplicationMutation = useCreateApplication();
-  const updateApplicationMutation = useUpdateApplication();
-  const deleteApplicationMutation = useDeleteApplication();
-
-  // Local state
-  const [groupMemberships, setGroupMemberships] = useState<GroupMembership[]>([]);
-  const [scopes, setScopes] = useState<Record<string, ApplicationScope[]>>({});
   const [appSearch, setAppSearch] = useState("");
+  const debouncedAppSearch = useDebouncedValue(appSearch, 300);
+  const { data: apps = [], isLoading: appsLoading, isFetching: appsFetching, error: appsError } = useApplications({ search: debouncedAppSearch });
+  const createApplication = useCreateApplication();
+  const updateApplication = useUpdateApplication();
+  const deleteApplication = useDeleteApplication();
+
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
   const [updatingAppId, setUpdatingAppId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ appId: string; appName: string } | null>(null);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "error" | "success" }>({
+    open: false,
+    message: "",
+    severity: "error",
+  });
 
-  // React Hook Form setup
   const {
     register,
     handleSubmit,
     watch,
     reset,
     control,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
-  } = useForm<ApplicationFormData>({
-    resolver: zodResolver(applicationFormSchema),
-    defaultValues: {
-      name: "",
-      rule_type: "BINARY",
-      identifier: "",
-      description: "",
-    },
-  });
+  } = useForm<ApplicationFormData>({ defaultValues: applicationFormDefaultValues });
 
   const watchedRuleType = watch("rule_type");
+  const identifierPlaceholder = applicationRuleTypeMetadata[watchedRuleType]?.placeholder ?? "Enter identifier...";
 
-  // Load additional data when apps change
-  React.useEffect(() => {
-    if (!apps || apps.length === 0) return;
+  const trimmedSearch = appSearch.trim();
+  const hasSearchTerm = trimmedSearch.length > 0;
 
-    (async () => {
-      try {
-        const [membershipData, ...scopeData] = await Promise.all([listGroupMemberships(), ...apps.map((app) => listScopes(app.id))]);
+  const totalScopes = useMemo(() => apps.reduce((sum, app) => sum + (app.assignment_stats?.total_scopes ?? 0), 0), [apps]);
 
-        setGroupMemberships(Array.isArray(membershipData) ? membershipData : []);
-
-        const scopeEntries = apps.map((app, index) => [app.id, Array.isArray(scopeData[index]) ? scopeData[index] : []] as const);
-        setScopes(Object.fromEntries(scopeEntries));
-      } catch (err) {
-        console.error("Failed to load additional data:", err);
-        showErrorToast("Failed to load additional application data");
-      }
-    })();
-  }, [apps]);
-
-  // Show error from apps query
-  React.useEffect(() => {
-    if (appsError) {
-      showErrorToast(appsError instanceof Error ? appsError.message : "Failed to load applications");
-    }
-  }, [appsError]);
-
-  const isLoading = appsLoading || groupsLoading || usersLoading;
-
-  const totalScopes = useMemo(() => Object.values(scopes).reduce((sum, scopeArray) => sum + scopeArray.length, 0), [scopes]);
-
-  const membersByGroup = useMemo(() => {
-    const mapping: Record<string, string[]> = {};
-    groupMemberships.forEach((membership) => {
-      if (!mapping[membership.group_id]) {
-        mapping[membership.group_id] = [];
-      }
-      mapping[membership.group_id].push(membership.user_id);
-    });
-    return mapping;
-  }, [groupMemberships]);
-
-  const filteredApps = useMemo(() => {
-    if (!apps || !Array.isArray(apps)) {
-      return [];
-    }
-    const term = appSearch.trim().toLowerCase();
-    if (!term) {
-      return apps;
-    }
-    return apps.filter((app) => {
-      const fields = [app.name, app.description ?? "", app.rule_type, app.identifier];
-      return fields.some((value) => value && value.toLowerCase().includes(term));
-    });
-  }, [apps, appSearch]);
+  function getAssignmentStats(app: { assignment_stats?: { allow_scopes?: number; block_scopes?: number; total_users?: number } }): AssignmentStats {
+    const stats = app.assignment_stats;
+    return { allowCount: stats?.allow_scopes ?? 0, blockCount: stats?.block_scopes ?? 0, totalUsersCovered: stats?.total_users ?? 0 };
+  }
 
   async function handleCreateApp(data: ApplicationFormData) {
-    // Check for duplicate identifier
-    const duplicate = apps?.find((app) => app.identifier.trim().toLowerCase() === data.identifier.trim().toLowerCase());
-    if (duplicate) {
-      showErrorToast(
-        `The identifier "${data.identifier}" already belongs to "${duplicate.name}". You can manage it from the application list.`,
-      );
-      return;
-    }
-
+    clearErrors();
     try {
-      await createApplicationMutation.mutateAsync({
-        name: data.name.trim(),
-        rule_type: data.rule_type,
-        identifier: data.identifier.trim(),
-        description: data.description?.trim() || undefined,
-      });
-
-      reset(); // Reset form using React Hook Form
-      showSuccessToast(`Application "${data.name}" created successfully`);
-    } catch (err) {
-      if (err instanceof ApplicationDuplicateError) {
-        showErrorToast(`The identifier "${data.identifier}" already belongs to "${err.existingApplication.name}".`);
-      } else if (err instanceof Error) {
-        showErrorToast(err.message);
-      } else {
-        showErrorToast("An unexpected error occurred");
+      const { normalized } = await validateApplication(data);
+      const payload: { name: string; rule_type: string; identifier: string; description?: string } = {
+        name: normalized.name,
+        rule_type: normalized.rule_type,
+        identifier: normalized.identifier,
+      };
+      if (normalized.description) {
+        payload.description = normalized.description;
       }
+      await createApplication.mutateAsync(payload);
+      reset(applicationFormDefaultValues);
+      setToast({ open: true, message: "Application rule created.", severity: "success" });
+    } catch (err) {
+      if (err instanceof ApiValidationError) {
+        Object.entries(err.fieldErrors).forEach(([field, message]) => {
+          if (field === "name" || field === "rule_type" || field === "identifier" || field === "description") {
+            setError(field as keyof ApplicationFormData, { type: "server", message });
+          }
+        });
+        return;
+      }
+      console.error("Create application failed", err);
+      setToast({ open: true, message: "Failed to create application rule.", severity: "error" });
     }
   }
 
@@ -211,11 +189,11 @@ export default function Applications() {
   async function handleDeleteApplication(appId: string) {
     setDeletingAppId(appId);
     try {
-      await deleteApplicationMutation.mutateAsync(appId);
-      showSuccessToast("Application deleted successfully");
+      await deleteApplication.mutateAsync(appId);
+      setToast({ open: true, message: "Application rule deleted.", severity: "success" });
     } catch (err) {
-      console.error("Failed to delete application", err);
-      showErrorToast(err instanceof Error ? err.message : "Failed to delete application");
+      console.error("Delete application failed", err);
+      setToast({ open: true, message: "Failed to delete application rule.", severity: "error" });
     } finally {
       setDeletingAppId(null);
       setConfirmDelete(null);
@@ -225,372 +203,311 @@ export default function Applications() {
   async function handleToggleEnabled(appId: string, currentEnabled: boolean) {
     setUpdatingAppId(appId);
     try {
-      await updateApplicationMutation.mutateAsync({
-        appId,
-        payload: { enabled: !currentEnabled },
-      });
-      showSuccessToast(`Application ${!currentEnabled ? "enabled" : "disabled"} successfully`);
+      await updateApplication.mutateAsync({ appId, payload: { enabled: !currentEnabled } });
+      setToast({ open: true, message: currentEnabled ? "Disabled." : "Enabled.", severity: "success" });
     } catch (err) {
-      console.error("Failed to update application", err);
-      showErrorToast(err instanceof Error ? err.message : "Failed to update application");
+      console.error("Toggle enabled failed", err);
+      setToast({ open: true, message: "Failed to update application.", severity: "error" });
     } finally {
       setUpdatingAppId(null);
     }
   }
 
-  function getAssignmentStats(appId: string): AssignmentStats {
-    const appScopes = scopes[appId] ?? [];
-    const allowScopes = appScopes.filter((scope) => scope.action === "allow");
-    const blockScopes = appScopes.filter((scope) => scope.action === "block");
-
-    const collectUserIds = (scopeList: ApplicationScope[]): number => {
-      const set = new Set<string>();
-      scopeList.forEach((scope) => {
-        if (scope.target_type === "user") {
-          set.add(scope.target_id);
-        } else {
-          (membersByGroup[scope.target_id] ?? []).forEach((id) => set.add(id));
-        }
-      });
-      return set.size;
-    };
-
-    const allowCount = collectUserIds(allowScopes);
-    const blockCount = collectUserIds(blockScopes);
-    const totalUsersCovered = (() => {
-      const combined = new Set<string>();
-      allowScopes.forEach((scope) => {
-        if (scope.target_type === "user") {
-          combined.add(scope.target_id);
-        } else {
-          (membersByGroup[scope.target_id] ?? []).forEach((id) => combined.add(id));
-        }
-      });
-      blockScopes.forEach((scope) => {
-        if (scope.target_type === "user") {
-          combined.add(scope.target_id);
-        } else {
-          (membersByGroup[scope.target_id] ?? []).forEach((id) => combined.add(id));
-        }
-      });
-      return combined.size;
-    })();
-
-    return {
-      allowCount,
-      blockCount,
-      totalUsersCovered,
-    };
-  }
-
-  if (isLoading) {
-    return (
-      <div className="center-page">
-        <p className="muted-text">Loading applications...</p>
-      </div>
-    );
+  if (appsError) {
+    console.error("Applications query failed", appsError);
   }
 
   return (
-    <div className="grid equal-split">
-      <div className="card">
-        <h2>Add Application Rule</h2>
-        <p>
-          Define application rules using reference-compatible identifiers. Rules can then be assigned to groups or users from the
-          application detail page.
-        </p>
-        <form onSubmit={handleSubmit(handleCreateApp)}>
-          <div className="app-form-grid">
-            <div className="app-form-field">
-              <label htmlFor="name">Application Name</label>
-              <input id="name" {...register("name")} placeholder="Santa" />
-              {errors.name && <div className="field-error">{errors.name.message}</div>}
-            </div>
-
-            <div></div>
-
-            <div className="app-form-field">
-              <label htmlFor="rule_type">Rule Type</label>
-              <Controller
-                name="rule_type"
-                control={control}
-                render={({ field }) => (
-                  <SelectRoot
-                    options={["BINARY", "TEAMID", "SIGNINGID", "CDHASH", "CERTIFICATE"].map((type) => ({
-                      value: type,
-                      label: type,
-                    }))}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    placeholder="Select rule type"
-                    name={field.name}
+    <Stack spacing={3}>
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card elevation={1} sx={{ height: "100%" }}>
+            <CardHeader
+              title="Add Application Rule"
+              subheader="Define rules using reference-compatible identifiers. Assign them to groups or users from the detail page."
+            />
+            {isSubmitting && <LinearProgress />}
+            <CardContent>
+              <form onSubmit={handleSubmit(handleCreateApp)}>
+                <Stack spacing={2.5}>
+                  <TextField
+                    label="Application Name"
+                    placeholder="Santa"
+                    {...register("name")}
+                    error={!!errors.name}
+                    helperText={errors.name?.message}
+                    autoComplete="off"
+                    fullWidth
+                    required
                   />
-                )}
-              />
-              {errors.rule_type && <div className="field-error">{errors.rule_type.message}</div>}
-            </div>
 
-            <div className="app-form-field">
-              <label htmlFor="identifier">Identifier</label>
-              <input
-                id="identifier"
-                {...register("identifier")}
-                placeholder={getIdentifierPlaceholder(watchedRuleType)}
-                spellCheck={false}
-                autoComplete="off"
-              />
-              {errors.identifier && <div className="field-error">{errors.identifier.message}</div>}
-            </div>
-
-            <div className="app-form-field">
-              <label htmlFor="description">Description (optional)</label>
-              <textarea
-                id="description"
-                {...register("description")}
-                rows={2}
-                placeholder="Explain why this rule exists or what it covers…"
-                style={{ resize: "none" }}
-              />
-              {errors.description && <div className="field-error">{errors.description.message}</div>}
-            </div>
-
-            <div></div>
-          </div>
-
-          <div style={{ marginTop: "16px" }}>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              Create Application Rule
-            </Button>
-          </div>
-        </form>
-      </div>
-
-      <div className="card">
-        <h2>Field Reference Guide</h2>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => window.open("https://northpole.dev/features/binary-authorization/", "_blank", "noopener,noreferrer")}
-          title="Binary Authorization Help"
-        >
-          <Icons.Help /> Help!
-        </Button>
-        <p>
-          Use <code>santactl fileinfo /path/to/app</code> to get these values:
-        </p>
-
-        <div className="field-reference-guide">
-          <div className="reference-output-example">
-            <div className="reference-output-item">
-              <div className="reference-field">
-                <span className="reference-key">SHA-256</span>
-                <span className="reference-separator">:</span>
-                <span className={`reference-value ${watchedRuleType === "BINARY" ? "active" : ""}`}>
-                  f820d4f4ed9aade09e1810314f21e4152988c54e489245670cc9de5639bc14ef
-                </span>
-              </div>
-            </div>
-
-            <div className="reference-output-item">
-              <div className="reference-field">
-                <span className="reference-key">Team ID</span>
-                <span className="reference-separator">:</span>
-                <span className={`reference-value ${watchedRuleType === "TEAMID" ? "active" : ""}`}>ZMCG7MLDV9</span>
-              </div>
-            </div>
-
-            <div className="reference-output-item">
-              <div className="reference-field">
-                <span className="reference-key">Signing ID</span>
-                <span className="reference-separator">:</span>
-                <span className={`reference-value ${watchedRuleType === "SIGNINGID" ? "active" : ""}`}>
-                  ZMCG7MLDV9:com.northpolesec.santa
-                </span>
-              </div>
-            </div>
-
-            <div className="reference-output-item">
-              <div className="reference-field">
-                <span className="reference-key">CDHash</span>
-                <span className="reference-separator">:</span>
-                <span className={`reference-value ${watchedRuleType === "CDHASH" ? "active" : ""}`}>
-                  a9fdcbc0427a0a585f91bbc7342c261c8ead1942
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <span className="reference-section-title">Signing Chain:</span>
-              <div className="reference-output-item indented">
-                <div className="reference-field">
-                  <span className="reference-key">1. SHA-256</span>
-                  <span className="reference-separator">:</span>
-                  <span className={`reference-value ${watchedRuleType === "CERTIFICATE" ? "active" : ""}`}>
-                    1afd16f5b920f0d3b5f841aace6e948d6190ea8b5156b02deb36572d1d082f64
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ gridColumn: "1 / -1" }}>
-        <h2>Application Rules &amp; Assignments</h2>
-        <p>Manage who can access each application. Click an application to open the full detail view with assignment controls.</p>
-
-        {apps && apps.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "16px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flex: "1 1 260px",
-                minWidth: "220px",
-              }}
-            >
-              <input
-                type="search"
-                placeholder="Search applications..."
-                value={appSearch}
-                onChange={(event) => setAppSearch(event.target.value)}
-                style={{ flex: 1 }}
-                aria-label="Search applications"
-              />
-              {appSearch && (
-                <Button variant="secondary" onClick={() => setAppSearch("")} title="Clear search" style={{ whiteSpace: "nowrap" }}>
-                  Clear
-                </Button>
-              )}
-            </div>
-            <div
-              className="muted-text"
-              style={{
-                fontSize: "14px",
-                marginLeft: "auto",
-                textAlign: "right",
-              }}
-            >
-              Showing {filteredApps.length} of {apps?.length || 0} application
-              {(apps?.length || 0) !== 1 ? "s" : ""} · {totalScopes} total assignment
-              {totalScopes !== 1 ? "s" : ""}
-            </div>
-          </div>
-        )}
-
-        {!apps || apps.length === 0 ? (
-          <div className="empty-state">
-            <h3>No application rules yet</h3>
-            <p>Create your first application rule above to get started.</p>
-          </div>
-        ) : filteredApps.length === 0 ? (
-          <div className="empty-state">
-            <h3 style={{ margin: "0 0 8px 0" }}>No matching applications</h3>
-            <p style={{ margin: 0 }}>
-              We couldn&apos;t find any applications matching &quot;{appSearch}
-              &quot;. Try a different search or clear the filter.
-            </p>
-          </div>
-        ) : (
-          filteredApps.map((app) => {
-            const stats = getAssignmentStats(app.id);
-            const appScopes = scopes[app.id] ?? [];
-            const allowCount = appScopes.filter((scope) => scope.action === "allow").length;
-            const blockCount = appScopes.filter((scope) => scope.action === "block").length;
-
-            return (
-              <Link
-                key={app.id}
-                to={`/applications/${app.id}`}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                <article className={`assignment-card ${!app.enabled ? "disabled" : ""}`} style={{ cursor: "pointer" }}>
-                  <div className="assignment-card-header" style={{ alignItems: "flex-start" }}>
-                    <div className="assignment-card-summary" style={{ cursor: "pointer" }}>
-                      <span className="assignment-card-icon" aria-hidden="true">
-                        <Icons.Shield />
-                      </span>
-                      <div className="assignment-card-summary-main">
-                        <div className="assignment-card-summary-title">
-                          <h3 className="assignment-card-title">{app.name}</h3>
-                          <Badge size="md" variant={app.rule_type.toLowerCase() as any} caps>
-                            {app.rule_type}
-                          </Badge>
-                        </div>
-                        <div className="assignment-card-summary-meta">
-                          <Badge size="md" variant="secondary">
-                            {app.identifier}
-                          </Badge>
-                          <div className="assignment-card-summary-stats">
-                            <Badge size="md" variant="success" label="Allow" value={stats.allowCount} caps />
-                            <Badge size="md" variant="danger" label="Block" value={stats.blockCount} caps />
-                            <Badge size="md" variant="neutral" label="Total" value={stats.totalUsersCovered} caps />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="assignment-card-actions" style={{ gap: "8px" }}>
-                      <Button
-                        type="button"
-                        variant="toggle"
-                        active={app.enabled}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleToggleEnabled(app.id, app.enabled);
-                        }}
-                        disabled={updatingAppId === app.id}
-                        title={app.enabled ? "Disable" : "Enable"}
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <FormControl fullWidth error={!!errors.rule_type}>
+                        <InputLabel id="rule-type-label">Rule Type</InputLabel>
+                        <Controller
+                          name="rule_type"
+                          control={control}
+                          render={({ field }) => (
+                            <Select labelId="rule-type-label" label="Rule Type" value={field.value} onChange={field.onChange}>
+                              {applicationRuleTypes.map((type) => (
+                                <MenuItem key={type} value={type}>
+                                  {type}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          )}
+                        />
+                        {errors.rule_type && (
+                          <Typography variant="caption" color="error">
+                            {errors.rule_type.message}
+                          </Typography>
+                        )}
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField
+                        label="Identifier"
+                        placeholder={identifierPlaceholder}
+                        spellCheck={false}
+                        autoComplete="off"
+                        {...register("identifier")}
+                        error={!!errors.identifier}
+                        helperText={errors.identifier?.message}
+                        fullWidth
+                        required
                       />
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          requestDeleteApplication(app.id, app.name);
-                        }}
-                        loading={deletingAppId === app.id}
-                        title="Delete this application rule"
-                      >
-                        Delete Rule
-                      </Button>
-                    </div>
-                  </div>
-                  {app.description && (
-                    <p className="assignment-card-description" style={{ marginTop: "12px" }}>
-                      {app.description}
-                    </p>
-                  )}
-                </article>
-              </Link>
-            );
-          })
-        )}
-      </div>
+                    </Grid>
+                  </Grid>
 
-      <ConfirmDialog
-        open={!!confirmDelete}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
-        title="Delete Application Rule"
-        description={`Are you sure you want to delete "${confirmDelete?.appName}"? This action cannot be undone.`}
-        onConfirm={() => confirmDelete && handleDeleteApplication(confirmDelete.appId)}
-        confirmText="Delete"
-        destructive
-      />
-    </div>
+                  <TextField
+                    label="Description"
+                    placeholder="Explain why this rule exists or what it covers..."
+                    {...register("description")}
+                    error={!!errors.description}
+                    helperText={errors.description?.message}
+                    multiline
+                    minRows={2}
+                    fullWidth
+                  />
+
+                  <Button type="submit" variant="contained" loading={isSubmitting}>
+                    Create Application Rule
+                  </Button>
+                </Stack>
+              </form>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card elevation={1} sx={{ height: "100%" }}>
+            <CardHeader
+              title="Field Reference Guide"
+              action={
+                <Tooltip title="Binary Authorisation Help">
+                  <Button
+                    variant="outlined"
+                    onClick={() => window.open("https://northpole.dev/features/binary-authorization/", "_blank", "noopener,noreferrer")}
+                    startIcon={<HelpIcon />}
+                  >
+                    Help
+                  </Button>
+                </Tooltip>
+              }
+            />
+            <CardContent>
+              <Typography variant="body2" gutterBottom>
+                Use <code>santactl fileinfo /path/to/app</code> to get these values:
+              </Typography>
+
+              <Stack spacing={1.5}>
+                {primaryRuleTypeEntries.map(({ type, meta }) => (
+                  <Stack key={type} direction="row" spacing={1} alignItems="center">
+                    <Typography variant="subtitle2" sx={{ minWidth: 88 }}>
+                      {meta.label}
+                    </Typography>
+                    <Tooltip title={meta.description} arrow placement="top">
+                      <Chip variant={watchedRuleType === type ? "filled" : "outlined"} label={meta.example} />
+                    </Tooltip>
+                  </Stack>
+                ))}
+
+                <Divider />
+
+                <Typography variant="subtitle2">Signing Chain:</Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ pl: 2 }}>
+                  <Typography variant="body2" sx={{ minWidth: 88 }}>
+                    1. SHA-256
+                  </Typography>
+                  <Tooltip title={signingChainReference.description} arrow placement="top">
+                    <Chip variant={watchedRuleType === "CERTIFICATE" ? "filled" : "outlined"} label={signingChainReference.example} />
+                  </Tooltip>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <Card elevation={1}>
+            <CardHeader title="Application Rules & Assignments" subheader="Manage who can access each application. Click a card to open the detail view." />
+            {(appsLoading || appsFetching) && <LinearProgress />}
+            <CardContent>
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mb: 2, flexWrap: "wrap" }}>
+                <TextField
+                  type="search"
+                  label="Search applications..."
+                  value={appSearch}
+                  onChange={(e) => setAppSearch(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+
+                <Typography variant="body2" color="text.secondary">
+                  Showing {apps.length} application{apps.length === 1 ? "" : "s"} · {totalScopes} total assignments
+                </Typography>
+              </Stack>
+
+              {apps.length === 0 ? (
+                <Stack alignItems="center" spacing={1} sx={{ py: 4, textAlign: "center" }}>
+                  <Typography variant="h6" gutterBottom>
+                    {hasSearchTerm ? "No matching applications" : "No application rules yet"}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    {hasSearchTerm
+                      ? `We couldn't find any applications matching “${trimmedSearch}”. Try a different search or clear the filter.`
+                      : "Create your first application rule above to get started."}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Grid container spacing={2}>
+                  {apps.map((app) => {
+                    const stats = getAssignmentStats(app);
+                    const allowScopes = app.assignment_stats?.allow_scopes ?? 0;
+                    const blockScopes = app.assignment_stats?.block_scopes ?? 0;
+
+                    return (
+                      <Grid key={app.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                        <Card elevation={2} sx={{ opacity: app.enabled ? 1 : 0.6 }}>
+                          <CardActionArea component={RouterLink} to={`/applications/${app.id}`} focusRipple>
+                            <CardContent>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                                <Avatar sx={{ bgcolor: app.enabled ? "success.main" : "grey.400" }} aria-hidden>
+                                  {/* TODO: Add custom icons */}
+                                  <ShieldIcon fontSize="small" />
+                                </Avatar>
+                                <Typography variant="subtitle1" noWrap title={app.name}>
+                                  {app.name}
+                                </Typography>
+                                <Chip size="small" variant="outlined" label={app.rule_type} />
+                              </Stack>
+
+                              <Typography variant="caption" color="text.secondary" title={app.identifier}>
+                                {app.identifier}
+                              </Typography>
+
+                              {app.description && (
+                                <Typography variant="body2" color="text.secondary">
+                                  {app.description}
+                                </Typography>
+                              )}
+                            </CardContent>
+
+                            <Divider />
+
+                            <CardActions sx={{ px: 1.5, py: 1, position: "relative" }} disableSpacing>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Chip size="small" color="success" label={`Allow ${allowScopes}`} />
+                                <Chip size="small" color="error" label={`Block ${blockScopes}`} />
+                                <Chip size="small" variant="outlined" label={`Total ${stats.totalUsersCovered}`} />
+                              </Stack>
+
+                              <Stack
+                                direction="row"
+                                spacing={0.5}
+                                sx={{
+                                  position: "absolute",
+                                  right: 8,
+                                  top: "50%",
+                                  transform: "translateY(-50%)",
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  aria-label={app.enabled ? "Pause application" : "Play application"}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleToggleEnabled(app.id, app.enabled);
+                                  }}
+                                  disabled={updatingAppId === app.id}
+                                >
+                                  {app.enabled ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+                                </IconButton>
+
+                                <IconButton
+                                  size="small"
+                                  aria-label="Delete application"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    requestDeleteApplication(app.id, app.name);
+                                  }}
+                                  disabled={deletingAppId === app.id}
+                                  sx={{ color: "error.main" }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Stack>
+                            </CardActions>
+                          </CardActionArea>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Dialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)} aria-labelledby="confirm-delete-title">
+        <DialogTitle id="confirm-delete-title">Delete Application Rule</DialogTitle>
+        <DialogContent dividers>
+          <Typography>Are you sure you want to delete “{confirmDelete?.appName}”? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
+          <Button
+            loading={!!(deletingAppId && confirmDelete && deletingAppId === confirmDelete.appId)}
+            color="error"
+            variant="contained"
+            onClick={() => confirmDelete && handleDeleteApplication(confirmDelete.appId)}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!appsError || toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity={toast.open ? toast.severity : "error"} onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
+          {toast.open ? toast.message : "Failed to load applications."}
+        </Alert>
+      </Snackbar>
+    </Stack>
   );
 }

@@ -1,223 +1,197 @@
-import { useEffect, useState, useMemo } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { Badge, Table, Button } from "../components";
-import { useSearch, searchConfigs } from "../hooks/useSearch";
-import { Device, listDevices } from "../api";
+import { useMemo, useState, useEffect } from "react";
+import { useDevices } from "../hooks/useQueries";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { formatTimeAgo } from "../utils/dates";
+import { Alert, Button, Card, CardContent, CardHeader, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography, Snackbar } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
 
 export default function Devices() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+  const trimmedSearch = searchTerm.trim();
+  const hasSearchTerm = trimmedSearch.length > 0;
 
-  const { searchTerm, setSearchTerm, filteredItems: filteredDevices, clearSearch, isSearching } = useSearch(devices, searchConfigs.devices);
+  const { data: devices = [], isLoading, isFetching, error, refetch } = useDevices({ search: debouncedSearch });
+
+  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   useEffect(() => {
-    void loadDevices();
-  }, []);
-
-  async function loadDevices() {
-    setError(null);
-    try {
-      const result = await listDevices();
-      setDevices(Array.isArray(result) ? result : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load devices");
+    if (error) {
+      console.error("Failed to load devices", error);
+      setToast({ open: true, message: error instanceof Error ? error.message : "Failed to load devices" });
     }
-  }
+  }, [error]);
 
-  function formatLastSeen(isoString: string) {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else {
-      return `${diffDays}d ago`;
-    }
-  }
-
-  function getStatusCategory(lastSeen?: string | null): "success" | "warning" | "danger" | "muted" {
-    if (!lastSeen) {
-      return "muted";
-    }
-    const lastSeenDate = new Date(lastSeen);
-    const diffMs = Date.now() - lastSeenDate.getTime();
-    const diffMinutes = diffMs / (1000 * 60);
-    if (diffMinutes <= 15) return "success"; // online
-    if (diffMinutes <= 120) return "warning"; // recently active
-    return "danger"; // offline
+  type Status = "success" | "warning" | "danger" | "muted";
+  function getStatusCategory(lastSeen?: string | null): Status {
+    if (!lastSeen) return "muted";
+    const diffMinutes = (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60);
+    if (diffMinutes <= 15) return "success";
+    if (diffMinutes <= 120) return "warning";
+    return "danger";
   }
 
   const statusCounts = useMemo(() => {
     let online = 0;
     let warning = 0;
     let offline = 0;
-    devices.forEach((device) => {
-      const category = getStatusCategory(device.last_seen);
-      if (category === "success") online += 1;
-      else if (category === "warning") warning += 1;
-      else if (category === "danger") offline += 1;
+    devices.forEach((d) => {
+      const c = getStatusCategory(d.lastSeen);
+      if (c === "success") online += 1;
+      else if (c === "warning") warning += 1;
+      else if (c === "danger") offline += 1;
     });
     return { online, warning, offline, total: devices.length };
   }, [devices]);
 
-  const columns = useMemo<ColumnDef<Device>[]>(
+  const statusChip = (cat: Status, label?: string) => {
+    const map: Record<Status, { color: "success" | "warning" | "error" | "default"; text: string }> = {
+      success: { color: "success", text: "Online" },
+      warning: { color: "warning", text: "Inactive" },
+      danger: { color: "error", text: "Offline" },
+      muted: { color: "default", text: "Unknown" },
+    };
+    const { color, text } = map[cat];
+    return <Chip size="small" color={color} variant={color === "default" ? "outlined" : "filled"} label={label ?? text} />;
+  };
+
+  const columns = useMemo<GridColDef[]>(
     () => [
       {
-        accessorKey: "hostname",
-        header: "Hostname",
-        cell: ({ getValue }) => <span className="principal-box">{getValue() as string}</span>,
+        field: "hostname",
+        headerName: "Hostname",
+        flex: 1.2,
+        minWidth: 160,
+        renderCell: (params) => (
+          <Typography variant="body2" fontWeight={600}>
+            {params.value || "—"}
+          </Typography>
+        ),
       },
       {
-        accessorKey: "serial_number",
-        header: "Serial",
-        cell: ({ row }) => <code>{row.original.serial_number ?? row.original.machine_id}</code>,
+        field: "serial",
+        headerName: "Serial",
+        flex: 1,
+        minWidth: 140,
+        renderCell: (p) => <Typography component="code">{p.value || "—"}</Typography>,
       },
       {
-        accessorKey: "last_seen",
-        header: "Status",
-        cell: ({ getValue, row }) => {
-          const lastSeen = getValue() as string | null;
-          const category = getStatusCategory(lastSeen);
-          return (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <span className={`status-dot ${category}`} />
-              <span
-                className={`status-text ${category}`}
-                style={{
-                  fontWeight: 500,
-                }}
-              >
-                {category === "success" ? "Online" : category === "warning" ? "Inactive" : lastSeen ? "Offline" : "Unknown"}
-              </span>
-            </div>
-          );
-        },
+        field: "status",
+        headerName: "Status",
+        flex: 1,
+        minWidth: 140,
+        sortable: false,
+        valueGetter: (_value, row) => getStatusCategory(row.lastSeen as string | null),
+        renderCell: (p) => statusChip(p.value as Status),
       },
       {
-        accessorKey: "primary_user_display_name",
-        header: "Primary User",
-        cell: ({ row }) => row.original.primary_user_display_name ?? row.original.primary_user_principal ?? "—",
+        field: "ruleCursor",
+        headerName: "Rule Cursor",
+        flex: 1,
+        minWidth: 140,
+        renderCell: (p) => <Typography variant="body2">{p.value || "—"}</Typography>,
       },
       {
-        accessorKey: "os_version",
-        header: "OS Version",
-        cell: ({ row }) => {
-          const { os_version, os_build } = row.original;
-          return os_version ? (
-            <span>
-              {os_version}
-              {os_build ? ` (${os_build})` : ""}
-            </span>
-          ) : (
-            "—"
-          );
-        },
+        field: "syncCursor",
+        headerName: "Sync Cursor",
+        flex: 1,
+        minWidth: 140,
+        renderCell: (p) => <Typography variant="body2">{p.value || "—"}</Typography>,
       },
       {
-        accessorKey: "santa_version",
-        header: "Santa Version",
-        cell: ({ getValue }) => {
-          const version = getValue() as string | null;
-          return version ? <Badge variant="secondary">{version}</Badge> : "—";
-        },
-      },
-      {
-        accessorKey: "last_seen",
-        header: "Last Seen",
-        cell: ({ getValue }) => {
-          const lastSeen = getValue() as string | null;
-          return lastSeen ? formatLastSeen(lastSeen) : "Never";
-        },
+        field: "lastSeen",
+        headerName: "Last Seen",
+        flex: 0.8,
+        minWidth: 120,
+        valueFormatter: (value) => (value ? formatTimeAgo(value as string) : "Never"),
       },
     ],
     [],
   );
 
-  if (error) {
-    return (
-      <div className="card">
-        <h2>Devices</h2>
-        <div className="alert error">
-          <p style={{ margin: 0 }}>{error}</p>
-          <Button variant="secondary" style={{ marginTop: "12px" }} onClick={() => void loadDevices()}>
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const rows = useMemo(
+    () =>
+      devices.map((d) => ({
+        id: d.serial || d.hostname || crypto.randomUUID(),
+        hostname: d.hostname,
+        serial: d.serial,
+        lastSeen: d.lastSeen,
+        ruleCursor: d.ruleCursor,
+        syncCursor: d.syncCursor,
+      })),
+    [devices],
+  );
 
   return (
-    <div className="card">
-      <h2>Devices</h2>
-      <p>Monitor and manage Santa agents deployed across your organization's devices.</p>
+    <Card elevation={1}>
+      <CardHeader title="Devices" subheader="Monitor and manage Santa agents across your fleet." />
+      <CardContent>
+        <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            {statusChip("success", `Online: ${statusCounts.online}`)}
+            {statusChip("warning", `Inactive: ${statusCounts.warning}`)}
+            {statusChip("danger", `Offline: ${statusCounts.offline}`)}
+            <Chip label={`Total: ${statusCounts.total}`} size="small" />
+            {isFetching && <CircularProgress size={16} />}
+          </Stack>
 
-      <div className="badge-row">
-        <Badge size="lg" variant="success" value={statusCounts.online} label="Online" caps />
-        <Badge size="lg" variant="danger" value={statusCounts.offline} label="Offline" caps />
-        <Badge size="lg" variant="info" value={statusCounts.total} label="Total Devices" caps />
-      </div>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button size="small" variant="outlined" onClick={() => void refetch()}>
+              Refresh
+            </Button>
+            <TextField
+              type="search"
+              size="small"
+              label="Search devices..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              inputProps={{ "aria-label": "Search devices" }}
+            />
+          </Stack>
+        </Stack>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Search devices..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            maxWidth: "300px",
-          }}
-        />
-        <Button variant="primary" style={{ marginLeft: "16px" }} onClick={() => void loadDevices()}>
-          Refresh
-        </Button>
-      </div>
-
-      {filteredDevices.length === 0 ? (
-        <div className="empty-state">
-          {isSearching ? (
-            <>
-              <h3>No devices found</h3>
-              <p>No devices match the search term "{searchTerm}"</p>
-            </>
-          ) : (
-            <>
-              <h3>No devices connected</h3>
-              <p>Deploy Santa agents to see devices here.</p>
-            </>
-          )}
+        <div style={{ height: 600, width: "100%", marginTop: 16 }}>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            disableColumnMenu
+            pageSizeOptions={[25, 50, 100]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 100, page: 0 } },
+              sorting: { sortModel: [{ field: "hostname", sort: "asc" }] },
+            }}
+            loading={isLoading || isFetching}
+            slots={{
+              noRowsOverlay: () => (
+                <Stack alignItems="center" spacing={0.5} p={3}>
+                  <Typography variant="h6">No devices found</Typography>
+                  <Typography color="text.secondary">
+                    {hasSearchTerm ? `No devices match "${trimmedSearch}".` : "No devices are available in the fleet."}
+                  </Typography>
+                </Stack>
+              ),
+            }}
+          />
         </div>
-      ) : (
-        <Table
-          data={filteredDevices}
-          columns={columns}
-          globalFilter={searchTerm}
-          sorting={true}
-          filtering={true}
-          pagination={devices.length > 10}
-          pageSize={100}
+
+        <Snackbar
+          open={toast.open}
+          autoHideDuration={4000}
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          message={toast.message}
         />
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

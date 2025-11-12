@@ -2,1527 +2,261 @@ package store
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/woodleighschool/grinch/backend/internal/config"
-	"github.com/woodleighschool/grinch/backend/internal/models"
+	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
-type Store struct {
-	pool *pgxpool.Pool
-	cfg  *config.Config
+type RuleFilter struct {
+	Search     string
+	RuleType   string
+	Identifier string
+	Enabled    *bool
 }
 
-func New(pool *pgxpool.Pool, config *config.Config) *Store {
-	return &Store{pool: pool, cfg: config}
+func (s *Store) ListUsers(ctx context.Context, search string) ([]sqlc.User, error) {
+	return s.queries.ListUsers(ctx, strings.TrimSpace(search))
 }
 
-func (s *Store) Pool() *pgxpool.Pool {
-	return s.pool
+func (s *Store) GetUser(ctx context.Context, id uuid.UUID) (sqlc.User, error) {
+	return s.queries.GetUser(ctx, id)
 }
 
-func (s *Store) UpsertUserByExternal(ctx context.Context, externalID, principal, displayName, email string) (*models.User, error) {
-	return s.UpsertCloudUserByExternal(ctx, externalID, principal, displayName, email)
+func (s *Store) GetUserByUPN(ctx context.Context, upn string) (sqlc.User, error) {
+	return s.queries.GetUserByUPN(ctx, upn)
 }
 
-func (s *Store) UpsertCloudUserByExternal(ctx context.Context, externalID, principal, displayName, email string) (*models.User, error) {
-	// First, handle potential conflicts with local users that have the same principal name
-	const checkConflictQ = `
-		UPDATE users 
-		SET external_id = $1,
-		    display_name = $2,
-		    email = $3,
-		    user_type = 'cloud',
-		    synced_at = NOW(),
-		    updated_at = NOW()
-		WHERE principal_name = $4 AND user_type = 'local' AND is_protected_local = false
-		RETURNING id, external_id, principal_name, display_name, email, user_type, synced_at, created_at, updated_at;
-	`
-
-	row := s.pool.QueryRow(ctx, checkConflictQ, externalID, displayName, email, principal)
-	var (
-		user        models.User
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
-
-	// Try to convert existing local user first
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err == nil {
-		// Successfully converted local user to cloud user
-		user.UserType = models.UserType(userTypeStr)
-		setUserStrings(&user, dbDisplay, dbEmail)
-		return &user, nil
-	}
-
-	// No local user to convert, proceed with normal upsert
-	const q = `
-		INSERT INTO users (external_id, principal_name, display_name, email, user_type, synced_at, updated_at)
-		VALUES ($1, $2, $3, $4, 'cloud', NOW(), NOW())
-		ON CONFLICT (external_id) DO UPDATE
-			SET principal_name = EXCLUDED.principal_name,
-			    display_name = EXCLUDED.display_name,
-			    email = EXCLUDED.email,
-			    user_type = 'cloud',
-			    synced_at = NOW(),
-			    updated_at = NOW()
-		RETURNING id,
-		          external_id,
-		          principal_name,
-		          display_name,
-		          email,
-		          user_type,
-		          synced_at,
-		          created_at,
-		          updated_at;
-	`
-
-	row = s.pool.QueryRow(ctx, q, externalID, principal, displayName, email)
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		return nil, err
-	}
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-	return &user, nil
+func (s *Store) GetUserByLogin(ctx context.Context, login string) (sqlc.User, error) {
+	return s.queries.GetUserByLogin(ctx, login)
 }
 
-func (s *Store) UpsertLocalUser(ctx context.Context, principal, displayName, machineID string) (*models.User, error) {
-	const q = `
-		INSERT INTO users (principal_name, display_name, user_type, created_at, updated_at)
-		VALUES ($1, NULLIF($2, ''), 'local', NOW(), NOW())
-		ON CONFLICT (principal_name) DO UPDATE
-			SET display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), users.display_name),
-			    external_id = NULL,
-			    user_type = 'local',
-			    updated_at = NOW()
-		WHERE users.user_type = 'local'
-		RETURNING id,
-		          external_id,
-		          principal_name,
-		          display_name,
-		          email,
-		          user_type,
-		          synced_at,
-		          created_at,
-		          updated_at;
-	`
+func (s *Store) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	return s.queries.DeleteUser(ctx, id)
+}
 
-	row := s.pool.QueryRow(ctx, q, principal, displayName)
-	var (
-		user        models.User
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			existing, lookupErr := s.UserByUsername(ctx, principal)
-			if lookupErr != nil {
-				return nil, lookupErr
+func (s *Store) DeleteUserByUPN(ctx context.Context, upn string) error {
+	return s.queries.DeleteUserByUPN(ctx, upn)
+}
+
+func (s *Store) UpsertUser(ctx context.Context, user sqlc.UpsertUserParams) (sqlc.User, error) {
+	return s.queries.UpsertUser(ctx, user)
+}
+
+func (s *Store) ListGroups(ctx context.Context, search string) ([]sqlc.Group, error) {
+	return s.queries.ListGroups(ctx, strings.TrimSpace(search))
+}
+
+func (s *Store) GetGroup(ctx context.Context, id uuid.UUID) (sqlc.Group, error) {
+	return s.queries.GetGroup(ctx, id)
+}
+
+func (s *Store) GetUserGroups(ctx context.Context, userID uuid.UUID) ([]sqlc.Group, error) {
+	return s.queries.GetUserGroups(ctx, userID)
+}
+
+func (s *Store) UpsertGroup(ctx context.Context, group sqlc.UpsertGroupParams) (sqlc.Group, error) {
+	return s.queries.UpsertGroup(ctx, group)
+}
+
+func (s *Store) DeleteGroup(ctx context.Context, id uuid.UUID) error {
+	return s.queries.DeleteGroup(ctx, id)
+}
+
+func (s *Store) ReplaceGroupMembers(ctx context.Context, groupID uuid.UUID, userIDs []uuid.UUID) error {
+	return s.WithTx(ctx, func(tx pgx.Tx) error {
+		queries := sqlc.New(tx)
+		if err := queries.DeleteGroupMembers(ctx, groupID); err != nil {
+			return err
+		}
+		for _, userID := range userIDs {
+			if err := queries.AddGroupMember(ctx, sqlc.AddGroupMemberParams{
+				GroupID: groupID,
+				UserID:  userID,
+			}); err != nil {
+				return err
 			}
-			if existing == nil {
-				return nil, errors.New("failed to upsert local user")
+		}
+		return nil
+	})
+}
+
+func (s *Store) ListGroupMemberIDs(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error) {
+	return s.queries.ListGroupMemberIDs(ctx, groupID)
+}
+
+func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]sqlc.User, error) {
+	return s.queries.ListGroupMembers(ctx, groupID)
+}
+
+func (s *Store) ListMachines(ctx context.Context, limit, offset int32, search string) ([]sqlc.Machine, error) {
+	return s.queries.ListMachines(ctx, sqlc.ListMachinesParams{
+		Limit:  limit,
+		Offset: offset,
+		Search: strings.TrimSpace(search),
+	})
+}
+
+func (s *Store) GetUserMachines(ctx context.Context, userID pgtype.UUID) ([]sqlc.Machine, error) {
+	return s.queries.GetUserMachines(ctx, userID)
+}
+
+func (s *Store) UpsertMachine(ctx context.Context, params sqlc.UpsertMachineParams) (sqlc.Machine, error) {
+	return s.queries.UpsertMachine(ctx, params)
+}
+
+func (s *Store) GetMachineByIdentifier(ctx context.Context, machineIdentifier string) (sqlc.Machine, error) {
+	return s.queries.GetMachineByIdentifier(ctx, machineIdentifier)
+}
+
+func (s *Store) UpdateMachinePreflightState(ctx context.Context, params sqlc.UpdateMachinePreflightStateParams) (sqlc.Machine, error) {
+	return s.queries.UpdateMachinePreflightState(ctx, params)
+}
+
+func (s *Store) UpdateMachinePostflightState(ctx context.Context, params sqlc.UpdateMachinePostflightStateParams) (sqlc.Machine, error) {
+	return s.queries.UpdateMachinePostflightState(ctx, params)
+}
+
+func (s *Store) TouchMachine(ctx context.Context, machineID uuid.UUID, clientVersion string, syncCursor, ruleCursor string) (sqlc.Machine, error) {
+	return s.queries.UpdateMachineSyncState(ctx, sqlc.UpdateMachineSyncStateParams{
+		ID:         machineID,
+		LastSeen:   pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		SyncCursor: pgtype.Text{String: syncCursor, Valid: syncCursor != ""},
+		RuleCursor: pgtype.Text{String: ruleCursor, Valid: ruleCursor != ""},
+	})
+}
+
+func (s *Store) CreateRule(ctx context.Context, rule sqlc.CreateRuleParams) (sqlc.Rule, error) {
+	return s.queries.CreateRule(ctx, rule)
+}
+
+func (s *Store) GetRule(ctx context.Context, id uuid.UUID) (sqlc.Rule, error) {
+	return s.queries.GetRule(ctx, id)
+}
+
+func (s *Store) GetRuleByTarget(ctx context.Context, target string) (sqlc.Rule, error) {
+	return s.queries.GetRuleByTarget(ctx, target)
+}
+
+func (s *Store) UpdateRule(ctx context.Context, rule sqlc.UpdateRuleParams) (sqlc.Rule, error) {
+	return s.queries.UpdateRule(ctx, rule)
+}
+
+func (s *Store) DeleteRule(ctx context.Context, id uuid.UUID) error {
+	return s.queries.DeleteRule(ctx, id)
+}
+
+func (s *Store) ListRules(ctx context.Context) ([]sqlc.Rule, error) {
+	return s.queries.ListRules(ctx)
+}
+
+func (s *Store) FilterRules(ctx context.Context, filter RuleFilter) ([]sqlc.Rule, error) {
+	var enabled pgtype.Bool
+	if filter.Enabled != nil {
+		enabled = pgtype.Bool{Bool: *filter.Enabled, Valid: true}
+	}
+	return s.queries.FilterRules(ctx, sqlc.FilterRulesParams{
+		Search:     strings.TrimSpace(filter.Search),
+		RuleType:   strings.TrimSpace(filter.RuleType),
+		Identifier: strings.TrimSpace(filter.Identifier),
+		Enabled:    enabled,
+	})
+}
+
+func (s *Store) ListRuleScopes(ctx context.Context, ruleID uuid.UUID) ([]sqlc.RuleScope, error) {
+	return s.queries.ListRuleScopes(ctx, ruleID)
+}
+
+func (s *Store) ListAllRuleScopes(ctx context.Context) ([]sqlc.RuleScope, error) {
+	return s.queries.ListAllRuleScopes(ctx)
+}
+
+func (s *Store) GetRuleScope(ctx context.Context, scopeID uuid.UUID) (sqlc.RuleScope, error) {
+	return s.queries.GetRuleScope(ctx, scopeID)
+}
+
+func (s *Store) GetRuleScopeByTarget(ctx context.Context, ruleID uuid.UUID, targetType string, targetID uuid.UUID) (sqlc.RuleScope, error) {
+	return s.queries.GetRuleScopeByTarget(ctx, sqlc.GetRuleScopeByTargetParams{
+		RuleID:     ruleID,
+		TargetType: targetType,
+		TargetID:   targetID,
+	})
+}
+
+func (s *Store) CreateRuleScope(ctx context.Context, params sqlc.InsertRuleScopeParams) (sqlc.RuleScope, error) {
+	return s.queries.InsertRuleScope(ctx, params)
+}
+
+func (s *Store) DeleteRuleScope(ctx context.Context, scopeID uuid.UUID) error {
+	return s.queries.DeleteRuleScope(ctx, scopeID)
+}
+
+func (s *Store) ReplaceRuleAssignments(ctx context.Context, ruleID uuid.UUID, assignments []sqlc.InsertRuleAssignmentParams) error {
+	return s.WithTx(ctx, func(tx pgx.Tx) error {
+		queries := sqlc.New(tx)
+		if err := queries.DeleteAssignmentsByRule(ctx, ruleID); err != nil {
+			return err
+		}
+		for _, assignment := range assignments {
+			if err := queries.InsertRuleAssignment(ctx, assignment); err != nil {
+				return err
 			}
-			return existing, nil
 		}
-		return nil, err
-	}
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-
-	// Insert local user metadata
-	const metaQ = `
-		INSERT INTO local_user_metadata (user_id, santa_agent_machine_id, updated_at)
-		VALUES ($1, $2, NOW())
-		ON CONFLICT (user_id) DO UPDATE
-			SET santa_agent_machine_id = COALESCE(EXCLUDED.santa_agent_machine_id, local_user_metadata.santa_agent_machine_id),
-			    updated_at = NOW();
-	`
-	if _, err := s.pool.Exec(ctx, metaQ, user.ID, machineID); err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+		return nil
+	})
 }
 
-func (s *Store) GetUser(ctx context.Context, id uuid.UUID) (*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       is_protected_local,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE id = $1;
-	`
-	row := s.pool.QueryRow(ctx, q, id)
-	var (
-		user        models.User
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.IsProtectedLocal,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-	return &user, nil
+func (s *Store) ListRuleAssignments(ctx context.Context, ruleID uuid.UUID) ([]sqlc.RuleAssignment, error) {
+	return s.queries.ListRuleAssignments(ctx, ruleID)
 }
 
-func (s *Store) UserByExternalID(ctx context.Context, externalID string) (*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE external_id = $1;
-	`
-	row := s.pool.QueryRow(ctx, q, externalID)
-	var (
-		user        models.User
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-	return &user, nil
+func (s *Store) ListAllAssignments(ctx context.Context) ([]sqlc.RuleAssignment, error) {
+	return s.queries.ListAllAssignments(ctx)
 }
 
-func (s *Store) UserByUsername(ctx context.Context, username string) (*models.User, error) {
-	var (
-		user        models.User
-		userMatched bool
-		principal   string
-		userTypeStr string
-		dbDisplay   sql.NullString
-		dbEmail     sql.NullString
-	)
-	const q = `
-		SELECT id,
-			external_id,
-			principal_name,
-			display_name,
-			email,
-			user_type,
-			synced_at,
-			created_at,
-			updated_at
-		FROM users
-		WHERE principal_name = $1
-	`
-	// Iterate over stored domains
-	i := 0
-	for !userMatched {
-		if i >= len(s.cfg.AzureRegisteredDomains) {
-			// Try with the username as-is if no domains or we've tried all domains
-			principal = username
-		} else {
-			domain := s.cfg.AzureRegisteredDomains[i]
-			principal = fmt.Sprintf("%s@%s", username, domain)
-		}
-		row := s.pool.QueryRow(ctx, q, principal)
-		if err := row.Scan(
-			&user.ID,
-			&user.ExternalID,
-			&user.PrincipalName,
-			&dbDisplay,
-			&dbEmail,
-			&userTypeStr,
-			&user.SyncedAt,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				i++
-				// If we've tried all domains and the username as-is, break
-				if i > len(s.cfg.AzureRegisteredDomains) {
-					break
-				}
-				continue
-			}
-			return nil, err
-		}
-		userMatched = true
+func (s *Store) ListUserAssignments(ctx context.Context, userID uuid.UUID) ([]sqlc.ListUserAssignmentsRow, error) {
+	return s.queries.ListUserAssignments(ctx, userID)
+}
+
+func (s *Store) ListApplicationAssignmentStats(ctx context.Context) ([]sqlc.ListApplicationAssignmentStatsRow, error) {
+	return s.queries.ListApplicationAssignmentStats(ctx)
+}
+
+func (s *Store) RequestCleanSyncAllMachines(ctx context.Context) error {
+	return s.queries.RequestCleanSyncAllMachines(ctx)
+}
+
+func (s *Store) RequestCleanSyncForUser(ctx context.Context, userID uuid.UUID) error {
+	return s.queries.RequestCleanSyncForUser(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+}
+
+func (s *Store) RequestCleanSyncForGroup(ctx context.Context, groupID uuid.UUID) error {
+	return s.queries.RequestCleanSyncForGroup(ctx, groupID)
+}
+
+func (s *Store) InsertEvent(ctx context.Context, params sqlc.InsertEventParams) (sqlc.Event, error) {
+	return s.queries.InsertEvent(ctx, params)
+}
+
+func (s *Store) ListEvents(ctx context.Context, limit, offset int32) ([]sqlc.Event, error) {
+	return s.queries.ListEvents(ctx, sqlc.ListEventsParams{Limit: limit, Offset: offset})
+}
+
+func (s *Store) SummarizeEvents(ctx context.Context, days int32) ([]sqlc.SummarizeEventsRow, error) {
+	if days <= 0 {
+		days = 14
 	}
-	if !userMatched {
+	return s.queries.SummarizeEvents(ctx, days)
+}
+
+func (s *Store) MarshalRuleMetadata(meta any) ([]byte, error) {
+	if meta == nil {
 		return nil, nil
 	}
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-	return &user, nil
-}
-
-func (s *Store) ListLocalUsers(ctx context.Context) ([]*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE user_type = 'local'
-		ORDER BY principal_name;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []*models.User
-	for rows.Next() {
-		var (
-			user        models.User
-			userTypeStr string
-			dbDisplay   sql.NullString
-			dbEmail     sql.NullString
-		)
-		if err := rows.Scan(
-			&user.ID,
-			&user.ExternalID,
-			&user.PrincipalName,
-			&dbDisplay,
-			&dbEmail,
-			&userTypeStr,
-			&user.SyncedAt,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		user.UserType = models.UserType(userTypeStr)
-		setUserStrings(&user, dbDisplay, dbEmail)
-		users = append(users, &user)
-	}
-	return users, rows.Err()
-}
-
-func (s *Store) ConvertLocalToCloudUser(ctx context.Context, userID uuid.UUID, externalID, displayName, email string) error {
-	const q = `
-		UPDATE users 
-		SET external_id = $2,
-		    display_name = $3,
-		    email = $4,
-		    user_type = 'cloud',
-		    synced_at = NOW(),
-		    updated_at = NOW()
-		WHERE id = $1 AND user_type = 'local' AND is_protected_local = false;
-	`
-
-	result, err := s.pool.Exec(ctx, q, userID, externalID, displayName, email)
-	if err != nil {
-		return err
-	}
-
-	if result.RowsAffected() == 0 {
-		return errors.New("user not found, not a local user, or is a protected local user")
-	}
-
-	// Update local user metadata to mark conversion check
-	const metaQ = `
-		UPDATE local_user_metadata 
-		SET last_converted_check = NOW(),
-		    updated_at = NOW()
-		WHERE user_id = $1;
-	`
-	_, _ = s.pool.Exec(ctx, metaQ, userID)
-
-	return nil
-}
-
-func (s *Store) GetCloudUsersNotSyncedSince(ctx context.Context, since time.Time) ([]*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE user_type = 'cloud'
-		  AND (synced_at IS NULL OR synced_at < $1)
-		ORDER BY principal_name;
-	`
-	rows, err := s.pool.Query(ctx, q, since)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []*models.User
-	for rows.Next() {
-		var (
-			user        models.User
-			userTypeStr string
-			dbDisplay   sql.NullString
-			dbEmail     sql.NullString
-		)
-		if err := rows.Scan(
-			&user.ID,
-			&user.ExternalID,
-			&user.PrincipalName,
-			&dbDisplay,
-			&dbEmail,
-			&userTypeStr,
-			&user.SyncedAt,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		user.UserType = models.UserType(userTypeStr)
-		setUserStrings(&user, dbDisplay, dbEmail)
-		users = append(users, &user)
-	}
-	return users, rows.Err()
-}
-
-func (s *Store) DeleteUser(ctx context.Context, userID uuid.UUID) error {
-	const q = `DELETE FROM users WHERE id = $1;`
-	result, err := s.pool.Exec(ctx, q, userID)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return errors.New("user not found")
-	}
-	return nil
-}
-
-func (s *Store) UpsertGroup(ctx context.Context, externalID, displayName, description string) (*models.Group, error) {
-	const q = `
-		INSERT INTO groups (external_id, display_name, description, synced_at, updated_at)
-		VALUES ($1, $2, $3, NOW(), NOW())
-		ON CONFLICT (external_id) DO UPDATE
-			SET display_name = EXCLUDED.display_name,
-			    description = EXCLUDED.description,
-			    synced_at = NOW(),
-			    updated_at = NOW()
-		RETURNING id, external_id, display_name, description, synced_at, created_at, updated_at;
-	`
-	row := s.pool.QueryRow(ctx, q, externalID, displayName, description)
-	var (
-		group         models.Group
-		dbDescription sql.NullString
-	)
-	if err := row.Scan(
-		&group.ID,
-		&group.ExternalID,
-		&group.DisplayName,
-		&dbDescription,
-		&group.SyncedAt,
-		&group.CreatedAt,
-		&group.UpdatedAt,
-	); err != nil {
-		return nil, err
-	}
-	if dbDescription.Valid {
-		group.Description = dbDescription.String
-	}
-	return &group, nil
-}
-
-func (s *Store) ListGroups(ctx context.Context) ([]models.Group, error) {
-	const q = `
-		SELECT id, external_id, display_name, description, synced_at, created_at, updated_at
-		FROM groups ORDER BY display_name ASC;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var groups []models.Group
-	for rows.Next() {
-		var (
-			group         models.Group
-			dbDescription sql.NullString
-		)
-		if err := rows.Scan(&group.ID, &group.ExternalID, &group.DisplayName, &dbDescription, &group.SyncedAt, &group.CreatedAt, &group.UpdatedAt); err != nil {
-			return nil, err
-		}
-		if dbDescription.Valid {
-			group.Description = dbDescription.String
-		}
-		groups = append(groups, group)
-	}
-	return groups, rows.Err()
-}
-
-func (s *Store) ListUsers(ctx context.Context, limit int) ([]models.User, error) {
-	baseQuery := `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		ORDER BY display_name NULLS LAST, principal_name
-	`
-	var (
-		rows pgx.Rows
-		err  error
-	)
-
-	if limit > 0 {
-		rows, err = s.pool.Query(ctx, baseQuery+" LIMIT $1", limit)
-	} else {
-		rows, err = s.pool.Query(ctx, baseQuery)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []models.User
-	for rows.Next() {
-		var (
-			user        models.User
-			userTypeStr string
-			dbDisplay   sql.NullString
-			dbEmail     sql.NullString
-		)
-		if err := rows.Scan(
-			&user.ID,
-			&user.ExternalID,
-			&user.PrincipalName,
-			&dbDisplay,
-			&dbEmail,
-			&userTypeStr,
-			&user.SyncedAt,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		user.UserType = models.UserType(userTypeStr)
-		setUserStrings(&user, dbDisplay, dbEmail)
-		users = append(users, user)
-	}
-	return users, rows.Err()
-}
-
-func (s *Store) GroupsForUser(ctx context.Context, userID uuid.UUID) ([]models.Group, error) {
-	const q = `
-		SELECT g.id,
-		       g.external_id,
-		       g.display_name,
-		       g.description,
-		       g.synced_at,
-		       g.created_at,
-		       g.updated_at
-		FROM group_memberships gm
-		JOIN groups g ON gm.group_id = g.id
-		WHERE gm.user_id = $1
-		ORDER BY g.display_name;
-	`
-	rows, err := s.pool.Query(ctx, q, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var groups []models.Group
-	for rows.Next() {
-		var (
-			group        models.Group
-			dbDesc       sql.NullString
-			dbExternalID string
-		)
-		if err := rows.Scan(
-			&group.ID,
-			&dbExternalID,
-			&group.DisplayName,
-			&dbDesc,
-			&group.SyncedAt,
-			&group.CreatedAt,
-			&group.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		group.ExternalID = dbExternalID
-		if dbDesc.Valid {
-			group.Description = dbDesc.String
-		}
-		groups = append(groups, group)
-	}
-	return groups, rows.Err()
-}
-
-func (s *Store) ListGroupMemberships(ctx context.Context) ([]models.GroupMembership, error) {
-	const q = `
-		SELECT group_id, user_id
-		FROM group_memberships
-		ORDER BY group_id, user_id;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	memberships := make([]models.GroupMembership, 0)
-	for rows.Next() {
-		var membership models.GroupMembership
-		if err := rows.Scan(&membership.GroupID, &membership.UserID); err != nil {
-			return nil, err
-		}
-		memberships = append(memberships, membership)
-	}
-	return memberships, rows.Err()
-}
-
-func (s *Store) HostsForUser(ctx context.Context, userID uuid.UUID) ([]models.Host, error) {
-	const q = `
-		SELECT
-			h.id,
-			h.hostname,
-			h.serial_number,
-			h.machine_id,
-			h.primary_user_id,
-			h.last_seen,
-			h.created_at,
-			h.updated_at,
-			h.os_version,
-			h.os_build,
-			h.model_identifier,
-			h.santa_version,
-			h.client_mode,
-			u.principal_name,
-			u.display_name
-		FROM hosts h
-		LEFT JOIN users u ON u.id = h.primary_user_id
-		WHERE h.primary_user_id = $1
-		ORDER BY h.hostname NULLS LAST;
-	`
-	rows, err := s.pool.Query(ctx, q, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var hosts []models.Host
-	for rows.Next() {
-		var (
-			host        models.Host
-			clientMode  sql.NullString
-			principal   sql.NullString
-			displayName sql.NullString
-			lastSeen    sql.NullTime
-		)
-		if err := rows.Scan(
-			&host.ID,
-			&host.Hostname,
-			&host.SerialNumber,
-			&host.MachineID,
-			&host.PrimaryUserID,
-			&lastSeen,
-			&host.CreatedAt,
-			&host.UpdatedAt,
-			&host.OSVersion,
-			&host.OSBuild,
-			&host.ModelIdentifier,
-			&host.SantaVersion,
-			&clientMode,
-			&principal,
-			&displayName,
-		); err != nil {
-			return nil, err
-		}
-		if clientMode.Valid {
-			host.ClientMode = models.ClientMode(clientMode.String)
-		}
-		if principal.Valid {
-			host.PrimaryUserPrincipal = principal.String
-		}
-		if displayName.Valid {
-			host.PrimaryUserDisplayName = displayName.String
-		}
-		if lastSeen.Valid {
-			ls := lastSeen.Time
-			host.LastSeen = &ls
-		}
-		hosts = append(hosts, host)
-	}
-	return hosts, rows.Err()
-}
-
-func (s *Store) RecentUserEvents(ctx context.Context, userID uuid.UUID, limit int) ([]models.UserEvent, error) {
-	if limit <= 0 {
-		limit = 10
-	}
-	const q = `
-		SELECT
-			be.id,
-			be.host_id,
-			h.hostname,
-			be.application_id,
-			be.process_path,
-			be.blocked_reason,
-			be.decision,
-			be.occurred_at
-		FROM blocked_events be
-		LEFT JOIN hosts h ON h.id = be.host_id
-		WHERE be.user_id = $1
-		ORDER BY be.occurred_at DESC
-		LIMIT $2;
-	`
-	rows, err := s.pool.Query(ctx, q, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	events := make([]models.UserEvent, 0)
-	for rows.Next() {
-		var (
-			event       models.UserEvent
-			hostname    sql.NullString
-			blockReason sql.NullString
-			decision    sql.NullString
-		)
-		if err := rows.Scan(
-			&event.ID,
-			&event.HostID,
-			&hostname,
-			&event.ApplicationID,
-			&event.ProcessPath,
-			&blockReason,
-			&decision,
-			&event.OccurredAt,
-		); err != nil {
-			return nil, err
-		}
-		if hostname.Valid {
-			event.Hostname = hostname.String
-		}
-		if blockReason.Valid {
-			event.BlockedReason = blockReason.String
-		}
-		if decision.Valid {
-			event.Decision = decision.String
-		}
-		events = append(events, event)
-	}
-	return events, rows.Err()
-}
-
-func (s *Store) UserPoliciesForUser(ctx context.Context, userID uuid.UUID, groupIDs []uuid.UUID) ([]models.UserPolicy, error) {
-	const userQ = `
-		SELECT
-			s.id,
-			s.application_id,
-			a.name,
-			a.rule_type,
-			a.identifier,
-			s.action,
-			s.created_at,
-			u.display_name,
-			u.principal_name
-		FROM application_scopes s
-		JOIN applications a ON a.id = s.application_id
-		JOIN users u ON u.id = s.target_id
-		WHERE s.target_type = 'user' AND s.target_id = $1
-		ORDER BY a.name, s.created_at DESC;
-	`
-	rows, err := s.pool.Query(ctx, userQ, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	policies := make([]models.UserPolicy, 0)
-	for rows.Next() {
-		var (
-			policy      models.UserPolicy
-			displayName sql.NullString
-			principal   string
-		)
-		if err := rows.Scan(
-			&policy.ScopeID,
-			&policy.ApplicationID,
-			&policy.ApplicationName,
-			&policy.RuleType,
-			&policy.Identifier,
-			&policy.Action,
-			&policy.CreatedAt,
-			&displayName,
-			&principal,
-		); err != nil {
-			return nil, err
-		}
-		policy.TargetType = "user"
-		policy.TargetID = userID
-		if displayName.Valid {
-			policy.TargetName = displayName.String
-		} else {
-			policy.TargetName = principal
-		}
-		policy.ViaGroup = false
-		policies = append(policies, policy)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(groupIDs) == 0 {
-		return policies, nil
-	}
-
-	const groupQ = `
-		SELECT
-			s.id,
-			s.application_id,
-			a.name,
-			a.rule_type,
-			a.identifier,
-			s.action,
-			s.created_at,
-			s.target_id,
-			g.display_name
-		FROM application_scopes s
-		JOIN applications a ON a.id = s.application_id
-		JOIN groups g ON g.id = s.target_id
-		WHERE s.target_type = 'group' AND s.target_id = ANY($1::uuid[])
-		ORDER BY a.name, s.created_at DESC;
-	`
-	groupRows, err := s.pool.Query(ctx, groupQ, groupIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer groupRows.Close()
-
-	for groupRows.Next() {
-		var (
-			policy   models.UserPolicy
-			targetID uuid.UUID
-			name     sql.NullString
-		)
-		if err := groupRows.Scan(
-			&policy.ScopeID,
-			&policy.ApplicationID,
-			&policy.ApplicationName,
-			&policy.RuleType,
-			&policy.Identifier,
-			&policy.Action,
-			&policy.CreatedAt,
-			&targetID,
-			&name,
-		); err != nil {
-			return nil, err
-		}
-		policy.TargetType = "group"
-		policy.TargetID = targetID
-		if name.Valid {
-			policy.TargetName = name.String
-		}
-		policy.ViaGroup = true
-		policies = append(policies, policy)
-	}
-	return policies, groupRows.Err()
-}
-
-func (s *Store) ReplaceGroupMemberships(ctx context.Context, groupID uuid.UUID, userIDs []uuid.UUID) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = tx.Rollback(ctx) // Ignore rollback errors; transaction may be committed
-	}()
-
-	if _, err := tx.Exec(ctx, `DELETE FROM group_memberships WHERE group_id = $1`, groupID); err != nil {
-		return err
-	}
-
-	batch := &pgx.Batch{}
-	for _, userID := range userIDs {
-		batch.Queue(`INSERT INTO group_memberships (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, userID)
-	}
-
-	br := tx.SendBatch(ctx, batch)
-	if err := br.Close(); err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
-}
-
-func (s *Store) ListApplications(ctx context.Context) ([]models.Application, error) {
-	const q = `
-		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
-		FROM applications ORDER BY created_at DESC;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var apps []models.Application
-	for rows.Next() {
-		var (
-			app           models.Application
-			dbDescription sql.NullString
-		)
-		if err := rows.Scan(
-			&app.ID,
-			&app.Name,
-			&app.RuleType,
-			&app.Identifier,
-			&dbDescription,
-			&app.Enabled,
-			&app.CreatedAt,
-			&app.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		if dbDescription.Valid {
-			app.Description = dbDescription.String
-		}
-		apps = append(apps, app)
-	}
-	return apps, rows.Err()
-}
-
-func (s *Store) GetApplicationByIdentifier(ctx context.Context, identifier string) (*models.Application, error) {
-	const q = `
-		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
-		FROM applications WHERE identifier = $1;
-	`
-	var (
-		app           models.Application
-		dbDescription sql.NullString
-	)
-	row := s.pool.QueryRow(ctx, q, identifier)
-	if err := row.Scan(
-		&app.ID,
-		&app.Name,
-		&app.RuleType,
-		&app.Identifier,
-		&dbDescription,
-		&app.Enabled,
-		&app.CreatedAt,
-		&app.UpdatedAt,
-	); err != nil {
-		return nil, err
-	}
-	if dbDescription.Valid {
-		app.Description = dbDescription.String
-	}
-	return &app, nil
-}
-
-func (s *Store) CreateApplication(ctx context.Context, app models.Application) (*models.Application, error) {
-	const q = `
-		INSERT INTO applications (name, rule_type, identifier, description, enabled, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		RETURNING id, created_at, updated_at;
-	`
-	// Default enabled to true if not set
-	if !app.Enabled {
-		app.Enabled = true
-	}
-	row := s.pool.QueryRow(ctx, q, app.Name, app.RuleType, app.Identifier, app.Description, app.Enabled)
-	if err := row.Scan(&app.ID, &app.CreatedAt, &app.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return &app, nil
-}
-
-func (s *Store) DeleteApplication(ctx context.Context, id uuid.UUID) error {
-	const q = `DELETE FROM applications WHERE id = $1`
-	commandTag, err := s.pool.Exec(ctx, q, id)
-	if err != nil {
-		return err
-	}
-	if commandTag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return nil
-}
-
-func (s *Store) UpdateApplication(ctx context.Context, id uuid.UUID, enabled bool) (*models.Application, error) {
-	const q = `
-		UPDATE applications 
-		SET enabled = $2, updated_at = NOW()
-		WHERE id = $1
-		RETURNING id, name, rule_type, identifier, description, enabled, created_at, updated_at;
-	`
-	var (
-		app           models.Application
-		dbDescription sql.NullString
-	)
-	row := s.pool.QueryRow(ctx, q, id, enabled)
-	if err := row.Scan(
-		&app.ID,
-		&app.Name,
-		&app.RuleType,
-		&app.Identifier,
-		&dbDescription,
-		&app.Enabled,
-		&app.CreatedAt,
-		&app.UpdatedAt,
-	); err != nil {
-		return nil, err
-	}
-	if dbDescription.Valid {
-		app.Description = dbDescription.String
-	}
-	return &app, nil
-}
-
-func (s *Store) AddApplicationScope(ctx context.Context, scope models.ApplicationScope) (*models.ApplicationScope, error) {
-	const q = `
-		INSERT INTO application_scopes (application_id, target_type, target_id, action)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at;
-	`
-	row := s.pool.QueryRow(ctx, q, scope.ApplicationID, scope.TargetType, scope.TargetID, scope.Action)
-	if err := row.Scan(&scope.ID, &scope.CreatedAt); err != nil {
-		return nil, err
-	}
-	return &scope, nil
-}
-
-func (s *Store) DeleteApplicationScope(ctx context.Context, id uuid.UUID) error {
-	const q = `DELETE FROM application_scopes WHERE id = $1`
-	commandTag, err := s.pool.Exec(ctx, q, id)
-	if err != nil {
-		return err
-	}
-	if commandTag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
-	}
-	return nil
-}
-
-func (s *Store) ListApplicationScopes(ctx context.Context, appID uuid.UUID) ([]models.ApplicationScope, error) {
-	const q = `
-		SELECT id, application_id, target_type, target_id, action, created_at
-		FROM application_scopes
-		WHERE application_id = $1
-		ORDER BY created_at DESC;
-	`
-	rows, err := s.pool.Query(ctx, q, appID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var scopes []models.ApplicationScope
-	for rows.Next() {
-		var scope models.ApplicationScope
-		if err := rows.Scan(
-			&scope.ID,
-			&scope.ApplicationID,
-			&scope.TargetType,
-			&scope.TargetID,
-			&scope.Action,
-			&scope.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		scopes = append(scopes, scope)
-	}
-	return scopes, rows.Err()
-}
-
-func (s *Store) InsertBlockedEvent(ctx context.Context, event models.BlockedEvent) (*models.BlockedEvent, error) {
-	const q = `
-		INSERT INTO blocked_events (
-			host_id, user_id, application_id, process_path, process_hash, signer, blocked_reason, event_payload, occurred_at, ingested_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, NOW()), NOW())
-		RETURNING id, occurred_at, ingested_at;
-	`
-	var occurredAt time.Time
-	if !event.OccurredAt.IsZero() {
-		occurredAt = event.OccurredAt
-	}
-	row := s.pool.QueryRow(
-		ctx,
-		q,
-		event.HostID,
-		event.UserID,
-		event.ApplicationID,
-		event.ProcessPath,
-		event.ProcessHash,
-		event.Signer,
-		event.BlockedReason,
-		event.EventPayload,
-		sqlNullTime(occurredAt),
-	)
-	if err := row.Scan(&event.ID, &event.OccurredAt, &event.IngestedAt); err != nil {
-		return nil, err
-	}
-	return &event, nil
-}
-
-func (s *Store) UpsertHost(ctx context.Context, host models.Host) (*models.Host, error) {
-	const q = `
-		INSERT INTO hosts (machine_id, hostname, serial_number, primary_user_id, last_seen, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW())
-		ON CONFLICT (machine_id) DO UPDATE
-			SET hostname = EXCLUDED.hostname,
-			    serial_number = EXCLUDED.serial_number,
-			    primary_user_id = EXCLUDED.primary_user_id,
-			    last_seen = NOW(),
-			    updated_at = NOW()
-		RETURNING id, last_seen, created_at, updated_at;
-	`
-	row := s.pool.QueryRow(ctx, q, host.MachineID, host.Hostname, host.SerialNumber, host.PrimaryUserID)
-	if err := row.Scan(&host.ID, &host.LastSeen, &host.CreatedAt, &host.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return &host, nil
-}
-
-func (s *Store) HostByMachineID(ctx context.Context, machineID string) (*models.Host, error) {
-	const q = `
-		SELECT id, hostname, serial_number, machine_id, primary_user_id, last_seen,
-		       created_at, updated_at, os_version, os_build, model_identifier,
-		       santa_version, client_mode
-		FROM hosts WHERE machine_id = $1;
-	`
-	row := s.pool.QueryRow(ctx, q, machineID)
-	var host models.Host
-	var clientMode sql.NullString
-	if err := row.Scan(
-		&host.ID,
-		&host.Hostname,
-		&host.SerialNumber,
-		&host.MachineID,
-		&host.PrimaryUserID,
-		&host.LastSeen,
-		&host.CreatedAt,
-		&host.UpdatedAt,
-		&host.OSVersion,
-		&host.OSBuild,
-		&host.ModelIdentifier,
-		&host.SantaVersion,
-		&clientMode,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if clientMode.Valid {
-		host.ClientMode = models.ClientMode(clientMode.String)
-	}
-	return &host, nil
-}
-
-func (s *Store) ApplicationScopesForTargets(ctx context.Context, targetIDs []uuid.UUID) ([]models.ApplicationScope, error) {
-	if len(targetIDs) == 0 {
-		return []models.ApplicationScope{}, nil
-	}
-	const q = `
-		SELECT id, application_id, target_type, target_id, action, created_at
-		FROM application_scopes
-		WHERE (target_type = 'group' AND target_id = ANY($1))
-		   OR (target_type = 'user' AND target_id = ANY($1))
-	`
-	rows, err := s.pool.Query(ctx, q, targetIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var scopes []models.ApplicationScope
-	for rows.Next() {
-		var scope models.ApplicationScope
-		if err := rows.Scan(&scope.ID, &scope.ApplicationID, &scope.TargetType, &scope.TargetID, &scope.Action, &scope.CreatedAt); err != nil {
-			return nil, err
-		}
-		scopes = append(scopes, scope)
-	}
-	return scopes, rows.Err()
-}
-
-func (s *Store) ApplicationsByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]models.Application, error) {
-	if len(ids) == 0 {
-		return map[uuid.UUID]models.Application{}, nil
-	}
-	const q = `
-		SELECT id, name, rule_type, identifier, description, enabled, created_at, updated_at
-		FROM applications
-		WHERE id = ANY($1);
-	`
-	rows, err := s.pool.Query(ctx, q, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result := make(map[uuid.UUID]models.Application, len(ids))
-	for rows.Next() {
-		var (
-			app           models.Application
-			dbDescription sql.NullString
-		)
-		if err := rows.Scan(&app.ID, &app.Name, &app.RuleType, &app.Identifier, &dbDescription, &app.Enabled, &app.CreatedAt, &app.UpdatedAt); err != nil {
-			return nil, err
-		}
-		if dbDescription.Valid {
-			app.Description = dbDescription.String
-		}
-		result[app.ID] = app
-	}
-	return result, rows.Err()
-}
-
-func (s *Store) RecentBlockedEvents(ctx context.Context, limit int) ([]models.BlockedEvent, error) {
-	const q = `
-		SELECT id, host_id, user_id, application_id, process_path, process_hash, signer, blocked_reason, event_payload, occurred_at, ingested_at
-		FROM blocked_events
-		ORDER BY occurred_at DESC
-		LIMIT $1;
-	`
-	rows, err := s.pool.Query(ctx, q, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var events []models.BlockedEvent
-	for rows.Next() {
-		var event models.BlockedEvent
-		if err := rows.Scan(
-			&event.ID,
-			&event.HostID,
-			&event.UserID,
-			&event.ApplicationID,
-			&event.ProcessPath,
-			&event.ProcessHash,
-			&event.Signer,
-			&event.BlockedReason,
-			&event.EventPayload,
-			&event.OccurredAt,
-			&event.IngestedAt,
-		); err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-	return events, rows.Err()
-}
-
-func (s *Store) UserGroups(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
-	const q = `
-		SELECT group_id FROM group_memberships WHERE user_id = $1;
-	`
-	rows, err := s.pool.Query(ctx, q, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []uuid.UUID
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
-}
-
-func (s *Store) GroupsByExternalIDs(ctx context.Context, externalIDs []string) (map[string]uuid.UUID, error) {
-	if len(externalIDs) == 0 {
-		return map[string]uuid.UUID{}, nil
-	}
-	const q = `
-		SELECT external_id, id FROM groups WHERE external_id = ANY($1);
-	`
-	rows, err := s.pool.Query(ctx, q, externalIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result := make(map[string]uuid.UUID, len(externalIDs))
-	for rows.Next() {
-		var external string
-		var id uuid.UUID
-		if err := rows.Scan(&external, &id); err != nil {
-			return nil, err
-		}
-		result[external] = id
-	}
-	return result, rows.Err()
-}
-
-func (s *Store) ListHosts(ctx context.Context) ([]models.Host, error) {
-	const q = `
-		SELECT
-			h.id,
-			h.hostname,
-			h.serial_number,
-			h.machine_id,
-			h.primary_user_id,
-			h.last_seen,
-			h.created_at,
-			h.updated_at,
-			h.os_version,
-			h.os_build,
-			h.model_identifier,
-			h.santa_version,
-			h.client_mode,
-			u.principal_name,
-			u.display_name
-		FROM hosts h
-		LEFT JOIN users u ON u.id = h.primary_user_id
-		ORDER BY h.hostname NULLS LAST;
-	`
-	rows, err := s.pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	hosts := make([]models.Host, 0)
-	for rows.Next() {
-		var host models.Host
-		var clientMode, principal, displayName sql.NullString
-		if err := rows.Scan(
-			&host.ID,
-			&host.Hostname,
-			&host.SerialNumber,
-			&host.MachineID,
-			&host.PrimaryUserID,
-			&host.LastSeen,
-			&host.CreatedAt,
-			&host.UpdatedAt,
-			&host.OSVersion,
-			&host.OSBuild,
-			&host.ModelIdentifier,
-			&host.SantaVersion,
-			&clientMode,
-			&principal,
-			&displayName,
-		); err != nil {
-			return nil, err
-		}
-		if clientMode.Valid {
-			host.ClientMode = models.ClientMode(clientMode.String)
-		}
-		if principal.Valid {
-			host.PrimaryUserPrincipal = principal.String
-		}
-		if displayName.Valid {
-			host.PrimaryUserDisplayName = displayName.String
-		}
-		hosts = append(hosts, host)
-	}
-	return hosts, rows.Err()
-}
-
-func sqlNullTime(t time.Time) any {
-	if t.IsZero() {
-		return nil
-	}
-	return t
-}
-
-func setUserStrings(user *models.User, display, email sql.NullString) {
-	if display.Valid {
-		user.DisplayName = display.String
-	} else {
-		user.DisplayName = ""
-	}
-	if email.Valid {
-		user.Email = email.String
-	} else {
-		user.Email = ""
-	}
-}
-
-// EnsureInitialAdminUser creates or updates an initial admin user based on provided configuration
-func (s *Store) EnsureInitialAdminUser(ctx context.Context, password string) error {
-	if password == "" {
-		return fmt.Errorf("password is required for initial admin user")
-	}
-
-	const adminPrincipal = "admin"
-	const adminDisplayName = "Master Claus"
-
-	// Hash the password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	// Create or update the user as a protected local user with password
-	const upsertUserQuery = `
-		INSERT INTO users (principal_name, display_name, email, user_type, password_hash, is_protected_local, created_at, updated_at)
-		VALUES ($1, $2, NULL, 'local', $3, true, NOW(), NOW())
-		ON CONFLICT (principal_name) DO UPDATE
-			SET display_name = EXCLUDED.display_name,
-			    email = NULL,
-			    password_hash = EXCLUDED.password_hash,
-			    user_type = 'local',
-			    is_protected_local = true,
-			    updated_at = NOW()
-		WHERE users.is_protected_local = true  -- Only update if it's already a protected local user
-		RETURNING id;
-	`
-
-	var userID uuid.UUID
-	err = s.pool.QueryRow(ctx, upsertUserQuery, adminPrincipal, adminDisplayName, string(passwordHash)).Scan(&userID)
-	if err != nil {
-		return fmt.Errorf("failed to create/update initial admin user: %w", err)
-	}
-
-	return nil
-}
-
-// AuthenticateLocalUser validates a local user's credentials
-func (s *Store) AuthenticateLocalUser(ctx context.Context, principal, password string) (*models.User, error) {
-	const q = `
-		SELECT id,
-		       external_id,
-		       principal_name,
-		       display_name,
-		       email,
-		       user_type,
-		       password_hash,
-		       is_protected_local,
-		       synced_at,
-		       created_at,
-		       updated_at
-		FROM users
-		WHERE principal_name = $1 AND user_type = 'local' AND password_hash IS NOT NULL;
-	`
-	row := s.pool.QueryRow(ctx, q, principal)
-
-	var (
-		user         models.User
-		userTypeStr  string
-		passwordHash string
-		dbDisplay    sql.NullString
-		dbEmail      sql.NullString
-	)
-
-	if err := row.Scan(
-		&user.ID,
-		&user.ExternalID,
-		&user.PrincipalName,
-		&dbDisplay,
-		&dbEmail,
-		&userTypeStr,
-		&passwordHash,
-		&user.IsProtectedLocal,
-		&user.SyncedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil // User not found
-		}
-		return nil, err
-	}
-
-	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
-		return nil, nil // Invalid password
-	}
-
-	user.UserType = models.UserType(userTypeStr)
-	setUserStrings(&user, dbDisplay, dbEmail)
-	return &user, nil
+	return json.Marshal(meta)
 }

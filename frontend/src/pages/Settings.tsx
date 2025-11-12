@@ -1,286 +1,159 @@
-import { useEffect, useRef, useState } from "react";
-import { SantaConfig } from "../api";
-import { Badge } from "../components/Badge";
-import { Button } from "../components/Button";
-import { Icons } from "../components";
+import { useEffect, useState } from "react";
+import { type SantaConfig } from "../api";
+import { useSantaConfig } from "../hooks/useQueries";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Grid,
+  List,
+  ListItem,
+  ListItemText,
+  Stack,
+  TextField,
+  Typography,
+  Snackbar,
+  LinearProgress,
+} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import HelpIcon from "@mui/icons-material/Help";
+import CakeIcon from "@mui/icons-material/Cake"; // TODO: find better icon
 
-interface SettingsModuleProps {
-  title: string;
-  description: string;
-  icon: string | React.ReactNode;
-  children: React.ReactNode;
-  enabled?: boolean;
-  moduleId: string;
-  isExpanded: boolean;
-  onToggleExpand: (moduleId: string) => void;
-  onToggleEnabled?: (enabled: boolean) => void;
-  showToggle?: boolean;
-}
-
-function SettingsModule({
-  title,
-  description,
-  icon,
-  children,
-  enabled,
-  moduleId,
-  isExpanded,
-  onToggleExpand,
-  onToggleEnabled,
-  showToggle = false,
-}: SettingsModuleProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-  const detailsId = `settings-module-details-${moduleId}`;
-
-  // Update content height when expanded or content changes
-  useEffect(() => {
-    if (isExpanded && contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight);
-    }
-  }, [isExpanded, children]);
-
-  const handleToggle = () => {
-    onToggleExpand(moduleId);
-  };
-
-  return (
-    <div className={`assignment-card ${isExpanded ? "expanded" : ""}`}>
-      <div
-        className="assignment-card-header"
-        onClick={handleToggle}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-        aria-controls={detailsId}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleToggle();
-          }
-        }}
-      >
-        <div className="assignment-card-summary">
-          <div className="assignment-card-summary-main">
-            <div className="assignment-card-summary-title">
-              <div className="assignment-card-icon">{icon}</div>
-              <div>
-                <h3 className="assignment-card-title">{title}</h3>
-              </div>
-            </div>
-            <div className="assignment-card-summary-meta">
-              <Badge size="md" variant="secondary">
-                {description}
-              </Badge>
-              <div className="assignment-card-summary-stats">
-                {enabled !== undefined && (
-                  <Badge size="md" variant={enabled ? "success" : "neutral"}>
-                    {enabled ? "Enabled" : "Disabled"}
-                  </Badge>
-                )}
-                {showToggle && onToggleEnabled && (
-                  <Button
-                    type="button"
-                    variant="toggle"
-                    active={enabled}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleEnabled(!enabled);
-                    }}
-                    title={enabled ? "Disable" : "Enable"}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style={{ color: "var(--text-muted)", fontSize: "18px" }}>
-          {isExpanded ? "−" : "+"}
-          {/* TO:DO - This could be animated */}
-        </div>
-      </div>
-
-      <div
-        className={`assignment-card-expanded-wrapper${isExpanded ? " expanded" : ""}`}
-        style={{
-          maxHeight: isExpanded ? `${contentHeight}px` : "0px",
-        }}
-      >
-        <div className="assignment-card-expanded-content" id={detailsId} ref={contentRef} aria-hidden={!isExpanded}>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface SantaConfigModuleProps {
-  config: SantaConfig | null;
-}
-
-function SantaConfigModule({ config }: SantaConfigModuleProps) {
+function SantaConfigPanel({ config }: { config: SantaConfig | null }) {
   if (!config) {
-    return null;
+    return <Alert severity="warning">Unable to load configuration XML. Verify the backend is reachable and try again.</Alert>;
   }
 
   return (
-    <div>
-      <div className="grid two-column">
-        <section className="settings-form-section" style={{ marginBottom: 0 }}>
-          <p
-            style={{
-              margin: "0 0 16px 0",
-              color: "var(--text-muted)",
-              lineHeight: 1.6,
-            }}
-          >
-            Deploy this XML via MDM to preconfigure Santa&apos;s sync URLs, baseline telemetry, and ownership metadata.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              alignItems: "center",
-              marginBottom: "16px",
-            }}
-          >
-            <Button
-              variant="secondary"
-              onClick={() => window.open("https://northpole.dev/configuration/keys/", "_blank", "noopener,noreferrer")}
-              title="Keys Help"
-            >
-              <Icons.Help /> Help!
-            </Button>
-          </div>
-          <label htmlFor="santa-config-xml">Santa Configuration XML</label>
-          <div>
-            <textarea
-              id="santa-config-xml"
-              className="settings-textarea-mono"
-              value={config.xml}
-              readOnly
-              rows={20}
-              style={{
-                width: "100%",
-                resize: "vertical",
-                minHeight: "400px",
-              }}
-            />
-          </div>
-          <small className="settings-field-help">
-            Paste this payload into a preferences file and upload to your MDM. Curly-brace <code>{"{{ }}"}</code> placeholders should be
-            expanded by your provider.
-          </small>
-        </section>
+    <Grid container spacing={3}>
+      <Grid size={{ xs: 12, md: 7 }}>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          Deploy this XML via MDM to preconfigure Santa's sync URLs, telemetry, and ownership metadata.
+        </Typography>
 
-        <aside className="settings-form-section" style={{ marginBottom: 0 }}>
-          <div className="settings-advanced-section" style={{ marginBottom: "16px" }}>
-            <h4 className="settings-section-header" style={{ marginTop: 0 }}>
-              Deployment checklist
-            </h4>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: "20px",
-                display: "grid",
-                gap: "8px",
-                color: "var(--text-primary)",
-              }}
-            >
-              <li>
-                Deploy the payload as a profile targeting <code>com.northpolesec.santa</code>.
-              </li>
-              <li>Sync server URLs should already point at this Grinch instance.</li>
-              <li>Defaults keep Santa in Monitor mode; raise the enforcement level when you're ready.</li>
-            </ul>
-          </div>
+        <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<HelpIcon />}
+            component="a"
+            href="https://northpole.dev/configuration/keys/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Configuration Reference
+          </Button>
+        </Stack>
 
-          <div className="settings-advanced-section" style={{ marginBottom: 0 }}>
-            <h4 className="settings-section-header" style={{ marginTop: 0 }}>
-              Template placeholders
-            </h4>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: "20px",
-                display: "grid",
-                gap: "8px",
-                color: "var(--text-primary)",
-              }}
-            >
-              <li>
-                Adjust <code>{"{{username}}"}</code> to your MDM provider's placeholder expectations.
-                {/* TO:DO - Grinch expects email, do we use email or mail alias (username)? */}
-              </li>
-            </ul>
-          </div>
-        </aside>
-      </div>
-    </div>
+        <TextField label="Santa Configuration XML" value={config.xml} multiline minRows={18} fullWidth InputProps={{ readOnly: true }} />
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          Paste this payload into your MDM profile. Curly-brace <code>{"{{ }}"}</code> placeholders should be expanded by your provider.
+        </Typography>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 5 }}>
+        <Card elevation={2} sx={{ mb: 3 }}>
+          <CardHeader title="Deployment checklist" />
+          <CardContent>
+            <List dense>
+              <ListItem>
+                <ListItemText
+                  primary={
+                    <span>
+                      Deploy the payload as a profile targeting <code>com.northpolesec.santa</code>.
+                    </span>
+                  }
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Sync server URLs should point at this Grinch instance." />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Defaults keep Santa in Monitor mode; raise enforcement when ready." />
+              </ListItem>
+            </List>
+          </CardContent>
+        </Card>
+
+        <Card elevation={2}>
+          <CardHeader title="Template placeholders" />
+          <CardContent>
+            <List dense>
+              <ListItem>
+                <ListItemText
+                  primary={
+                    <span>
+                      Adjust <code>{"{{username}}"}</code> to match your MDM provider's placeholder syntax.
+                    </span>
+                  }
+                />
+              </ListItem>
+            </List>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
   );
 }
 
 export default function Settings() {
-  const [santaConfig, setSantaConfig] = useState<SantaConfig | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const [expandedPanel, setExpandedPanel] = useState<string | null>("santa");
+  const { data: santaConfig, isLoading, error, refetch, isFetching } = useSantaConfig();
+  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      const [santaResponse] = await Promise.all([fetch("/api/settings/santa-config", { credentials: "include" })]);
-
-      if (!santaResponse.ok) {
-        throw new Error("Failed to load Santa configuration");
-      }
-
-      const santaConfigData = await santaResponse.json();
-
-      setSantaConfig(santaConfigData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load settings");
+    if (error) {
+      console.error("Santa config load failed", error);
+      setToast({ open: true, message: "Failed to load Santa configuration." });
     }
-  };
+  }, [error]);
 
   return (
-    <div>
-      <div className="card">
-        <h2>Settings</h2>
-        <p>Configure system settings and authentication providers for Grinch.</p>
+    <Stack spacing={3}>
+      <Card elevation={1}>
+        <CardHeader title="Settings" subheader="Configure system defaults and deployment helpers for Santa." />
+        <CardContent />
+      </Card>
 
-        {error && (
-          <Badge size="lg" variant="danger" style={{ marginBottom: "16px" }}>
-            {error}
-          </Badge>
-        )}
+      <Accordion expanded={expandedPanel === "santa"} onChange={(_, isExpanded) => setExpandedPanel(isExpanded ? "santa" : null)}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="santa-content" id="santa-header">
+          <Stack direction="row" spacing={2} alignItems="center">
+            <CakeIcon />
+            <Stack>
+              <Typography fontWeight={600}>Santa Client Configuration</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Generate configuration XML for Santa clients to deploy via MDM.
+              </Typography>
+            </Stack>
+          </Stack>
+        </AccordionSummary>
+        <AccordionDetails>
+          {(isLoading || isFetching) && <LinearProgress sx={{ mb: 2 }} />}
+          <SantaConfigPanel config={santaConfig ?? null} />
+          {error && (
+            <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+              <Button size="small" variant="outlined" onClick={() => void refetch()}>
+                Retry
+              </Button>
+            </Stack>
+          )}
+        </AccordionDetails>
+      </Accordion>
 
-        {successMessage && (
-          <Badge size="lg" variant="success" style={{ marginBottom: "16px" }}>
-            {successMessage}
-          </Badge>
-        )}
-      </div>
-
-      <SettingsModule
-        title="Santa Client Configuration"
-        description="Generate configuration XML for Santa clients to deploy via MDM"
-        icon={<Icons.CandyCane />}
-        moduleId="santa"
-        isExpanded={expandedModuleId === "santa"}
-        onToggleExpand={(moduleId) => {
-          setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId);
-        }}
-        showToggle={false}
-        enabled={undefined}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <SantaConfigModule config={santaConfig} />
-      </SettingsModule>
-    </div>
+        <Alert severity="error" onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
+          {toast.message}
+        </Alert>
+      </Snackbar>
+    </Stack>
   );
 }

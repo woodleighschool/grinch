@@ -1,155 +1,147 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { ColumnDef } from "@tanstack/react-table";
-import { Icons, Badge, Table, Button } from "../components";
-import { useSearch, searchConfigs } from "../hooks/useSearch";
+import { useMemo, useState, useEffect } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import type { DirectoryUser } from "../api";
-import { listUsers } from "../api";
+import { useUsers } from "../hooks/useQueries";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography, Button, Box, Snackbar, Alert } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import PersonIcon from "@mui/icons-material/Person";
 
 function getDisplayName(user: DirectoryUser): string {
-  return user.display_name || user.principal_name;
+  return user.displayName || user.upn;
 }
 
 export default function Users() {
-  const [users, setUsers] = useState<DirectoryUser[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+  const trimmedSearch = searchTerm.trim();
+  const hasSearchTerm = trimmedSearch.length > 0;
 
-  const {
-    searchTerm,
-    setSearchTerm,
-    filteredItems: filteredUsers,
-    clearSearch,
-    isSearching,
-    hasResults,
-  } = useSearch(users, searchConfigs.users);
+  const { data: users = [], isLoading, isFetching, error } = useUsers({ search: debouncedSearch });
 
-  const columns = useMemo<ColumnDef<DirectoryUser>[]>(
+  const [toastOpen, setToastOpen] = useState(false);
+  useEffect(() => {
+    if (error) {
+      console.error("Failed to load users", error);
+      setToastOpen(true);
+    }
+  }, [error]);
+
+  const columns = useMemo<GridColDef[]>(
     () => [
       {
-        accessorKey: "display_name",
-        header: "Name",
-        cell: ({ row }) => {
-          const displayName = getDisplayName(row.original);
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Icons.User />
-              <span style={{ fontWeight: 500 }}>{displayName}</span>
-            </div>
-          );
-        },
+        field: "displayName",
+        headerName: "Name",
+        flex: 1.2,
+        minWidth: 200,
+        sortable: true,
+        renderCell: (p) => (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <PersonIcon />
+            <Typography variant="body2" fontWeight={600}>
+              {getDisplayName(p.row as DirectoryUser)}
+            </Typography>
+          </Stack>
+        ),
       },
       {
-        accessorKey: "principal_name",
-        header: "Principal Name",
-        cell: ({ getValue }) => <code style={{ fontSize: "13px" }}>{getValue() as string}</code>,
+        field: "upn",
+        headerName: "UPN",
+        flex: 1,
+        minWidth: 200,
+        renderCell: (p) => (
+          <Typography component="code" sx={{ fontSize: 13 }}>
+            {p.value}
+          </Typography>
+        ),
       },
       {
-        accessorKey: "user_type",
-        header: "Type",
-        cell: ({ getValue }) => {
-          const userType = getValue() as string;
-          return <Badge variant={userType === "cloud" ? "primary" : "secondary"}>{userType === "cloud" ? "CLOUD" : "LOCAL"}</Badge>;
-        },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <Link to={`/users/${row.original.id}`} style={{ textDecoration: "none" }}>
-            <Button variant="secondary" size="sm">
-              View Details
-            </Button>
-          </Link>
+        field: "actions",
+        headerName: "Actions",
+        flex: 0.8,
+        minWidth: 140,
+        sortable: false,
+        filterable: false,
+        renderCell: (p) => (
+          <Button component={RouterLink} to={`/users/${(p.row as DirectoryUser).id}`} size="small" variant="outlined">
+            View Details
+          </Button>
         ),
       },
     ],
     [],
   );
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const usersData = await listUsers();
-        setUsers(Array.isArray(usersData) ? usersData : []);
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Failed to load users");
-        }
-      }
-    })();
-  }, []);
-
-  if (error) {
-    return (
-      <div className="card">
-        <h2>Users</h2>
-        <p className="error-text">Failed to load users: {error}</p>
-      </div>
-    );
-  }
+  const rows = useMemo(
+    () =>
+      users.map((u) => ({
+        id: u.id,
+        displayName: u.displayName,
+        upn: u.upn,
+      })),
+    [users],
+  );
 
   return (
-    <div className="card">
-      <h2>Users</h2>
-      <p>Manage individual user access and permissions from your Entra ID directory.</p>
+    <Card elevation={1}>
+      <CardHeader title="Users" subheader="Manage user access from your Entra ID directory." />
+      <CardContent>
+        <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip label={`Total: ${users.length}`} size="small" />
+          </Stack>
 
-      {users.length > 0 && (
-        <div style={{ marginBottom: "16px" }}>
-          <input
+          <TextField
             type="search"
-            placeholder="Search users..."
+            size="small"
+            label="Search users..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            style={{
-              maxWidth: "300px",
-              marginBottom: "8px",
+            onChange={(e) => setSearchTerm(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
-            aria-label="Search users"
           />
-          {searchTerm && (
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <span style={{ fontSize: "14px", color: "var(--text-muted)" }}>
-                Showing {filteredUsers.length} of {users.length} users
-              </span>
-              <Button variant="secondary" size="sm" onClick={clearSearch}>
-                Clear
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+        </Stack>
 
-      {filteredUsers.length === 0 ? (
-        <div className="empty-state">
-          {isSearching ? (
-            <>
-              <h3>No users found</h3>
-              <p>
-                No users match the search term &quot;
-                {searchTerm}&quot;
-              </p>
-            </>
-          ) : (
-            <>
-              <h3>No users found</h3>
-              <p>No users are available in the directory.</p>
-            </>
-          )}
-        </div>
-      ) : (
-        <Table
-          data={filteredUsers}
-          columns={columns}
-          globalFilter={searchTerm}
-          onGlobalFilterChange={setSearchTerm}
-          sorting={true}
-          filtering={true}
-          pagination={users.length > 10}
-          pageSize={100}
-        />
-      )}
-    </div>
+        <Box sx={{ height: 600, width: "100%", mt: 2 }}>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            disableColumnMenu
+            pageSizeOptions={[25, 50, 100]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 100, page: 0 } },
+              sorting: { sortModel: [{ field: "displayName", sort: "asc" }] },
+            }}
+            loading={isLoading || isFetching}
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{ textAlign: "center", p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    No users found
+                  </Typography>
+                  <Typography color="text.secondary">
+                    {hasSearchTerm ? `No users match "${trimmedSearch}".` : "No users are available in the directory."}
+                  </Typography>
+                </Box>
+              ),
+            }}
+          />
+        </Box>
+      </CardContent>
+
+      <Snackbar open={toastOpen} autoHideDuration={4000} onClose={() => setToastOpen(false)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="error" onClose={() => setToastOpen(false)} variant="filled">
+          {error instanceof Error ? error.message : "Failed to load users"}
+        </Alert>
+      </Snackbar>
+    </Card>
   );
 }

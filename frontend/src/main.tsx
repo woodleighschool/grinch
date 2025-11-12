@@ -1,38 +1,46 @@
-import React, { ErrorInfo } from "react";
+import React, { type ErrorInfo, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider, CssBaseline, useMediaQuery } from "@mui/material";
+import type { PaletteMode } from "@mui/material";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import "./styles.css";
+import { createAppTheme } from "./styles/theme";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      retry: (failureCount, error) => {
-        // Don't retry on 401/403 errors
-        if (error instanceof Error && error.message.includes("401")) return false;
-        if (error instanceof Error && error.message.includes("403")) return false;
-        return failureCount < 3;
-      },
     },
   },
 });
 
-const handleError = (error: Error, errorInfo: ErrorInfo) => {
-  console.error("Application Error:", error);
-  console.error("Error Info:", errorInfo);
+const handleError = (error: Error, info: ErrorInfo) => {
+  console.error("App error", { error, info });
 };
+
+function Root() {
+  const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
+  const paletteMode: PaletteMode = prefersDark ? "dark" : "light";
+  const theme = useMemo(() => createAppTheme(paletteMode), [paletteMode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary onError={handleError}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <Root />
       </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>,
