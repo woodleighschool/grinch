@@ -41,9 +41,9 @@ import {
   Snackbar,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import GroupIcon from "@mui/icons-material/Groups2";
-import PersonIcon from "@mui/icons-material/PersonOutline";
+import DeleteIcon from "@mui/icons-material/Delete";
+import GroupIcon from "@mui/icons-material/Groups";
+import PersonIcon from "@mui/icons-material/Person";
 import SearchIcon from "@mui/icons-material/Search";
 
 export interface SelectedTarget {
@@ -340,7 +340,7 @@ export default function ApplicationDetails() {
         target_id: selectedTarget.id,
         action: selectedAction,
       });
-      const n = validation.normalized;
+      const n = validation.normalised;
       await createScope(targetAppId, { target_type: n.target_type, target_id: n.target_id, action: n.action });
       await refetch();
       setSelectedTarget(null);
@@ -423,7 +423,7 @@ export default function ApplicationDetails() {
                 <Button
                   color="error"
                   variant="outlined"
-                  startIcon={<DeleteOutlineIcon />}
+                  startIcon={<DeleteIcon />}
                   onClick={() => app && setConfirmDeleteApp({ appId: app.id, appName: app.name })}
                   disabled={!app || deletingApp}
                 >
