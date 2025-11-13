@@ -26,6 +26,7 @@ pkg/
 dist/
 build/
 tmp/
+dev/
 /jcdssync
 .env
 *.tsbuildinfo

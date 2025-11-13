@@ -16,7 +16,7 @@ type eventDTO struct {
 	Kind            string          `json:"kind"`
 	Payload         json.RawMessage `json:"payload"`
 	Hostname        string          `json:"hostname"`
-	UserDisplayName string          `json:"display_name"`
+	UserDisplayName string          `json:"userDisplayName"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {

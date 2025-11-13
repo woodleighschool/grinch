@@ -135,7 +135,9 @@ export default function Dashboard() {
     if (kind.includes("BLOCK")) {
       return kind.includes("SILENT") ? theme.palette.warning.main : theme.palette.error.main;
     }
-    if (kind.includes("ALLOW")) return theme.palette.success.main;
+    if (kind.includes("ALLOW")) {
+      return kind.includes("UNKNOWN") ? theme.palette.warning.main : theme.palette.success.main;
+    }
     return theme.palette.info.main;
   };
 
@@ -164,7 +166,7 @@ export default function Dashboard() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Occurred</TableCell>
-                    <TableCell>Details</TableCell>
+                    <TableCell>Process</TableCell>
                     <TableCell>Machine</TableCell>
                     <TableCell>User</TableCell>
                     <TableCell>Kind</TableCell>
@@ -173,7 +175,7 @@ export default function Dashboard() {
                 <TableBody>
                   {events.map((event) => {
                     const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
-                    const processPath = typeof event.payload?.process_path === "string" ? event.payload.process_path : event.kind;
+                    const processPath = typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind;
                     const reason = typeof event.payload?.decision === "string" ? event.payload.decision : event.kind;
                     var eventStatus: "warning" | "success" | "error" | "info";
                     if (reason.includes("ALLOW")) {
@@ -206,7 +208,6 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
-
       <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
