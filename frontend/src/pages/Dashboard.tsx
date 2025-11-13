@@ -42,6 +42,15 @@ function renderRow(event: EventRecord) {
   const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
   const processPath = typeof event.payload?.process_path === "string" ? (event.payload.process_path as string) : event.kind;
   const reason = typeof event.payload?.decision === "string" ? (event.payload.decision as string) : event.kind;
+  var eventStatus: "warning" | "success" | "error" | "info"
+  if (reason.includes("ALLOW")) {
+	eventStatus = reason.includes("UNKNOWN") ? "warning" : "success"
+  } else if (reason.includes("BLOCK")) {
+	eventStatus = reason.includes("UNKNOWN") ? "warning" : "error"
+  } else {
+	eventStatus = "info"
+  }
+
 
   return (
     <TableRow key={event.id} hover>
@@ -54,7 +63,7 @@ function renderRow(event: EventRecord) {
       <TableCell>{event.hostname}</TableCell>
       <TableCell>{event.userDisplayName || "-"}</TableCell>
       <TableCell>
-        <Chip label={reason} color="error" size="small" />
+        <Chip label={reason} color={eventStatus} size="small" />
       </TableCell>
     </TableRow>
   );

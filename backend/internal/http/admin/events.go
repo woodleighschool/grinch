@@ -11,12 +11,12 @@ import (
 )
 
 type eventDTO struct {
-	ID          int64           `json:"id"`
-	Occurred    time.Time       `json:"occurredAt"`
-	Kind        string          `json:"kind"`
-	Payload     json.RawMessage `json:"payload"`
-	Hostname    string          `json:"hostname"`
-	DisplayName string          `json:"display_name"`
+	ID              int64           `json:"id"`
+	Occurred        time.Time       `json:"occurredAt"`
+	Kind            string          `json:"kind"`
+	Payload         json.RawMessage `json:"payload"`
+	Hostname        string          `json:"hostname"`
+	UserDisplayName string          `json:"display_name"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {
@@ -75,11 +75,11 @@ func mapEvent(e sqlc.ListEventSummariesRow) eventDTO {
 		occurred = e.OccurredAt.Time
 	}
 	return eventDTO{
-		ID:          e.ID,
-		Kind:        e.Kind,
-		Payload:     e.Payload,
-		Occurred:    occurred,
-		Hostname:    e.Hostname,
-		DisplayName: displayName,
+		ID:              e.ID,
+		Kind:            e.Kind,
+		Payload:         e.Payload,
+		Occurred:        occurred,
+		Hostname:        e.Hostname,
+		UserDisplayName: displayName,
 	}
 }
