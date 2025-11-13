@@ -11,12 +11,12 @@ import (
 )
 
 type eventDTO struct {
-	ID        int64           `json:"id"`
-	MachineID string          `json:"machineId"`
-	UserID    string          `json:"userId,omitempty"`
-	Kind      string          `json:"kind"`
-	Payload   json.RawMessage `json:"payload"`
-	Occurred  time.Time       `json:"occurredAt"`
+	ID          int64           `json:"id"`
+	Occurred    time.Time       `json:"occurredAt"`
+	Kind        string          `json:"kind"`
+	Payload     json.RawMessage `json:"payload"`
+	Hostname    string          `json:"hostname"`
+	DisplayName string          `json:"display_name"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {
@@ -65,21 +65,21 @@ func (h Handler) eventStats(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
-func mapEvent(e sqlc.Event) eventDTO {
-	var userID string
-	if e.UserID.Valid {
-		userID = e.UserID.String()
+func mapEvent(e sqlc.ListEventSummariesRow) eventDTO {
+	var displayName string
+	if e.DisplayName.Valid {
+		displayName = e.DisplayName.String
 	}
 	var occurred time.Time
 	if e.OccurredAt.Valid {
 		occurred = e.OccurredAt.Time
 	}
 	return eventDTO{
-		ID:        e.ID,
-		MachineID: e.MachineID.String(),
-		UserID:    userID,
-		Kind:      e.Kind,
-		Payload:   e.Payload,
-		Occurred:  occurred,
+		ID:          e.ID,
+		Kind:        e.Kind,
+		Payload:     e.Payload,
+		Occurred:    occurred,
+		Hostname:    e.Hostname,
+		DisplayName: displayName,
 	}
 }

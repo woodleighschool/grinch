@@ -243,8 +243,8 @@ func (s *Store) InsertEvent(ctx context.Context, params sqlc.InsertEventParams) 
 	return s.queries.InsertEvent(ctx, params)
 }
 
-func (s *Store) ListEvents(ctx context.Context, limit, offset int32) ([]sqlc.Event, error) {
-	return s.queries.ListEvents(ctx, sqlc.ListEventsParams{Limit: limit, Offset: offset})
+func (s *Store) ListEvents(ctx context.Context, limit, offset int32) ([]sqlc.ListEventSummariesRow, error) {
+	return s.queries.ListEventSummaries(ctx, sqlc.ListEventSummariesParams{Limit: limit, Offset: offset})
 }
 
 func (s *Store) SummarizeEvents(ctx context.Context, days int32) ([]sqlc.SummarizeEventsRow, error) {

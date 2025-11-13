@@ -26,12 +26,12 @@ export class ApiValidationError extends Error {
 }
 
 export interface EventRecord {
-  id: number;
-  machineId: string;
-  userId?: string;
-  kind: string;
+  id: string;
   occurredAt?: string;
+  kind: string;
   payload: Record<string, unknown>;
+  hostname: string;
+  userDisplayName?: string;
 }
 
 export interface EventStat {
