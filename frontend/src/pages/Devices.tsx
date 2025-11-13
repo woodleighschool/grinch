@@ -2,9 +2,10 @@ import { useMemo, useState, useEffect } from "react";
 import { useDevices } from "../hooks/useQueries";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { formatTimeAgo } from "../utils/dates";
-import { Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography, Snackbar, Box } from "@mui/material";
+import { Box, Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
+import { PageSnackbar, type PageToast } from "../components";
 
 export default function Devices() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -14,14 +15,16 @@ export default function Devices() {
 
   const { data: devices = [], isLoading, isFetching, error } = useDevices({ search: debouncedSearch });
 
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   useEffect(() => {
     if (error) {
       console.error("Failed to load devices", error);
-      setToast({ open: true, message: error instanceof Error ? error.message : "Failed to load devices" });
+      setToast({ open: true, message: error instanceof Error ? error.message : "Failed to load devices", severity: "error" });
     }
   }, [error]);
+
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   type Status = "success" | "warning" | "danger" | "muted";
   function getStatusCategory(lastSeen?: string | null): Status {
@@ -192,7 +195,7 @@ export default function Devices() {
           />
         </Stack>
 
-        <Box sx={{ height: 600, width: "100%", mt: 2 }}>
+        <Box style={{ height: 600, width: "100%", marginTop: 16 }}>
           <DataGrid
             rows={rows}
             columns={columns}
@@ -205,24 +208,20 @@ export default function Devices() {
             loading={isLoading || isFetching}
             slots={{
               noRowsOverlay: () => (
-                <Stack alignItems="center" spacing={0.5} p={3}>
-                  <Typography variant="h6">No devices found</Typography>
-                  <Typography color="text.secondary">
-                    {hasSearchTerm ? `No devices match "${trimmedSearch}".` : "No devices are available in the fleet."}
-                  </Typography>
-                </Stack>
+                <Box textAlign="center" padding={3}>
+                  <Stack alignItems="center" spacing={0.5}>
+                    <Typography variant="h6">No devices found</Typography>
+                    <Typography color="text.secondary">
+                      {hasSearchTerm ? `No devices match "${trimmedSearch}".` : "No devices are available in the fleet."}
+                    </Typography>
+                  </Stack>
+                </Box>
               ),
             }}
           />
         </Box>
 
-        <Snackbar
-          open={toast.open}
-          autoHideDuration={4000}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-          message={toast.message}
-        />
+        <PageSnackbar toast={toast} onClose={handleToastClose} />
       </CardContent>
     </Card>
   );

@@ -1,11 +1,8 @@
 import { useMemo, useEffect, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
-import { useTheme } from "@mui/material/styles";
 import { useBlockedEvents, useEventStats } from "../hooks/useQueries";
 import { formatDateTime } from "../utils/dates";
-import type { EventRecord } from "../api";
 import {
-  Alert,
   Card,
   CardContent,
   CardHeader,
@@ -20,9 +17,10 @@ import {
   TableHead,
   TableRow,
   Typography,
-  Snackbar,
+  useTheme,
 } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
+import { PageSnackbar, type PageToast } from "../components";
 
 type ChartDay = {
   day: string;
@@ -37,37 +35,6 @@ type EventVolumeChartProps = {
   totalEvents: number;
   colorForKind: (kind: string) => string;
 };
-
-function renderRow(event: EventRecord) {
-  const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
-  const processPath = typeof event.payload?.process_path === "string" ? (event.payload.process_path as string) : event.kind;
-  const reason = typeof event.payload?.decision === "string" ? (event.payload.decision as string) : event.kind;
-  var eventStatus: "warning" | "success" | "error" | "info"
-  if (reason.includes("ALLOW")) {
-	eventStatus = reason.includes("UNKNOWN") ? "warning" : "success"
-  } else if (reason.includes("BLOCK")) {
-	eventStatus = reason.includes("UNKNOWN") ? "warning" : "error"
-  } else {
-	eventStatus = "info"
-  }
-
-
-  return (
-    <TableRow key={event.id} hover>
-      <TableCell>{occurredAt}</TableCell>
-      <TableCell>
-        <Typography noWrap title={processPath} variant="body2">
-          {processPath}
-        </Typography>
-      </TableCell>
-      <TableCell>{event.hostname}</TableCell>
-      <TableCell>{event.userDisplayName || "-"}</TableCell>
-      <TableCell>
-        <Chip label={reason} color={eventStatus} size="small" />
-      </TableCell>
-    </TableRow>
-  );
-}
 
 function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVolumeChartProps) {
   if (dataset.length === 0 || kinds.length === 0) {
@@ -113,7 +80,7 @@ export default function Dashboard() {
   const { stats, loading: statsLoading, error: statsError } = useEventStats(14);
   const theme = useTheme();
 
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "" });
 
   useEffect(() => {
     if (error) {
@@ -172,6 +139,8 @@ export default function Dashboard() {
     return theme.palette.info.main;
   };
 
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
+
   return (
     <Stack spacing={3}>
       <Card elevation={1}>
@@ -201,23 +170,44 @@ export default function Dashboard() {
                     <TableCell>Kind</TableCell>
                   </TableRow>
                 </TableHead>
-                <TableBody>{events.map(renderRow)}</TableBody>
+                <TableBody>
+                  {events.map((event) => {
+                    const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
+                    const processPath = typeof event.payload?.process_path === "string" ? event.payload.process_path : event.kind;
+                    const reason = typeof event.payload?.decision === "string" ? event.payload.decision : event.kind;
+                    var eventStatus: "warning" | "success" | "error" | "info";
+                    if (reason.includes("ALLOW")) {
+                      eventStatus = reason.includes("UNKNOWN") ? "warning" : "success";
+                    } else if (reason.includes("BLOCK")) {
+                      eventStatus = reason.includes("UNKNOWN") ? "warning" : "error";
+                    } else {
+                      eventStatus = "info";
+                    }
+
+                    return (
+                      <TableRow key={event.id} hover>
+                        <TableCell>{occurredAt}</TableCell>
+                        <TableCell>
+                          <Typography noWrap title={processPath} variant="body2">
+                            {processPath}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{event.hostname}</TableCell>
+                        <TableCell>{event.userDisplayName || "-"}</TableCell>
+                        <TableCell>
+                          <Chip label={reason} color={eventStatus} size="small" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
               </Table>
             </TableContainer>
           )}
         </CardContent>
       </Card>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="error" onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
 }

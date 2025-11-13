@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { ApiValidationError, validateApplication } from "../api";
@@ -30,8 +30,6 @@ import {
   Tooltip,
   Typography,
   LinearProgress,
-  Snackbar,
-  Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import HelpIcon from "@mui/icons-material/Help";
@@ -39,6 +37,7 @@ import ShieldIcon from "@mui/icons-material/Shield";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { PageSnackbar, type PageToast } from "../components";
 
 const applicationRuleTypes = ["BINARY", "CERTIFICATE", "SIGNINGID", "TEAMID", "CDHASH"] as const;
 type ApplicationRuleType = (typeof applicationRuleTypes)[number];
@@ -123,11 +122,7 @@ export default function Applications() {
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
   const [updatingAppId, setUpdatingAppId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ appId: string; appName: string } | null>(null);
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "error" | "success" }>({
-    open: false,
-    message: "",
-    severity: "error",
-  });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   const {
     register,
@@ -213,15 +208,20 @@ export default function Applications() {
     }
   }
 
-  if (appsError) {
-    console.error("Applications query failed", appsError);
-  }
+  useEffect(() => {
+    if (appsError) {
+      console.error("Applications query failed", appsError);
+      setToast({ open: true, message: "Failed to load applications.", severity: "error" });
+    }
+  }, [appsError]);
+
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   return (
     <Stack spacing={3}>
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card elevation={1} sx={{ height: "100%" }}>
+          <Card elevation={1}>
             <CardHeader
               title="Add Application Rule"
               subheader="Define rules using reference-compatible identifiers. Assign them to groups or users from the detail page."
@@ -301,7 +301,7 @@ export default function Applications() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card elevation={1} sx={{ height: "100%" }}>
+          <Card elevation={1}>
             <CardHeader
               title="Field Reference Guide"
               action={
@@ -324,9 +324,7 @@ export default function Applications() {
               <Stack spacing={1.5}>
                 {primaryRuleTypeEntries.map(({ type, meta }) => (
                   <Stack key={type} direction="row" spacing={1} alignItems="center">
-                    <Typography variant="subtitle2" sx={{ minWidth: 88 }}>
-                      {meta.label}
-                    </Typography>
+                    <Typography variant="subtitle2">{meta.label}</Typography>
                     <Tooltip title={meta.description} arrow placement="top">
                       <Chip variant={watchedRuleType === type ? "filled" : "outlined"} label={meta.example} />
                     </Tooltip>
@@ -336,10 +334,8 @@ export default function Applications() {
                 <Divider />
 
                 <Typography variant="subtitle2">Signing Chain:</Typography>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ pl: 2 }}>
-                  <Typography variant="body2" sx={{ minWidth: 88 }}>
-                    1. SHA-256
-                  </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2">1. SHA-256</Typography>
                   <Tooltip title={signingChainReference.description} arrow placement="top">
                     <Chip variant={watchedRuleType === "CERTIFICATE" ? "filled" : "outlined"} label={signingChainReference.example} />
                   </Tooltip>
@@ -352,129 +348,121 @@ export default function Applications() {
         <Grid size={{ xs: 12 }}>
           <Card elevation={1}>
             <CardHeader title="Application Rules & Assignments" subheader="Manage who can access each application. Click a card to open the detail view." />
-            {(appsLoading || appsFetching) && <LinearProgress />}
             <CardContent>
-              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mb: 2, flexWrap: "wrap" }}>
-                <TextField
-                  type="search"
-                  label="Search applications..."
-                  value={appSearch}
-                  onChange={(e) => setAppSearch(e.target.value)}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" flexWrap="wrap">
+                  <TextField
+                    type="search"
+                    label="Search applications..."
+                    value={appSearch}
+                    onChange={(e) => setAppSearch(e.target.value)}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
 
-                <Typography variant="body2" color="text.secondary">
-                  Showing {apps.length} application{apps.length === 1 ? "" : "s"} · {totalScopes} total assignments
-                </Typography>
-              </Stack>
-
-              {apps.length === 0 ? (
-                <Stack alignItems="center" spacing={1} sx={{ py: 4, textAlign: "center" }}>
-                  <Typography variant="h6" gutterBottom>
-                    {hasSearchTerm ? "No matching applications" : "No application rules yet"}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {hasSearchTerm
-                      ? `We couldn't find any applications matching “${trimmedSearch}”. Try a different search or clear the filter.`
-                      : "Create your first application rule above to get started."}
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {apps.length} application{apps.length === 1 ? "" : "s"} · {totalScopes} total assignments
                   </Typography>
                 </Stack>
-              ) : (
-                <Grid container spacing={2}>
-                  {apps.map((app) => {
-                    const stats = getAssignmentStats(app);
-                    const allowScopes = app.assignment_stats?.allow_scopes ?? 0;
-                    const blockScopes = app.assignment_stats?.block_scopes ?? 0;
 
-                    return (
-                      <Grid key={app.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                        <Card elevation={2} sx={{ opacity: app.enabled ? 1 : 0.6 }}>
-                          <CardActionArea component={RouterLink} to={`/applications/${app.id}`} focusRipple>
-                            <CardContent>
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                                <Avatar sx={{ bgcolor: app.enabled ? "success.main" : "grey.400" }} aria-hidden>
-                                  {/* TODO: Add custom icons */}
-                                  <ShieldIcon fontSize="small" />
-                                </Avatar>
-                                <Typography variant="subtitle1" noWrap title={app.name}>
-                                  {app.name}
+                {apps.length === 0 ? (
+                  <Stack alignItems="center" spacing={1}>
+                    <Typography variant="h6" gutterBottom>
+                      {hasSearchTerm ? "No matching applications" : "No application rules yet"}
+                    </Typography>
+                    <Typography color="text.secondary" align="center">
+                      {hasSearchTerm
+                        ? `We couldn't find any applications matching “${trimmedSearch}”. Try a different search or clear the filter.`
+                        : "Create your first application rule above to get started."}
+                    </Typography>
+                  </Stack>
+                ) : (
+                  <Grid container spacing={2}>
+                    {apps.map((app) => {
+                      const stats = getAssignmentStats(app);
+                      const allowScopes = app.assignment_stats?.allow_scopes ?? 0;
+                      const blockScopes = app.assignment_stats?.block_scopes ?? 0;
+
+                      return (
+                        <Grid key={app.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                          <Card elevation={2} sx={{ opacity: app.enabled ? 1 : 0.6 }}>
+                            <CardActionArea component={RouterLink} to={`/applications/${app.id}`} focusRipple>
+                              <CardContent>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Avatar sx={{ bgcolor: app.enabled ? "success.main" : "grey.400" }} aria-hidden>
+                                    {/* TODO: Add custom icons */}
+                                    <ShieldIcon fontSize="small" />
+                                  </Avatar>
+                                  <Typography variant="subtitle1" noWrap title={app.name}>
+                                    {app.name}
+                                  </Typography>
+                                  <Chip size="small" variant="outlined" label={app.rule_type} />
+                                </Stack>
+
+                                <Typography variant="caption" color="text.secondary" title={app.identifier}>
+                                  {app.identifier}
                                 </Typography>
-                                <Chip size="small" variant="outlined" label={app.rule_type} />
-                              </Stack>
 
-                              <Typography variant="caption" color="text.secondary" title={app.identifier}>
-                                {app.identifier}
-                              </Typography>
+                                {app.description && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {app.description}
+                                  </Typography>
+                                )}
+                              </CardContent>
 
-                              {app.description && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {app.description}
-                                </Typography>
-                              )}
-                            </CardContent>
+                              <Divider />
 
-                            <Divider />
+                              <CardActions disableSpacing sx={{ justifyContent: "space-between" }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Chip size="small" color="success" label={`Allow ${allowScopes}`} />
+                                  <Chip size="small" color="error" label={`Block ${blockScopes}`} />
+                                  <Chip size="small" variant="outlined" label={`Total ${stats.totalUsersCovered}`} />
+                                </Stack>
 
-                            <CardActions sx={{ px: 1.5, py: 1, position: "relative" }} disableSpacing>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Chip size="small" color="success" label={`Allow ${allowScopes}`} />
-                                <Chip size="small" color="error" label={`Block ${blockScopes}`} />
-                                <Chip size="small" variant="outlined" label={`Total ${stats.totalUsersCovered}`} />
-                              </Stack>
+                                <Stack direction="row" spacing={0.5}>
+                                  <IconButton
+                                    size="small"
+                                    aria-label={app.enabled ? "Pause application" : "Play application"}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleToggleEnabled(app.id, app.enabled);
+                                    }}
+                                    disabled={updatingAppId === app.id}
+                                  >
+                                    {app.enabled ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+                                  </IconButton>
 
-                              <Stack
-                                direction="row"
-                                spacing={0.5}
-                                sx={{
-                                  position: "absolute",
-                                  right: 8,
-                                  top: "50%",
-                                  transform: "translateY(-50%)",
-                                }}
-                              >
-                                <IconButton
-                                  size="small"
-                                  aria-label={app.enabled ? "Pause application" : "Play application"}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleToggleEnabled(app.id, app.enabled);
-                                  }}
-                                  disabled={updatingAppId === app.id}
-                                >
-                                  {app.enabled ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
-                                </IconButton>
-
-                                <IconButton
-                                  size="small"
-                                  aria-label="Delete application"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    requestDeleteApplication(app.id, app.name);
-                                  }}
-                                  disabled={deletingAppId === app.id}
-                                  sx={{ color: "error.main" }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Stack>
-                            </CardActions>
-                          </CardActionArea>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              )}
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Delete application"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      requestDeleteApplication(app.id, app.name);
+                                    }}
+                                    disabled={deletingAppId === app.id}
+                                    color="error"
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              </CardActions>
+                            </CardActionArea>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
+              </Stack>
             </CardContent>
           </Card>
         </Grid>
@@ -498,16 +486,7 @@ export default function Applications() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={!!appsError || toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={toast.open ? toast.severity : "error"} onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
-          {toast.open ? toast.message : "Failed to load applications."}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
 }

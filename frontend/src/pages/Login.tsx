@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { getAuthProviders } from "../api";
-import { Alert, Button, Card, CardContent, Container, Divider, Snackbar, Stack, TextField, Typography } from "@mui/material";
+import { Button, Card, CardContent, Container, Divider, Stack, TextField, Typography } from "@mui/material";
 import ParkIcon from "@mui/icons-material/Park"; // TODO: find better icon
+import { PageSnackbar, type PageToast } from "../components";
 
 interface LoginProps {
   onLogin: () => void;
@@ -17,7 +18,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [oauthEnabled, setOauthEnabled] = useState(true);
   const [showLocalLogin, setShowLocalLogin] = useState(false);
 
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   const {
     register,
@@ -40,7 +41,7 @@ export default function Login({ onLogin }: LoginProps) {
       } catch (e) {
         console.error("Failed to fetch auth providers", e);
         setOauthEnabled(true);
-        setToast({ open: true, message: "Could not verify sign-in providers. Using defaults." });
+        setToast({ open: true, message: "Could not verify sign-in providers. Using defaults.", severity: "error" });
       }
     })();
   }, []);
@@ -66,15 +67,17 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin();
     } catch (err) {
       console.error("Local login failed", err);
-      setToast({ open: true, message: "Login failed. Please try again." });
+      setToast({ open: true, message: "Login failed. Please try again.", severity: "error" });
     }
   }
+
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   const showOAuthPanel = oauthEnabled && !showLocalLogin;
 
   return (
-    <Container maxWidth="sm" sx={{ minHeight: "100dvh", display: "flex", alignItems: "center" }}>
-      <Card elevation={1} sx={{ width: "100%" }}>
+    <Container maxWidth="sm">
+      <Card elevation={1}>
         <CardContent>
           <Stack spacing={3}>
             <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
@@ -164,16 +167,7 @@ export default function Login({ onLogin }: LoginProps) {
         </CardContent>
       </Card>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="error" onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Container>
   );
 }

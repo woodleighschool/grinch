@@ -17,12 +17,12 @@ import {
   Stack,
   TextField,
   Typography,
-  Snackbar,
   LinearProgress,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpIcon from "@mui/icons-material/Help";
 import CakeIcon from "@mui/icons-material/Cake"; // TODO: find better icon
+import { PageSnackbar, type PageToast } from "../components";
 
 function SantaConfigPanel({ config }: { config: SantaConfig | null }) {
   if (!config) {
@@ -32,69 +32,73 @@ function SantaConfigPanel({ config }: { config: SantaConfig | null }) {
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 7 }}>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          Deploy this XML via MDM to preconfigure Santa's sync URLs, telemetry, and ownership metadata.
-        </Typography>
+        <Stack spacing={2}>
+          <Typography color="text.secondary">Deploy this XML via MDM to preconfigure Santa's sync URLs, telemetry, and ownership metadata.</Typography>
 
-        <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<HelpIcon />}
-            component="a"
-            href="https://northpole.dev/configuration/keys/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Configuration Reference
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              startIcon={<HelpIcon />}
+              component="a"
+              href="https://northpole.dev/configuration/keys/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Configuration Reference
+            </Button>
+          </Stack>
+
+          <Stack spacing={1}>
+            <TextField label="Santa Configuration XML" value={config.xml} multiline minRows={18} fullWidth InputProps={{ readOnly: true }} />
+            <Typography variant="caption" color="text.secondary">
+              Paste this payload into your MDM profile. Curly-brace <code>{"{{ }}"}</code> placeholders should be expanded by your provider.
+            </Typography>
+          </Stack>
         </Stack>
-
-        <TextField label="Santa Configuration XML" value={config.xml} multiline minRows={18} fullWidth InputProps={{ readOnly: true }} />
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-          Paste this payload into your MDM profile. Curly-brace <code>{"{{ }}"}</code> placeholders should be expanded by your provider.
-        </Typography>
       </Grid>
 
       <Grid size={{ xs: 12, md: 5 }}>
-        <Card elevation={2} sx={{ mb: 3 }}>
-          <CardHeader title="Deployment checklist" />
-          <CardContent>
-            <List dense>
-              <ListItem>
-                <ListItemText
-                  primary={
-                    <span>
-                      Deploy the payload as a profile targeting <code>com.northpolesec.santa</code>.
-                    </span>
-                  }
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Sync server URLs should point at this Grinch instance." />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Defaults keep Santa in Monitor mode; raise enforcement when ready." />
-              </ListItem>
-            </List>
-          </CardContent>
-        </Card>
+        <Stack spacing={3}>
+          <Card elevation={2}>
+            <CardHeader title="Deployment checklist" />
+            <CardContent>
+              <List dense>
+                <ListItem>
+                  <ListItemText
+                    primary={
+                      <span>
+                        Deploy the payload as a profile targeting <code>com.northpolesec.santa</code>.
+                      </span>
+                    }
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Sync server URLs should point at this Grinch instance." />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Defaults keep Santa in Monitor mode; raise enforcement when ready." />
+                </ListItem>
+              </List>
+            </CardContent>
+          </Card>
 
-        <Card elevation={2}>
-          <CardHeader title="Template placeholders" />
-          <CardContent>
-            <List dense>
-              <ListItem>
-                <ListItemText
-                  primary={
-                    <span>
-                      Adjust <code>{"{{username}}"}</code> to match your MDM provider's placeholder syntax.
-                    </span>
-                  }
-                />
-              </ListItem>
-            </List>
-          </CardContent>
-        </Card>
+          <Card elevation={2}>
+            <CardHeader title="Template placeholders" />
+            <CardContent>
+              <List dense>
+                <ListItem>
+                  <ListItemText
+                    primary={
+                      <span>
+                        Adjust <code>{"{{username}}"}</code> to match your MDM provider's placeholder syntax.
+                      </span>
+                    }
+                  />
+                </ListItem>
+              </List>
+            </CardContent>
+          </Card>
+        </Stack>
       </Grid>
     </Grid>
   );
@@ -103,14 +107,15 @@ function SantaConfigPanel({ config }: { config: SantaConfig | null }) {
 export default function Settings() {
   const [expandedPanel, setExpandedPanel] = useState<string | null>("santa");
   const { data: santaConfig, isLoading, error, refetch, isFetching } = useSantaConfig();
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   useEffect(() => {
     if (error) {
       console.error("Santa config load failed", error);
-      setToast({ open: true, message: "Failed to load Santa configuration." });
+      setToast({ open: true, message: "Failed to load Santa configuration.", severity: "error" });
     }
   }, [error]);
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   return (
     <Stack spacing={3}>
@@ -132,28 +137,21 @@ export default function Settings() {
           </Stack>
         </AccordionSummary>
         <AccordionDetails>
-          {(isLoading || isFetching) && <LinearProgress sx={{ mb: 2 }} />}
-          <SantaConfigPanel config={santaConfig ?? null} />
-          {error && (
-            <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-              <Button size="small" variant="outlined" onClick={() => void refetch()}>
-                Retry
-              </Button>
-            </Stack>
-          )}
+          <Stack spacing={2}>
+            {(isLoading || isFetching) && <LinearProgress />}
+            <SantaConfigPanel config={santaConfig ?? null} />
+            {error && (
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" onClick={() => void refetch()}>
+                  Retry
+                </Button>
+              </Stack>
+            )}
+          </Stack>
         </AccordionDetails>
       </Accordion>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="error" onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
 }

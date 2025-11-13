@@ -1,16 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import type { DirectoryUser } from "../api";
 import { useUsers } from "../hooks/useQueries";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
-import { Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography, Button, Box, Snackbar, Alert } from "@mui/material";
+import { Box, Card, CardContent, CardHeader, Chip, InputAdornment, Stack, TextField, Typography, Button } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
-
-function getDisplayName(user: DirectoryUser): string {
-  return user.displayName || user.upn;
-}
+import { PageSnackbar, type PageToast } from "../components";
 
 export default function Users() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,13 +16,14 @@ export default function Users() {
 
   const { data: users = [], isLoading, isFetching, error } = useUsers({ search: debouncedSearch });
 
-  const [toastOpen, setToastOpen] = useState(false);
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
   useEffect(() => {
     if (error) {
       console.error("Failed to load users", error);
-      setToastOpen(true);
+      setToast({ open: true, message: error instanceof Error ? error.message : "Failed to load users", severity: "error" });
     }
   }, [error]);
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   const columns = useMemo<GridColDef[]>(
     () => [
@@ -36,11 +33,11 @@ export default function Users() {
         flex: 1.2,
         minWidth: 200,
         sortable: true,
-        renderCell: (p) => (
+        renderCell: ({ row }) => (
           <Stack direction="row" spacing={1} alignItems="center">
             <PersonIcon />
             <Typography variant="body2" fontWeight={600}>
-              {getDisplayName(p.row as DirectoryUser)}
+              {row.displayName}
             </Typography>
           </Stack>
         ),
@@ -51,7 +48,7 @@ export default function Users() {
         flex: 1,
         minWidth: 200,
         renderCell: (p) => (
-          <Typography component="code" sx={{ fontSize: 13 }}>
+          <Typography component="code" variant="body2">
             {p.value}
           </Typography>
         ),
@@ -63,8 +60,8 @@ export default function Users() {
         minWidth: 140,
         sortable: false,
         filterable: false,
-        renderCell: (p) => (
-          <Button component={RouterLink} to={`/users/${(p.row as DirectoryUser).id}`} size="small" variant="outlined">
+        renderCell: ({ row }) => (
+          <Button component={RouterLink} to={`/users/${row.id}`} size="small" variant="outlined">
             View Details
           </Button>
         ),
@@ -110,7 +107,7 @@ export default function Users() {
           />
         </Stack>
 
-        <Box sx={{ height: 600, width: "100%", mt: 2 }}>
+        <Box style={{ height: 600, width: "100%", marginTop: 16 }}>
           <DataGrid
             rows={rows}
             columns={columns}
@@ -123,13 +120,13 @@ export default function Users() {
             loading={isLoading || isFetching}
             slots={{
               noRowsOverlay: () => (
-                <Box sx={{ textAlign: "center", p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    No users found
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {hasSearchTerm ? `No users match "${trimmedSearch}".` : "No users are available in the directory."}
-                  </Typography>
+                <Box textAlign="center" padding={3}>
+                  <Stack spacing={1}>
+                    <Typography variant="h6">No users found</Typography>
+                    <Typography color="text.secondary">
+                      {hasSearchTerm ? `No users match "${trimmedSearch}".` : "No users are available in the directory."}
+                    </Typography>
+                  </Stack>
                 </Box>
               ),
             }}
@@ -137,11 +134,7 @@ export default function Users() {
         </Box>
       </CardContent>
 
-      <Snackbar open={toastOpen} autoHideDuration={4000} onClose={() => setToastOpen(false)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        <Alert severity="error" onClose={() => setToastOpen(false)} variant="filled">
-          {error instanceof Error ? error.message : "Failed to load users"}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Card>
   );
 }

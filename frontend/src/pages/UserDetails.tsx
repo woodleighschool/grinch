@@ -21,23 +21,14 @@ import {
   TableHead,
   TableRow,
   Typography,
-  Snackbar,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-
-function getDisplayName(user: DirectoryUser): string {
-  return user.displayName || user.upn;
-}
+import { PageSnackbar, type PageToast } from "../components";
 
 function UserSummary({ user }: { user: DirectoryUser }) {
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          {getDisplayName(user)}
-        </Typography>
-        <Typography color="text.secondary">{user.upn}</Typography>
-      </Box>
+    <Stack spacing={1.5}>
+      <Typography color="text.secondary">{user.upn}</Typography>
       <Stack direction="row" spacing={1} flexWrap="wrap">
         {user.createdAt && <Chip variant="outlined" label={`Created ${formatDateTime(user.createdAt)}`} />}
         {user.updatedAt && <Chip variant="outlined" label={`Updated ${formatDateTime(user.updatedAt)}`} />}
@@ -52,24 +43,27 @@ export default function UserDetails() {
 
   const { data, isLoading, error } = useUserDetails(userId ?? "");
   const details = data ?? null;
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   useEffect(() => {
     if (error) {
       console.error("Failed to load user details", error);
-      setToast({ open: true, message: "Failed to load user details." });
+      setToast({ open: true, message: "Failed to load user details.", severity: "error" });
     }
   }, [error]);
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   if (!userId) {
     return (
       <Card elevation={1}>
         <CardHeader title="User Details" />
         <CardContent>
-          <Alert severity="error">Missing user identifier.</Alert>
-          <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />} sx={{ mt: 2 }}>
-            Back
-          </Button>
+          <Stack spacing={2}>
+            <Alert severity="error">Missing user identifier.</Alert>
+            <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
+              Back
+            </Button>
+          </Stack>
         </CardContent>
       </Card>
     );
@@ -80,10 +74,12 @@ export default function UserDetails() {
       <Card elevation={1}>
         <CardHeader title="User Details" />
         <CardContent>
-          <Typography color="text.secondary">User not found.</Typography>
-          <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />} sx={{ mt: 2 }}>
-            Back
-          </Button>
+          <Stack spacing={2}>
+            <Typography color="text.secondary">User not found.</Typography>
+            <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
+              Back
+            </Button>
+          </Stack>
         </CardContent>
       </Card>
     );
@@ -107,18 +103,17 @@ export default function UserDetails() {
     <Stack spacing={3}>
       {isLoading && <LinearProgress />}
 
-      <Button variant="text" startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
-        Back to users
-      </Button>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
+          Back
+        </Button>
+        <Typography variant="h4">User Details</Typography>
+      </Stack>
 
-      {user && (
-        <Card elevation={1}>
-          <CardHeader title="User Overview" subheader="View directory data, devices, events, and applied policies." />
-          <CardContent>
-            <UserSummary user={user} />
-          </CardContent>
-        </Card>
-      )}
+      <Card elevation={1}>
+        <CardHeader title={user?.displayName ?? "Loading user..."} subheader="View directory data, devices, events, and applied policies." />
+        <CardContent>{user ? <UserSummary user={user} /> : <Typography color="text.secondary">Loading user details…</Typography>}</CardContent>
+      </Card>
 
       <Card elevation={1}>
         <CardHeader title="Group Assignments" />
@@ -179,21 +174,23 @@ export default function UserDetails() {
           ) : (
             <Stack spacing={2}>
               {events.map((event) => (
-                <Paper key={event.id} elevation={2} sx={{ p: 2 }}>
-                  <Stack spacing={1}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography fontWeight={600}>{event.process_path}</Typography>
-                      {event.decision && <Chip size="small" label={event.decision} color="error" />}
+                <Card key={event.id} elevation={2}>
+                  <CardContent>
+                    <Stack spacing={1}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography fontWeight={600}>{event.process_path}</Typography>
+                        {event.decision && <Chip size="small" label={event.decision} color="error" />}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        Host: {event.hostname || "—"} · {formatCompactDateTime(event.occurred_at)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Decision: {event.decision || "Unknown"}
+                        {event.blocked_reason ? ` · Reason: ${event.blocked_reason}` : ""}
+                      </Typography>
                     </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      Host: {event.hostname || "—"} · {formatCompactDateTime(event.occurred_at)}
-                    </Typography>
-                    <Typography variant="body2">
-                      Decision: {event.decision || "Unknown"}
-                      {event.blocked_reason ? ` · Reason: ${event.blocked_reason}` : ""}
-                    </Typography>
-                  </Stack>
-                </Paper>
+                  </CardContent>
+                </Card>
               ))}
             </Stack>
           )}
@@ -208,45 +205,38 @@ export default function UserDetails() {
           ) : (
             <Stack spacing={2}>
               {policies.map((policy) => (
-                <Paper key={policy.scope_id} elevation={2} sx={{ p: 2 }}>
-                  <Stack spacing={1.5}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography fontWeight={600}>{policy.application_name}</Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        <Chip size="small" variant="outlined" label={policy.rule_type} />
-                        <Chip size="small" color={policy.action?.toLowerCase() === "allow" ? "success" : "error"} label={policy.action.toUpperCase()} />
-                        {policy.via_group && <Chip size="small" variant="outlined" label={`Via group: ${policy.target_name || policy.target_id}`} />}
+                <Card key={policy.scope_id} elevation={2}>
+                  <CardContent>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography fontWeight={600}>{policy.application_name}</Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                          <Chip size="small" variant="outlined" label={policy.rule_type} />
+                          <Chip size="small" color={policy.action?.toLowerCase() === "allow" ? "success" : "error"} label={policy.action.toUpperCase()} />
+                          {policy.via_group && <Chip size="small" variant="outlined" label={`Via group: ${policy.target_name || policy.target_id}`} />}
+                        </Stack>
                       </Stack>
+                      <Typography variant="body2">
+                        Identifier:{" "}
+                        <Typography component="code" variant="body2">
+                          {policy.identifier}
+                        </Typography>
+                      </Typography>
+                      {policy.target_type === "user" && !policy.via_group && (
+                        <Typography variant="body2" color="text.secondary">
+                          Applied directly to this user.
+                        </Typography>
+                      )}
                     </Stack>
-                    <Typography variant="body2">
-                      Identifier:{" "}
-                      <Typography component="code" variant="body2">
-                        {policy.identifier}
-                      </Typography>
-                    </Typography>
-                    {policy.target_type === "user" && !policy.via_group && (
-                      <Typography variant="body2" color="text.secondary">
-                        Applied directly to this user.
-                      </Typography>
-                    )}
-                  </Stack>
-                </Paper>
+                  </CardContent>
+                </Card>
               ))}
             </Stack>
           )}
         </CardContent>
       </Card>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="error" onClose={() => setToast((t) => ({ ...t, open: false }))} variant="filled">
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
 }

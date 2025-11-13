@@ -38,13 +38,14 @@ import {
   Typography,
   InputAdornment,
   LinearProgress,
-  Snackbar,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import GroupIcon from "@mui/icons-material/Groups";
 import PersonIcon from "@mui/icons-material/Person";
 import SearchIcon from "@mui/icons-material/Search";
+import { PageSnackbar, type PageToast } from "../components";
 
 export interface SelectedTarget {
   type: "group" | "user";
@@ -59,7 +60,7 @@ interface ScopeAssignmentRowProps {
 }
 
 function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowProps) {
-  const memberUsers = Array.isArray(scope.effective_members) ? scope.effective_members : [];
+  const memberUsers = Array.isArray(scope.effective_members) ? (scope.effective_members as DirectoryUser[]) : [];
   const maxDisplayedMembers = 10;
   const displayedMembers = memberUsers.slice(0, maxDisplayedMembers);
   const remainingCount = Math.max((scope.effective_member_count ?? memberUsers.length) - displayedMembers.length, 0);
@@ -107,7 +108,7 @@ function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowPro
                 ) : (
                   <Stack direction="row" flexWrap="wrap" gap={1}>
                     {displayedMembers.map((user) => (
-                      <Chip key={user.id} size="small" variant="outlined" label={user.displayName || user.upn} />
+                      <Chip key={user.id} size="small" variant="outlined" label={user.displayName} />
                     ))}
                     {remainingCount > 0 && <Chip size="small" label={`+${remainingCount} more`} />}
                   </Stack>
@@ -198,7 +199,7 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disable
   const handleSelectItem = (item: DirectoryGroup | DirectoryUser) => {
     if (disabled) return;
     const type = activeTab === "groups" ? "group" : "user";
-    const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName || (item as DirectoryUser).upn;
+    const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName;
     onSelectTarget({ type, id: item.id, name });
   };
 
@@ -226,58 +227,60 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disable
         }}
       />
 
-      <Paper elevation={2} sx={{ height: 360, overflow: "hidden" }}>
-        {activeInitialLoading ? (
-          <LinearProgress />
-        ) : (groupError || userError) && activeErrorObj ? (
-          <Box p={2} textAlign="center">
-            <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-              {activeErrorObj instanceof Error ? activeErrorObj.message : `Failed to load ${activeTab}.`}
-            </Typography>
-            <Button size="small" variant="outlined" onClick={() => void activeRefetch()}>
-              Retry
-            </Button>
-          </Box>
-        ) : activeItems.length === 0 ? (
-          <Box p={2} textAlign="center">
-            <Typography variant="body2" color="text.secondary">
-              {trimmedActiveSearch ? `No ${activeTab} match “${trimmedActiveSearch}”` : `No ${activeTab} are available.`}
-            </Typography>
-          </Box>
-        ) : (
-          <Virtuoso<DirectoryGroup | DirectoryUser>
-            data={activeItems as Array<DirectoryGroup | DirectoryUser>}
-            overscan={200}
-            style={{ height: 360 }}
-            itemContent={(_, item) => {
-              const type = activeTab === "groups" ? "group" : "user";
-              const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName || (item as DirectoryUser).upn;
-              const subtitle = type === "group" ? (item as DirectoryGroup).description : (item as DirectoryUser).upn;
-              const isSelected = selectedTarget?.id === item.id && selectedTarget.type === type;
-              return (
-                <ListItem disablePadding divider>
-                  <ListItemButton onClick={() => handleSelectItem(item)} selected={isSelected} disabled={disabled}>
-                    <ListItemAvatar>
-                      <Avatar>{type === "group" ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}</Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Stack direction={{ sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {name}
-                          </Typography>
-                          {activeLoading && <LinearProgress sx={{ width: 60 }} />}
-                        </Stack>
-                      }
-                      secondary={<Typography variant="body2">{subtitle}</Typography>}
-                    />
-                    {isSelected && <Chip label="Selected" size="small" color="primary" />}
-                  </ListItemButton>
-                </ListItem>
-              );
-            }}
-          />
-        )}
+      <Paper elevation={2}>
+        <Box style={{ height: 360, overflow: "hidden" }}>
+          {activeInitialLoading ? (
+            <LinearProgress />
+          ) : (groupError || userError) && activeErrorObj ? (
+            <Box p={2} textAlign="center">
+              <Typography color="error" variant="body2" gutterBottom>
+                {activeErrorObj instanceof Error ? activeErrorObj.message : `Failed to load ${activeTab}.`}
+              </Typography>
+              <Button size="small" variant="outlined" onClick={() => void activeRefetch()}>
+                Retry
+              </Button>
+            </Box>
+          ) : activeItems.length === 0 ? (
+            <Box p={2} textAlign="center">
+              <Typography variant="body2" color="text.secondary">
+                {trimmedActiveSearch ? `No ${activeTab} match “${trimmedActiveSearch}”` : `No ${activeTab} are available.`}
+              </Typography>
+            </Box>
+          ) : (
+            <Virtuoso<DirectoryGroup | DirectoryUser>
+              data={activeItems as Array<DirectoryGroup | DirectoryUser>}
+              overscan={200}
+              style={{ height: 360 }}
+              itemContent={(_, item) => {
+                const type = activeTab === "groups" ? "group" : "user";
+                const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName;
+                const subtitle = type === "group" ? (item as DirectoryGroup).description : (item as DirectoryUser).upn;
+                const isSelected = selectedTarget?.id === item.id && selectedTarget.type === type;
+                return (
+                  <ListItem disablePadding divider>
+                    <ListItemButton onClick={() => handleSelectItem(item)} selected={isSelected} disabled={disabled}>
+                      <ListItemAvatar>
+                        <Avatar>{type === "group" ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}</Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Stack direction={{ sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                            <Typography variant="body2" fontWeight={600}>
+                              {name}
+                            </Typography>
+                            {activeLoading && <CircularProgress size={16} />}
+                          </Stack>
+                        }
+                        secondary={<Typography variant="body2">{subtitle}</Typography>}
+                      />
+                      {isSelected && <Chip label="Selected" size="small" color="primary" />}
+                    </ListItemButton>
+                  </ListItem>
+                );
+              }}
+            />
+          )}
+        </Box>
       </Paper>
     </Stack>
   );
@@ -294,11 +297,7 @@ export default function ApplicationDetails() {
   const [deletingScopeId, setDeletingScopeId] = useState<string | null>(null);
   const [confirmDeleteApp, setConfirmDeleteApp] = useState<{ appId: string; appName: string } | null>(null);
   const [deletingApp, setDeletingApp] = useState(false);
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "error" | "success" }>({
-    open: false,
-    message: "",
-    severity: "error",
-  });
+  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   const { data: groups = [] } = useGroups();
   const { data: users = [] } = useUsers();
@@ -316,6 +315,8 @@ export default function ApplicationDetails() {
       setToast({ open: true, message: "Failed to load application details.", severity: "error" });
     }
   }, [error]);
+
+  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
   useEffect(() => {
     if (assignmentError && selectedTarget) setAssignmentError(null);
@@ -393,12 +394,12 @@ export default function ApplicationDetails() {
       <Card elevation={1}>
         <CardHeader title="Application Details" />
         <CardContent>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            Missing application identifier.
-          </Alert>
-          <Button component={RouterLink} to="/applications" variant="contained">
-            Back to applications
-          </Button>
+          <Stack spacing={2}>
+            <Alert severity="error">Missing application identifier.</Alert>
+            <Button component={RouterLink} to="/applications" variant="contained">
+              Back to applications
+            </Button>
+          </Stack>
         </CardContent>
       </Card>
     );
@@ -451,7 +452,7 @@ export default function ApplicationDetails() {
       </Card>
 
       <Grid container spacing={3}>
-        <Grid size={{ lg: 6 }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card elevation={1}>
             <CardHeader title="Assign to Groups or Users" />
             <CardContent>
@@ -484,7 +485,7 @@ export default function ApplicationDetails() {
           </Card>
         </Grid>
 
-        <Grid size={{ lg: 6 }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card elevation={1}>
             <CardHeader title="Current Assignments" subheader="Allow and block scopes targeting this application." />
             <CardContent>
@@ -514,16 +515,7 @@ export default function ApplicationDetails() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={3500}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={toast.severity} variant="filled" onClose={() => setToast((t) => ({ ...t, open: false }))}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <PageSnackbar toast={toast} onClose={handleToastClose} autoHideDuration={3500} />
     </Stack>
   );
 }
