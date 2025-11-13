@@ -75,7 +75,7 @@ type apiErrorResponse struct {
 
 type validationSuccessResponse[T any] struct {
 	Valid      bool `json:"valid"`
-	Normalized T    `json:"normalized"`
+	Normalised T    `json:"normalised"`
 }
 
 type scopeValidationRequest struct {
@@ -102,7 +102,7 @@ func respondValidationError(w http.ResponseWriter, status int, code, message str
 func respondValidationSuccess[T any](w http.ResponseWriter, result T) {
 	respondJSON(w, http.StatusOK, validationSuccessResponse[T]{
 		Valid:      true,
-		Normalized: result,
+		Normalised: result,
 	})
 }
 

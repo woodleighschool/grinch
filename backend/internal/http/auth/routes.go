@@ -150,7 +150,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	session := auth.Session{
 		Subject: idToken.Subject,
-		Claims:  sanitizeClaims(claims),
+		Claims:  sanitiseClaims(claims),
 	}
 	if err := h.sessions.Issue(w, session); err != nil {
 		h.logger.Error("issue session", "err", err)
@@ -288,7 +288,7 @@ func (h *Handler) clearStateCookie(w http.ResponseWriter) {
 	})
 }
 
-func sanitizeClaims(claims map[string]any) map[string]any {
+func sanitiseClaims(claims map[string]any) map[string]any {
 	out := make(map[string]any)
 	for k, v := range claims {
 		switch k {

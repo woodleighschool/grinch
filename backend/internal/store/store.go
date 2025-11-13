@@ -247,11 +247,11 @@ func (s *Store) ListEvents(ctx context.Context, limit, offset int32) ([]sqlc.Lis
 	return s.queries.ListEventSummaries(ctx, sqlc.ListEventSummariesParams{Limit: limit, Offset: offset})
 }
 
-func (s *Store) SummarizeEvents(ctx context.Context, days int32) ([]sqlc.SummarizeEventsRow, error) {
+func (s *Store) SummariseEvents(ctx context.Context, days int32) ([]sqlc.SummariseEventsRow, error) {
 	if days <= 0 {
 		days = 14
 	}
-	return s.queries.SummarizeEvents(ctx, days)
+	return s.queries.SummariseEvents(ctx, days)
 }
 
 func (s *Store) MarshalRuleMetadata(meta any) ([]byte, error) {

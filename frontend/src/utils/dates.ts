@@ -1,6 +1,6 @@
 import { format, formatDistanceToNow, parseISO, isValid } from "date-fns";
 
-// Format a date string to a localized date and time
+// Format a date string to a localised date and time
 export function formatDateTime(input: string | undefined): string {
   if (!input) return "Never";
 

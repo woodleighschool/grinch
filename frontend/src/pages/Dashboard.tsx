@@ -52,7 +52,7 @@ function renderRow(event: EventRecord) {
         </Typography>
       </TableCell>
       <TableCell>{event.hostname}</TableCell>
-	  <TableCell>{event.userDisplayName || "-"}</TableCell>
+      <TableCell>{event.userDisplayName || "-"}</TableCell>
       <TableCell>
         <Chip label={reason} color="error" size="small" />
       </TableCell>
@@ -188,7 +188,7 @@ export default function Dashboard() {
                     <TableCell>Occurred</TableCell>
                     <TableCell>Details</TableCell>
                     <TableCell>Machine</TableCell>
-					<TableCell>User</TableCell>
+                    <TableCell>User</TableCell>
                     <TableCell>Kind</TableCell>
                   </TableRow>
                 </TableHead>

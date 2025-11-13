@@ -66,9 +66,9 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 }
 
 func (c *Compiler) CompileAssignments(rule sqlc.Rule, scopes []sqlc.RuleScope, meta RuleMetadata, groupMembers map[uuid.UUID][]uuid.UUID) []sqlc.InsertRuleAssignmentParams {
-	normalized := append([]sqlc.RuleScope(nil), scopes...)
+	normalised := append([]sqlc.RuleScope(nil), scopes...)
 	if len(meta.Users) > 0 || len(meta.Groups) > 0 {
-		normalized = append(normalized, legacyScopes(rule.ID, meta)...)
+		normalised = append(normalised, legacyScopes(rule.ID, meta)...)
 	}
 
 	type key string
@@ -83,9 +83,9 @@ func (c *Compiler) CompileAssignments(rule sqlc.Rule, scopes []sqlc.RuleScope, m
 		assignments = append(assignments, param)
 	}
 
-	for _, scope := range normalized {
+	for _, scope := range normalised {
 		targetType := scope.TargetType
-		action := normalizeAction(scope.Action)
+		action := normaliseAction(scope.Action)
 		switch targetType {
 		case "user":
 			add(key("user:"+scope.TargetID.String()+":"+string(action)), sqlc.InsertRuleAssignmentParams{
@@ -161,7 +161,7 @@ func legacyScopes(ruleID uuid.UUID, meta RuleMetadata) []sqlc.RuleScope {
 	return scopes
 }
 
-func normalizeAction(value string) RuleAction {
+func normaliseAction(value string) RuleAction {
 	switch RuleAction(value) {
 	case RuleActionBlock:
 		return RuleActionBlock
@@ -200,7 +200,7 @@ func ComputeCursor(rules []sqlc.Rule) string {
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-func SerializeMetadata(meta []byte) map[string]any {
+func SerialiseMetadata(meta []byte) map[string]any {
 	if len(meta) == 0 {
 		return nil
 	}

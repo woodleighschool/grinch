@@ -187,7 +187,7 @@ export interface AuthProviders {
 
 export interface ValidationSuccess<T> {
   valid: true;
-  normalized: T;
+  normalised: T;
 }
 
 export interface ScopeValidationRequest {

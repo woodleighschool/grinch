@@ -65,7 +65,7 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "primary_user required")
 		return
 	}
-	clientMode := normalizeClientMode(req.GetClientMode())
+	clientMode := normaliseClientMode(req.GetClientMode())
 	ctx := r.Context()
 	userID := resolveUserID(ctx, h.store, h.logger, primaryUser)
 	machine, err := h.store.UpsertMachine(ctx, sqlc.UpsertMachineParams{
@@ -116,7 +116,7 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	respondProtoJSON(w, http.StatusOK, resp)
 }
 
-func normalizeClientMode(mode syncv1.ClientMode) syncv1.ClientMode {
+func normaliseClientMode(mode syncv1.ClientMode) syncv1.ClientMode {
 	switch mode {
 	case syncv1.ClientMode_MONITOR,
 		syncv1.ClientMode_LOCKDOWN,

@@ -48,10 +48,10 @@ type eventStatDTO struct {
 
 func (h Handler) eventStats(w http.ResponseWriter, r *http.Request) {
 	days := parseInt(r.URL.Query().Get("days"), 14)
-	stats, err := h.Store.SummarizeEvents(r.Context(), int32(days))
+	stats, err := h.Store.SummariseEvents(r.Context(), int32(days))
 	if err != nil {
-		h.Logger.Error("summarize events", "err", err)
-		respondError(w, http.StatusInternalServerError, "failed to summarize events")
+		h.Logger.Error("summarise events", "err", err)
+		respondError(w, http.StatusInternalServerError, "failed to summarise events")
 		return
 	}
 	resp := make([]eventStatDTO, 0, len(stats))

@@ -156,14 +156,14 @@ export default function Applications() {
   async function handleCreateApp(data: ApplicationFormData) {
     clearErrors();
     try {
-      const { normalized } = await validateApplication(data);
+      const { normalised } = await validateApplication(data);
       const payload: { name: string; rule_type: string; identifier: string; description?: string } = {
-        name: normalized.name,
-        rule_type: normalized.rule_type,
-        identifier: normalized.identifier,
+        name: normalised.name,
+        rule_type: normalised.rule_type,
+        identifier: normalised.identifier,
       };
-      if (normalized.description) {
-        payload.description = normalized.description;
+      if (normalised.description) {
+        payload.description = normalised.description;
       }
       await createApplication.mutateAsync(payload);
       reset(applicationFormDefaultValues);

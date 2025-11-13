@@ -330,7 +330,7 @@ func (h Handler) applicationDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	appDTO := mapApplication(rule)
-	appDTO.Stats = summarizeScopeStats(resolved)
+	appDTO.Stats = summariseScopeStats(resolved)
 	resp := applicationDetailResponse{
 		Application: appDTO,
 		Scopes:      resolved,
@@ -574,7 +574,7 @@ func mapAssignmentStats(row sqlc.ListApplicationAssignmentStatsRow) applicationA
 	}
 }
 
-func summarizeScopeStats(scopes []applicationScopeRelationshipDTO) applicationAssignmentStatsDTO {
+func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAssignmentStatsDTO {
 	stats := applicationAssignmentStatsDTO{}
 	allowUsers := make(map[uuid.UUID]struct{})
 	blockUsers := make(map[uuid.UUID]struct{})

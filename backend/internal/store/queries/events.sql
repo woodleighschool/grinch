@@ -11,7 +11,7 @@ LEFT JOIN users ON events.user_id = users.id
 ORDER BY occurred_at DESC
 LIMIT $1 OFFSET $2;
 
--- name: SummarizeEvents :many
+-- name: SummariseEvents :many
 SELECT
     date_trunc('day', COALESCE(occurred_at, created_at))::timestamptz AS bucket,
     kind,
