@@ -31,7 +31,9 @@ export interface EventRecord {
   kind: string;
   payload: Record<string, unknown>;
   hostname: string;
+  machineId: string;
   userDisplayName?: string;
+  userId?: string;
 }
 
 export interface EventStat {

@@ -4,7 +4,7 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListEventSummaries :many
-SELECT events.id, events.occurred_at, events.kind, events.payload, machines.hostname, users.display_name
+SELECT events.id, events.occurred_at, events.kind, events.payload, machines.hostname, machines.id AS machineId, users.display_name, users.id AS userId
 FROM events
 INNER JOIN machines ON events.machine_id = machines.id
 LEFT JOIN users ON events.user_id = users.id

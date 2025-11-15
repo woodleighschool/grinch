@@ -16,7 +16,9 @@ type eventDTO struct {
 	Kind            string          `json:"kind"`
 	Payload         json.RawMessage `json:"payload"`
 	Hostname        string          `json:"hostname"`
+	MachineID       string          `json:"machineId"`
 	UserDisplayName string          `json:"userDisplayName"`
+	UserID          string          `json:"userId"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {
@@ -74,12 +76,19 @@ func mapEvent(e sqlc.ListEventSummariesRow) eventDTO {
 	if e.OccurredAt.Valid {
 		occurred = e.OccurredAt.Time
 	}
+	var userId string
+	if e.Userid.Valid {
+		userId = e.Userid.String()
+	}
+
 	return eventDTO{
 		ID:              e.ID,
 		Kind:            e.Kind,
 		Payload:         e.Payload,
 		Occurred:        occurred,
 		Hostname:        e.Hostname,
+		MachineID:       e.Machineid.String(),
 		UserDisplayName: displayName,
+		UserID:          userId,
 	}
 }

@@ -8,6 +8,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
 import GroupIcon from "@mui/icons-material/Group";
 import DevicesIcon from "@mui/icons-material/Devices";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import SettingsIcon from "@mui/icons-material/Settings";
 
 const Login = lazy(() => import("./pages/Login"));
@@ -15,6 +16,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Applications = lazy(() => import("./pages/Applications"));
 const Users = lazy(() => import("./pages/Users"));
 const Devices = lazy(() => import("./pages/Devices"));
+const Events = lazy(() => import("./pages/Events"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ApplicationDetails = lazy(() => import("./pages/ApplicationDetails"));
 const UserDetails = lazy(() => import("./pages/UserDetails"));
@@ -41,6 +43,7 @@ export default function App() {
     if (p.startsWith("/applications")) return "/applications";
     if (p.startsWith("/users")) return "/users";
     if (p.startsWith("/devices")) return "/devices";
+	if (p.startsWith("/events")) return "/events";
     return false;
   }, [location.pathname]);
 
@@ -95,6 +98,7 @@ export default function App() {
               />
               <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Users" component={NavLink} to="/users" value="/users" />
               <Tab icon={<DevicesIcon fontSize="small" />} iconPosition="start" label="Devices" component={NavLink} to="/devices" value="/devices" />
+			  <Tab icon={<EventNoteIcon fontSize="small" />} iconPosition="start" label="Events" component={NavLink} to="/events" value="/events" />
             </Tabs>
           </Box>
 
@@ -135,6 +139,7 @@ export default function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/users/:userId" element={<UserDetails />} />
             <Route path="/devices" element={<Devices />} />
+			<Route path="/events" element={<Events />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Suspense>

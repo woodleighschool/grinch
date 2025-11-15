@@ -169,7 +169,7 @@ export default function Dashboard() {
                     <TableCell>Process</TableCell>
                     <TableCell>Machine</TableCell>
                     <TableCell>User</TableCell>
-                    <TableCell>Kind</TableCell>
+                    <TableCell>Result</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
