@@ -164,6 +164,7 @@ export default function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/users/:userId" element={<UserDetails />} />
             <Route path="/devices" element={<Devices />} />
+			<Route path="/events" element={<Events />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Suspense>

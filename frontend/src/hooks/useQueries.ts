@@ -71,7 +71,7 @@ export function useCurrentUser() {
 export function useStatus() {
   return useQuery<AppStatusResponse>({
     queryKey: queryKeys.status,
-    queryFn: getStatus,
+    queryFn: () => getStatus(),
     staleTime: 60 * 1000,
   });
 }

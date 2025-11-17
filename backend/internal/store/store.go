@@ -247,6 +247,10 @@ func (s *Store) ListEvents(ctx context.Context, limit, offset int32) ([]sqlc.Lis
 	return s.queries.ListEventSummaries(ctx, sqlc.ListEventSummariesParams{Limit: limit, Offset: offset})
 }
 
+func (s *Store) ListBlocksByUser(ctx context.Context, userID pgtype.UUID) ([]sqlc.ListBlocksByUserRow, error) {
+	return s.queries.ListBlocksByUser(ctx, userID)
+}
+
 func (s *Store) SummariseEvents(ctx context.Context, days int32) ([]sqlc.SummariseEventsRow, error) {
 	if days <= 0 {
 		days = 14

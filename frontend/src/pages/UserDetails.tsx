@@ -89,13 +89,13 @@ export default function UserDetails() {
     user,
     groups = [],
     devices = [],
-    recent_events: events = [],
+    recent_blocks: events = [],
     policies = [],
   } = details ?? {
     user: undefined,
     groups: [],
     devices: [],
-    recent_events: [],
+    recent_blocks: [],
     policies: [],
   };
 
@@ -167,31 +167,33 @@ export default function UserDetails() {
       </Card>
 
       <Card elevation={1}>
-        <CardHeader title="Recent Events" subheader="Latest Santa telemetry targeting this user." />
+        <CardHeader title="Recent Blocks" subheader="Latest Santa telemetry targeting this user." />
         <CardContent>
           {events.length === 0 ? (
-            <Alert severity="info">No recent Santa events recorded for this user.</Alert>
+            <Alert severity="info">No recent Santa blocks recorded for this user.</Alert>
           ) : (
             <Stack spacing={2}>
-              {events.map((event) => (
-                <Card key={event.id} elevation={2}>
-                  <CardContent>
-                    <Stack spacing={1}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                        <Typography fontWeight={600}>{event.process_path}</Typography>
-                        {event.decision && <Chip size="small" label={event.decision} color="error" />}
-                      </Stack>
-                      <Typography variant="body2" color="text.secondary">
-                        Host: {event.hostname || "—"} · {formatCompactDateTime(event.occurred_at)}
-                      </Typography>
-                      <Typography variant="body2">
-                        Decision: {event.decision || "Unknown"}
-                        {event.blocked_reason ? ` · Reason: ${event.blocked_reason}` : ""}
-                      </Typography>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+              {events.map((event) => {
+				const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
+                const processPath = typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind;
+                const reason = typeof event.payload?.decision === "string" ? event.payload.decision : event.kind;
+				
+				return (
+					<Card key={event.id} elevation={2}>
+					<CardContent>
+						<Stack spacing={1}>
+						<Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+							<Typography fontWeight={600}>{processPath}</Typography>
+							{event.kind && <Chip size="small" label={event.kind} color="error" />}
+						</Stack>
+						<Typography variant="body2" color="text.secondary">
+							Host: {event.hostname || "—"} · {occurredAt}
+						</Typography>
+						</Stack>
+					</CardContent>
+					</Card>
+				);
+			})}
             </Stack>
           )}
         </CardContent>

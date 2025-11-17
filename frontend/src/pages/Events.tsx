@@ -1,15 +1,18 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, type MouseEvent, type ReactElement } from "react";
 import { useNavigate } from "react-router";
 import { useBlockedEvents } from "../hooks/useQueries";
+import { type EventRecord } from "../api";
 import { formatDateTime } from "../utils/dates";
-import { Badge, Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Tooltip, Typography } from "@mui/material";
+import { Badge, Box, Card, CardContent, CardHeader, Chip, Divider, Popover, Stack, Tooltip, Typography } from "@mui/material";
 import { DataGrid, GridActionsCellItem, type GridRowParams, type GridColDef, type GridActionsCellItemProps } from "@mui/x-data-grid";
 import { PageSnackbar, type PageToast } from "../components";
 import GroupIcon from "@mui/icons-material/Group";
 import DevicesIcon from "@mui/icons-material/Devices";
+import AppsIcon from "@mui/icons-material/Apps";
+import ArticleIcon from "@mui/icons-material/Article";
 
 export default function Events() {
-	const navigate = useNavigate();
+  const navigate = useNavigate();
   const { events, loading, error } = useBlockedEvents();
 
   const [toast, setToast] = useState<PageToast>({
@@ -30,12 +33,18 @@ export default function Events() {
 
   const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
+  const [eventPayload, setEventPayload] = useState<String>("");
+
+  const handlePopoverClose = () => {
+    setEventPayload("");
+  };
+
   const columns = useMemo<GridColDef[]>(
     () => [
       { field: "occurredAt", headerName: "Occurred", flex: 1, sortable: true },
       { field: "file_path", headerName: "Process", flex: 1 },
       { field: "hostname", headerName: "Machine", flex: 1, sortable: false, filterable: true },
-      { field: "userDisplayName", headerName: "User", flex: 1, sortable: false, filterable: true },
+      { field: "user", headerName: "User", flex: 1, sortable: false, filterable: true },
       {
         field: "kind",
         headerName: "Result",
@@ -58,10 +67,25 @@ export default function Events() {
       {
         field: "actions",
         type: "actions",
-        getActions: (params: GridRowParams) => [
-          <GridActionsCellItem showInMenu icon={<GroupIcon />} label="Go to user" onClick={() => navigate(`/users/${params.row.userId}`)} />,
-          <GridActionsCellItem showInMenu icon={<DevicesIcon />} label="Go to device" onClick={() => navigate(`/devices/${params.row.machineId}`)} />,
-        ],
+        getActions: (params: GridRowParams) => {
+          var actions: ReactElement[] = [];
+          if (params.row.userId != "") {
+            actions.push(<GridActionsCellItem showInMenu icon={<GroupIcon />} label="Go to user" onClick={() => navigate(`/users/${params.row.userId}`)} />);
+          }
+          if (params.row.machineId != "") {
+            actions.push(
+              <GridActionsCellItem showInMenu icon={<DevicesIcon />} label="Go to device" onClick={() => navigate(`/devices/${params.row.machineId}`)} />,
+            );
+          }
+          actions.push(
+            <GridActionsCellItem
+              icon={<ArticleIcon />}
+              label="Show details"
+              onClick={() => {setEventPayload(params.row.payload)}}
+            />,
+          );
+          return actions;
+        },
       },
     ],
     [],
@@ -71,12 +95,13 @@ export default function Events() {
     () =>
       events.map((event) => ({
         id: event.id,
-        occurredAt: event.occurredAt ? formatDateTime(event.occurredAt) : "-",
+        occurredAt: event.occurredAt ? formatDateTime(event.occurredAt) : null,
         file_path: typeof event.payload?.file_name == "string" ? event.payload.file_name : event.kind,
+        payload: JSON.stringify(event.payload, null, "\t"),
         hostname: event.hostname,
-		machineId: event.machineId,
-        userDisplayName: event.userDisplayName || "-",
-		userId: event.userId || "-",
+        machineId: event.machineId,
+        user: event.email,
+        userId: event.userId,
         kind: event.kind,
       })),
     [events],
@@ -111,6 +136,19 @@ export default function Events() {
         </Box>
         <PageSnackbar toast={toast} onClose={handleToastClose} />
       </CardContent>
+      <Popover
+        open={eventPayload != ""}
+        anchorPosition={{ top: parent.innerHeight/2 ,left: parent.innerWidth/2 }}
+        onClose={handlePopoverClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "left",
+        }}
+      >
+        <Typography>
+          <pre>{eventPayload}</pre>
+        </Typography>
+      </Popover>
     </Card>
   );
 }

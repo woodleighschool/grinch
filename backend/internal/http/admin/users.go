@@ -27,7 +27,7 @@ type userDetailResponse struct {
 	User         userDTO      `json:"user"`
 	Groups       []groupDTO   `json:"groups"`
 	Devices      []machineDTO `json:"devices"`
-	RecentEvents []eventDTO   `json:"recent_events"`
+	RecentBlocks []eventDTO   `json:"recent_blocks"`
 	Policies     []userPolicy `json:"policies"`
 }
 
@@ -120,6 +120,15 @@ func (h Handler) userDetails(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to load devices")
 		return
 	}
+	events, err := h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			events = nil
+		}
+		h.Logger.Error("get user block events", "err", err, "user", userID)
+		respondError(w, http.StatusInternalServerError, "failed to load blocked events")
+		return
+	}
 	assignments, err := h.Store.ListUserAssignments(ctx, userID)
 	if err != nil {
 		h.Logger.Error("list user policies", "err", err, "user", userID)
@@ -131,7 +140,7 @@ func (h Handler) userDetails(w http.ResponseWriter, r *http.Request) {
 		User:         mapUserDTO(user),
 		Groups:       mapGroups(groups),
 		Devices:      mapMachines(machines),
-		RecentEvents: []eventDTO{},
+		RecentBlocks: mapUserBlocks(events),
 		Policies:     mapUserPolicies(assignments, user),
 	}
 	respondJSON(w, http.StatusOK, resp)
@@ -178,6 +187,14 @@ func mapMachines(machines []sqlc.Machine) []machineDTO {
 	resp := make([]machineDTO, 0, len(machines))
 	for _, m := range machines {
 		resp = append(resp, mapMachine(m))
+	}
+	return resp
+}
+
+func mapUserBlocks(events []sqlc.ListBlocksByUserRow) []eventDTO {
+	resp := make([]eventDTO, 0, len(events))
+	for _, e := range events {
+		resp = append(resp, mapUserBlock(e))
 	}
 	return resp
 }

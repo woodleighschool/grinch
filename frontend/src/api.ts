@@ -32,7 +32,7 @@ export interface EventRecord {
   payload: Record<string, unknown>;
   hostname: string;
   machineId: string;
-  userDisplayName?: string;
+  email?: string;
   userId?: string;
 }
 
@@ -126,6 +126,17 @@ export interface SantaConfig {
   xml: string;
 }
 
+export interface AppStatusResponse {
+  status: string;
+  version: BuildInfo;
+}
+
+export interface BuildInfo {
+	version: string;
+	gitCommit: string;
+	buildDate: string;
+}
+
 export interface Device {
   id: string;
   machineIdentifier: string;
@@ -143,21 +154,17 @@ export interface Device {
   syncCursor?: string;
 }
 
+// export interface DeviceDetailResponse {
+//   device: Device;
+// 	primaryUser: DirectoryUser;
+//   recent_events: DeviceEvent[];
+//   policies: DevicePolicy[];
+// }
+
 export interface DeviceQueryParams {
   search?: string;
   limit?: number;
   offset?: number;
-}
-
-export interface UserEvent {
-  id: number;
-  host_id?: string;
-  hostname?: string;
-  application_id?: string;
-  process_path: string;
-  blocked_reason?: string;
-  decision?: string;
-  occurred_at: string;
 }
 
 export interface UserPolicy {
@@ -178,7 +185,7 @@ export interface UserDetailResponse {
   user: DirectoryUser;
   groups: DirectoryGroup[];
   devices: Device[];
-  recent_events: UserEvent[];
+  recent_blocks: EventRecord[];
   policies: UserPolicy[];
 }
 
@@ -407,6 +414,11 @@ export async function listDevices(params: DeviceQueryParams = {}): Promise<Devic
   return handleResponse<Device[]>(res);
 }
 
+// export async function getDeviceDetails(deviceId: string): Promise<DeviceDetailResponse> {
+// 	const res = await fetch(`/api/devices/${deviceId}`, {credentials: "include"});
+// 	return handleResponse<DeviceDetailsResponse>(res);
+// }
+
 export async function listEvents(limit = 50, offset = 0): Promise<EventRecord[]> {
   const params = new URLSearchParams({ limit: `${limit}`, offset: `${offset}` });
   const res = await fetch(`/api/events?${params.toString()}`, { credentials: "include" });
@@ -417,6 +429,13 @@ export async function getEventStats(days = 14): Promise<EventStat[]> {
   const params = new URLSearchParams({ days: `${days}` });
   const res = await fetch(`/api/events/stats?${params.toString()}`, { credentials: "include" });
   return handleResponse<EventStat[]>(res);
+}
+
+export async function getStatus(): Promise<AppStatusResponse> {
+  const res = await fetch("/api/status", {
+    credentials: "include",
+  });
+  return handleResponse<AppStatusResponse>(res);
 }
 
 export async function getSantaConfig(): Promise<SantaConfig> {

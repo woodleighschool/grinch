@@ -11,14 +11,14 @@ import (
 )
 
 type eventDTO struct {
-	ID              int64           `json:"id"`
-	Occurred        time.Time       `json:"occurredAt"`
-	Kind            string          `json:"kind"`
-	Payload         json.RawMessage `json:"payload"`
-	Hostname        string          `json:"hostname"`
-	MachineID       string          `json:"machineId"`
-	UserDisplayName string          `json:"userDisplayName"`
-	UserID          string          `json:"userId"`
+	ID        int64           `json:"id"`
+	Occurred  time.Time       `json:"occurredAt"`
+	Kind      string          `json:"kind"`
+	Payload   json.RawMessage `json:"payload"`
+	Hostname  string          `json:"hostname"`
+	MachineID string          `json:"machineId"`
+	Email     string          `json:"email"`
+	UserID    string          `json:"userId"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {
@@ -68,9 +68,9 @@ func (h Handler) eventStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func mapEvent(e sqlc.ListEventSummariesRow) eventDTO {
-	var displayName string
-	if e.DisplayName.Valid {
-		displayName = e.DisplayName.String
+	var email string
+	if e.Upn.Valid {
+		email = e.Upn.String
 	}
 	var occurred time.Time
 	if e.OccurredAt.Valid {
@@ -82,13 +82,31 @@ func mapEvent(e sqlc.ListEventSummariesRow) eventDTO {
 	}
 
 	return eventDTO{
-		ID:              e.ID,
-		Kind:            e.Kind,
-		Payload:         e.Payload,
-		Occurred:        occurred,
-		Hostname:        e.Hostname,
-		MachineID:       e.Machineid.String(),
-		UserDisplayName: displayName,
-		UserID:          userId,
+		ID:        e.ID,
+		Kind:      e.Kind,
+		Payload:   e.Payload,
+		Occurred:  occurred,
+		Hostname:  e.Hostname,
+		MachineID: e.Machineid.String(),
+		Email:     email,
+		UserID:    userId,
+	}
+}
+
+func mapUserBlock(e sqlc.ListBlocksByUserRow) eventDTO {
+	var occurred time.Time
+	if e.OccurredAt.Valid {
+		occurred = e.OccurredAt.Time
+	}
+
+	return eventDTO{
+		ID:        e.ID,
+		Kind:      e.Kind,
+		Payload:   e.Payload,
+		Occurred:  occurred,
+		Hostname:  e.Hostname,
+		MachineID: e.Machineid.String(),
+		Email:     e.Upn,
+		UserID:    e.Userid.String(),
 	}
 }
