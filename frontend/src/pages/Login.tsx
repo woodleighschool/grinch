@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Box, Button, Card, CardContent, Container, Divider, Stack, TextField, Typography } from "@mui/material";
+
 import { getAuthProviders } from "../api";
-import { Button, Card, CardContent, Container, Divider, Stack, TextField, Typography } from "@mui/material";
-import ParkIcon from "@mui/icons-material/Park"; // TODO: find better icon
-import { PageSnackbar, type PageToast } from "../components";
+import { Logo, PageSnackbar, type PageToast } from "../components";
 
 interface LoginProps {
   onLogin: () => void;
@@ -15,35 +15,29 @@ type LoginFormData = {
 };
 
 export default function Login({ onLogin }: LoginProps) {
-  const [oauthEnabled, setOauthEnabled] = useState(true);
-  const [showLocalLogin, setShowLocalLogin] = useState(false);
+  const [oauthEnabled, setOauthEnabled] = useState(false);
 
   const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
+  const closeToast = () => setToast((prev) => ({ ...prev, open: false }));
 
   const {
     register,
     handleSubmit,
-    reset,
     setError,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormData>({
-    defaultValues: {
-      username: "",
-      password: "",
-    },
-  });
+    formState: { errors },
+  } = useForm<LoginFormData>();
 
   useEffect(() => {
-    (async () => {
+    const loadProviders = async () => {
       try {
         const providers = await getAuthProviders();
-        setOauthEnabled(Boolean(providers.oauth));
+        setOauthEnabled(Boolean(providers?.oauth));
       } catch (e) {
         console.error("Failed to fetch auth providers", e);
-        setOauthEnabled(true);
-        setToast({ open: true, message: "Could not verify sign-in providers. Using defaults.", severity: "error" });
       }
-    })();
+    };
+
+    loadProviders();
   }, []);
 
   async function handleLocalLogin(data: LoginFormData) {
@@ -52,18 +46,24 @@ export default function Login({ onLogin }: LoginProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username: data.username.trim(), password: data.password }),
+        body: JSON.stringify({
+          username: data.username.trim(),
+          password: data.password,
+        }),
       });
 
       if (!res.ok) {
         if (res.status === 401) {
-          setError("password", { type: "server", message: "Invalid username or password" });
+          setError("password", {
+            type: "server",
+            message: "Invalid username or password",
+          });
           return;
         }
+
         throw new Error(`Login failed (${res.status})`);
       }
 
-      // Success
       onLogin();
     } catch (err) {
       console.error("Local login failed", err);
@@ -71,103 +71,73 @@ export default function Login({ onLogin }: LoginProps) {
     }
   }
 
-  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
-
-  const showOAuthPanel = oauthEnabled && !showLocalLogin;
-
   return (
-    <Container maxWidth="sm">
-      <Card elevation={1}>
-        <CardContent>
-          <Stack spacing={3}>
-            <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
-              <ParkIcon />
-              <Typography variant="h4" component="h1" fontWeight={700}>
-                Grinch
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card>
+          <CardContent>
+            <Stack spacing={3}>
+              <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
+                <Logo size={56} />
+                <Typography variant="h4" component="h1" fontWeight={700}>
+                  Grinch
+                </Typography>
+              </Stack>
+
+              <Typography color="text.secondary" textAlign="center">
+                Manage Santa rules and monitor blocked executions.
               </Typography>
-            </Stack>
 
-            <Typography color="text.secondary" textAlign="center">
-              Manage Santa rules and monitor blocked executions.
-            </Typography>
-
-            {showOAuthPanel ? (
               <Stack spacing={2}>
-                <Button component="a" href="/api/auth/login" variant="contained" fullWidth>
+                <Button component="a" href="/api/auth/login" variant="contained" fullWidth disabled={!oauthEnabled}>
                   Sign in with OAuth
                 </Button>
-                <Button
-                  variant="outlined"
+
+                {!oauthEnabled && (
+                  <Typography variant="caption" color="text.secondary" textAlign="center">
+                    OAuth sign-in is disabled. Use your local administrator credentials instead.
+                  </Typography>
+                )}
+              </Stack>
+
+              <Divider />
+
+              <Stack component="form" spacing={2} onSubmit={handleSubmit(handleLocalLogin)}>
+                <TextField
+                  label="Username"
+                  {...register("username")}
+                  error={!!errors.username}
+                  helperText={errors.username?.message}
                   fullWidth
-                  onClick={() => {
-                    setShowLocalLogin(true);
-                    reset();
-                  }}
-                >
-                  Local Administrator Login
+                  required
+                />
+
+                <TextField
+                  label="Password"
+                  type="password"
+                  {...register("password")}
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
+                  fullWidth
+                  required
+                />
+
+                <Button type="submit" variant="contained" fullWidth>
+                  Sign In
                 </Button>
               </Stack>
-            ) : (
-              <form onSubmit={handleSubmit(handleLocalLogin)}>
-                <Stack spacing={2}>
-                  <TextField
-                    label="Username"
-                    {...register("username")}
-                    error={!!errors.username}
-                    helperText={errors.username?.message || " "}
-                    fullWidth
-                    autoComplete="username"
-                    autoFocus
-                    disabled={isSubmitting}
-                    required
-                  />
-                  <TextField
-                    label="Password"
-                    type="password"
-                    {...register("password")}
-                    error={!!errors.password}
-                    helperText={errors.password?.message || " "}
-                    fullWidth
-                    autoComplete="current-password"
-                    disabled={isSubmitting}
-                    required
-                  />
-                  <Stack direction="row" spacing={1}>
-                    <Button type="submit" variant="contained" disabled={isSubmitting} fullWidth>
-                      Sign In
-                    </Button>
-                    {oauthEnabled && (
-                      <Button
-                        variant="outlined"
-                        onClick={() => {
-                          setShowLocalLogin(false);
-                          reset();
-                        }}
-                        disabled={isSubmitting}
-                        fullWidth
-                      >
-                        Back
-                      </Button>
-                    )}
-                  </Stack>
-                </Stack>
-              </form>
-            )}
+            </Stack>
+          </CardContent>
+        </Card>
 
-            <Divider />
-
-            <Typography variant="body2" color="text.secondary">
-              {showOAuthPanel
-                ? "Choose your preferred sign-in method. Local login is available for system administrators."
-                : oauthEnabled
-                  ? "Use your local administrator credentials to sign in and configure system settings."
-                  : "OAuth sign-in is disabled. Use your local administrator credentials to access Grinch."}
-            </Typography>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <PageSnackbar toast={toast} onClose={handleToastClose} />
-    </Container>
+        <PageSnackbar toast={toast} onClose={closeToast} />
+      </Container>
+    </Box>
   );
 }

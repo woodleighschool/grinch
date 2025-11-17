@@ -16,6 +16,7 @@ import {
   deleteApplication,
   createScope,
   deleteScope,
+  getStatus,
   type Application,
   type ApplicationFilters,
   type DirectoryUser,
@@ -26,6 +27,7 @@ import {
   type GroupQueryParams,
   type EventRecord,
   type EventStat,
+  type AppStatusResponse,
 } from "../api";
 
 // Query Keys
@@ -55,6 +57,7 @@ export const queryKeys = {
   currentUser: ["currentUser"] as const,
   events: (params?: { limit?: number; offset?: number }) => ["events", params?.limit ?? 50, params?.offset ?? 0] as const,
   eventStats: (days: number) => ["eventStats", days] as const,
+  status: ["status"] as const,
 } as const;
 
 // Current User Hook
@@ -62,6 +65,14 @@ export function useCurrentUser() {
   return useQuery({
     queryKey: queryKeys.currentUser,
     queryFn: getCurrentUser,
+  });
+}
+
+export function useStatus() {
+  return useQuery<AppStatusResponse>({
+    queryKey: queryKeys.status,
+    queryFn: getStatus,
+    staleTime: 60 * 1000,
   });
 }
 

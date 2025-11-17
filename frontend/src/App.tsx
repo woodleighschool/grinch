@@ -1,8 +1,29 @@
 import { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { useCurrentUser } from "./hooks/useQueries";
-import { AppBar, Toolbar, Typography, Box, Container, Button, Avatar, Stack, Tabs, Tab, Divider, Snackbar, Alert, LinearProgress } from "@mui/material";
-import ParkIcon from "@mui/icons-material/Park";
+import { useCurrentUser, useStatus } from "./hooks/useQueries";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Box,
+  Container,
+  Button,
+  Avatar,
+  Stack,
+  Tabs,
+  Tab,
+  Divider,
+  Snackbar,
+  Alert,
+  LinearProgress,
+  IconButton,
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
+import { Logo } from "./components";
 import AppsIcon from "@mui/icons-material/Apps";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -10,6 +31,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import DevicesIcon from "@mui/icons-material/Devices";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import SettingsIcon from "@mui/icons-material/Settings";
+import GitHubIcon from "@mui/icons-material/GitHub";
 
 const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -23,12 +45,14 @@ const UserDetails = lazy(() => import("./pages/UserDetails"));
 
 export default function App() {
   const { data: user, error } = useCurrentUser();
+  const { data: status } = useStatus();
   const location = useLocation();
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "error" | "success" }>({
     open: false,
     message: "",
     severity: "error",
   });
+  const [creditsOpen, setCreditsOpen] = useState(false);
 
   useEffect(() => {
     if (error) {
@@ -60,6 +84,7 @@ export default function App() {
 
   const userDisplay = user?.display_name ?? "Administrator";
   const userInitial = (userDisplay[0] ?? "U").toUpperCase();
+  const versionLabel = status?.version?.version;
 
   if (!user) {
     return (
@@ -79,7 +104,7 @@ export default function App() {
     <Box minHeight="100dvh" display="flex" flexDirection="column">
       <AppBar position="sticky" color="primary" enableColorOnDark>
         <Toolbar>
-          <Button component={NavLink} to="/" color="inherit" startIcon={<ParkIcon />}>
+          <Button component={NavLink} to="/" color="inherit" startIcon={<Logo size={32} />}>
             <Typography variant="h6" component="span">
               Grinch
             </Typography>
@@ -98,7 +123,7 @@ export default function App() {
               />
               <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Users" component={NavLink} to="/users" value="/users" />
               <Tab icon={<DevicesIcon fontSize="small" />} iconPosition="start" label="Devices" component={NavLink} to="/devices" value="/devices" />
-			  <Tab icon={<EventNoteIcon fontSize="small" />} iconPosition="start" label="Events" component={NavLink} to="/events" value="/events" />
+              <Tab icon={<EventNoteIcon fontSize="small" />} iconPosition="start" label="Events" component={NavLink} to="/events" value="/events" />
             </Tabs>
           </Box>
 
@@ -139,20 +164,59 @@ export default function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/users/:userId" element={<UserDetails />} />
             <Route path="/devices" element={<Devices />} />
-			<Route path="/events" element={<Events />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Suspense>
       </Container>
 
-      <Divider />
-      <Box component="footer" sx={{ py: 2 }}>
+      <AppBar component="footer" position="static" elevation={1}>
         <Container maxWidth="lg">
-          <Typography variant="caption" color="text.secondary">
-            {/* TODO: Footer content */}
-          </Typography>
+          <Toolbar disableGutters sx={{ py: 1.5 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+              sx={{ width: "100%" }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center">
+                <IconButton
+                  component="a"
+                  href="https://github.com/woodleighschool/grinch"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  size="small"
+                  color="inherit"
+                >
+                  <GitHubIcon fontSize="inherit" />
+                </IconButton>
+
+                <Typography variant="caption" color="text.secondary">
+                  {versionLabel}
+                </Typography>
+              </Stack>
+
+              <Button variant="text" size="small" onClick={() => setCreditsOpen(true)}>
+                Credits
+              </Button>
+            </Stack>
+          </Toolbar>
         </Container>
-      </Box>
+      </AppBar>
+
+      <Dialog open={creditsOpen} onClose={() => setCreditsOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Credits</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            <Link href="https://www.flaticon.com/free-icons/grinch" title="grinch icons" target="_blank" rel="noopener noreferrer">
+              Grinch icons created by Freepik - Flaticon
+            </Link>
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreditsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={toast.open}
