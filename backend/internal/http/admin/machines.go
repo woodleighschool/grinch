@@ -1,35 +1,49 @@
 package admin
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
 type machineDTO struct {
-	ID                 string    `json:"id"`
-	MachineIdentifier  string    `json:"machineIdentifier"`
-	Serial             string    `json:"serial"`
-	Hostname           string    `json:"hostname"`
-	PrimaryUser        string    `json:"primaryUser,omitempty"`
-	ClientMode         string    `json:"clientMode"`
-	CleanSyncRequested bool      `json:"cleanSyncRequested"`
-	LastSeen           time.Time `json:"lastSeen"`
-	LastPreflightAt    time.Time `json:"lastPreflightAt,omitempty"`
-	LastPostflightAt   time.Time `json:"lastPostflightAt,omitempty"`
-	LastRulesReceived  *int      `json:"lastRulesReceived,omitempty"`
-	LastRulesProcessed *int      `json:"lastRulesProcessed,omitempty"`
-	RuleCursor         string    `json:"ruleCursor"`
-	SyncCursor         string    `json:"syncCursor"`
+	ID                   string          `json:"id"`
+	MachineIdentifier    string          `json:"machineIdentifier"`
+	Serial               string          `json:"serial"`
+	Hostname             string          `json:"hostname"`
+	PrimaryUser          string          `json:"primaryUser,omitempty"`
+	UserID               uuid.UUID       `json:"userId,omitempty"`
+	ClientMode           string          `json:"clientMode"`
+	CleanSyncRequested   bool            `json:"cleanSyncRequested"`
+	LastSeen             time.Time       `json:"lastSeen"`
+	LastPreflightAt      time.Time       `json:"lastPreflightAt,omitempty"`
+	LastPostflightAt     time.Time       `json:"lastPostflightAt,omitempty"`
+	LastRulesReceived    *int            `json:"lastRulesReceived,omitempty"`
+	LastRulesProcessed   *int            `json:"lastRulesProcessed,omitempty"`
+	LastPreflightPayload json.RawMessage `json:"lastPreflightPayload,omitempty"`
+	RuleCursor           string          `json:"ruleCursor"`
+	SyncCursor           string          `json:"syncCursor"`
+}
+
+type machineDetailsResponse struct {
+	Machine      machineDTO   `json:"machine"`
+	PrimaryUser  userDTO      `json:"primary_user"`
+	RecentBlocks []eventDTO   `json:"recent_blocks"`
+	Policies     []userPolicy `json:"policies"`
 }
 
 func (h Handler) machinesRoutes(r chi.Router) {
 	r.Get("/", h.listMachines)
+	r.Get("/{id}", h.machineDetails)
 }
 
 func (h Handler) listMachines(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +63,62 @@ func (h Handler) listMachines(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+func (h Handler) machineDetails(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	machineID, err := uuid.Parse(idParam)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid machine id")
+		return
+	}
+	ctx := r.Context()
+	machine, err := h.Store.GetMachine(ctx, machineID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "machine not found")
+			return
+		}
+		h.Logger.Error("get machine", "err", err, "machine", machineID)
+		respondError(w, http.StatusInternalServerError, "failed to load machine")
+		return
+	}
+
+	userId, err := uuid.Parse(machine.UserID.String())
+	if err != nil {
+		h.Logger.Error("parse machine primary user id", "err", err, "machine", machineID)
+		respondError(w, http.StatusInternalServerError, "failed to parse user id")
+	}
+	primaryUser, err := h.Store.GetUser(ctx, userId)
+	if err != nil {
+		h.Logger.Error("get machine primary user", "err", err, "machine", machine, "user", machine.PrimaryUser)
+		respondError(w, http.StatusInternalServerError, "failed to load machine primary user")
+		return
+	}
+	events, err := h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userId, Valid: true})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			events = nil
+		} else {
+			h.Logger.Error("get machine primary user block events", "err", err, "machine", machineID, "user", machine.PrimaryUser)
+			respondError(w, http.StatusInternalServerError, "failed to load machine primary user block events")
+			return
+		}
+	}
+	assignments, err := h.Store.ListUserAssignments(ctx, userId)
+	if err != nil {
+		h.Logger.Error("list machine primary user policies", "err", err, "machine", machineID, "user", machine.UserID)
+		respondError(w, http.StatusInternalServerError, "failed to load machine primary user policies")
+		return
+	}
+
+	resp := machineDetailsResponse{
+		Machine:      mapMachine(machine),
+		PrimaryUser:  mapUserDTO(primaryUser),
+		RecentBlocks: mapUserBlocks(events),
+		Policies:     mapUserPolicies(assignments, primaryUser),
+	}
+	respondJSON(w, http.StatusOK, resp)
+}
+
 func mapMachine(m sqlc.Machine) machineDTO {
 	var lastSeen time.Time
 	if m.LastSeen.Valid {
@@ -63,20 +133,21 @@ func mapMachine(m sqlc.Machine) machineDTO {
 		lastPostflight = m.LastPostflightAt.Time
 	}
 	return machineDTO{
-		ID:                 m.ID.String(),
-		MachineIdentifier:  m.MachineIdentifier,
-		Serial:             m.Serial,
-		Hostname:           m.Hostname,
-		PrimaryUser:        m.PrimaryUser.String,
-		ClientMode:         strings.ToUpper(m.ClientMode),
-		CleanSyncRequested: m.CleanSyncRequested,
-		LastSeen:           lastSeen,
-		LastPreflightAt:    lastPreflight,
-		LastPostflightAt:   lastPostflight,
-		LastRulesReceived:  intPtrFromInt4(m.LastRulesReceived),
-		LastRulesProcessed: intPtrFromInt4(m.LastRulesProcessed),
-		RuleCursor:         m.RuleCursor.String,
-		SyncCursor:         m.SyncCursor.String,
+		ID:                   m.ID.String(),
+		MachineIdentifier:    m.MachineIdentifier,
+		Serial:               m.Serial,
+		Hostname:             m.Hostname,
+		PrimaryUser:          m.PrimaryUser.String,
+		ClientMode:           strings.ToUpper(m.ClientMode),
+		CleanSyncRequested:   m.CleanSyncRequested,
+		LastSeen:             lastSeen,
+		LastPreflightAt:      lastPreflight,
+		LastPostflightAt:     lastPostflight,
+		LastRulesReceived:    intPtrFromInt4(m.LastRulesReceived),
+		LastRulesProcessed:   intPtrFromInt4(m.LastRulesProcessed),
+		LastPreflightPayload: m.LastPreflightPayload,
+		RuleCursor:           m.RuleCursor.String,
+		SyncCursor:           m.SyncCursor.String,
 	}
 }
 

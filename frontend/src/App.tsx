@@ -38,6 +38,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Applications = lazy(() => import("./pages/Applications"));
 const Users = lazy(() => import("./pages/Users"));
 const Devices = lazy(() => import("./pages/Devices"));
+const DeviceDetails = lazy(() => import("./pages/DeviceDetails"));
 const Events = lazy(() => import("./pages/Events"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ApplicationDetails = lazy(() => import("./pages/ApplicationDetails"));
@@ -67,7 +68,7 @@ export default function App() {
     if (p.startsWith("/applications")) return "/applications";
     if (p.startsWith("/users")) return "/users";
     if (p.startsWith("/devices")) return "/devices";
-	if (p.startsWith("/events")) return "/events";
+    if (p.startsWith("/events")) return "/events";
     return false;
   }, [location.pathname]);
 
@@ -164,7 +165,8 @@ export default function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/users/:userId" element={<UserDetails />} />
             <Route path="/devices" element={<Devices />} />
-			<Route path="/events" element={<Events />} />
+            <Route path="/devices/:deviceId" element={<DeviceDetails />} />
+            <Route path="/events" element={<Events />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Suspense>

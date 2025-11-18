@@ -102,6 +102,10 @@ func (s *Store) ListMachines(ctx context.Context, limit, offset int32, search st
 	})
 }
 
+func (s *Store) GetMachine(ctx context.Context, id uuid.UUID) (sqlc.Machine, error) {
+	return s.queries.GetMachine(ctx, id)
+}
+
 func (s *Store) GetUserMachines(ctx context.Context, userID pgtype.UUID) ([]sqlc.Machine, error) {
 	return s.queries.GetUserMachines(ctx, userID)
 }

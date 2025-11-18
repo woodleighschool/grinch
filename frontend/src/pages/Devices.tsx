@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { Box, Card, CardContent, CardHeader } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
+import { Box, Button, Card, CardContent, CardHeader } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 
 import { useDevices } from "../hooks/useQueries";
@@ -37,7 +38,18 @@ export default function Devices() {
         flex: 1,
         valueFormatter: (value) => formatDateTime(value as string),
       },
-      { field: "machineIdentifier", headerName: "Machine ID", flex: 1 },
+      {
+        field: "actions",
+        headerName: "Actions",
+        flex: 1,
+        sortable: false,
+        filterable: false,
+        renderCell: ({ row }) => (
+          <Button component={RouterLink} to={`/devices/${row.id}`} size="small" variant="outlined">
+            View details
+          </Button>
+        ),
+      },
     ],
     [],
   );
@@ -45,7 +57,7 @@ export default function Devices() {
   const rows = useMemo(
     () =>
       devices.map((device) => ({
-        id: device.serial,
+        id: device.id,
         hostname: device.hostname,
         serial: device.serial,
         primaryUser: device.primaryUser,

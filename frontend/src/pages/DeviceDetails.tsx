@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { formatDateTime, formatCompactDateTime } from "../utils/dates";
-import type { DirectoryUser } from "../api";
-import { useUserDetails } from "../hooks/useQueries";
+import type { Device } from "../api";
+import { useDeviceDetails } from "../hooks/useQueries";
+import { UserSummary } from "./UserDetails";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -11,7 +15,7 @@ import {
   CardContent,
   CardHeader,
   Chip,
-  Divider,
+  Grid,
   LinearProgress,
   Paper,
   Stack,
@@ -21,53 +25,65 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
-  type StackProps,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { PageSnackbar, type PageToast } from "../components";
 
-export function UserSummary({ user, ...props }: StackProps & { user: DirectoryUser }) {
+function PreflightPanel({ preflight }: { preflight: Record<string, any> }) {
   return (
-    <Card {...(props as any)} key="primary-user" elevation={2}>
-      <CardContent>
+    <Grid container spacing={3}>
+      <Grid size={{ xs: 12, md: 7 }}>
         <Stack spacing={2}>
-          <Typography font-weight={600}>{user.displayName}</Typography>
-          <Typography color="text.secondary">{user.upn}</Typography>
-          <Divider />
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            {user.createdAt && <Chip variant="outlined" label={`Created ${formatDateTime(user.createdAt)}`} />}
-            {user.updatedAt && <Chip variant="outlined" label={`Updated ${formatDateTime(user.updatedAt)}`} />}
-          </Stack>
+          <Typography color="text.secondary">
+            <pre>{JSON.stringify(preflight, null, "\t")}</pre>
+          </Typography>
         </Stack>
-      </CardContent>
-    </Card>
+      </Grid>
+    </Grid>
   );
 }
 
-export default function UserDetails() {
-  const { userId } = useParams<{ userId: string }>();
+function DeviceSummary({ device, ...props }: { device: Device }) {
+  return (
+    <Stack {...(props as any)} spacing={1.5}>
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        {device.clientMode && <Chip variant="outlined" label={`${device.clientMode}`} />}
+        {device.lastSeen && <Chip variant="outlined" label={`Last seen on ${formatDateTime(device.lastSeen)}`} />}
+        {device.lastPreflightAt && <Chip variant="outlined" label={`Last preflight on ${formatDateTime(device.lastPreflightAt)}`} />}
+        {device.lastPreflightPayload?.santa_version && <Chip variant="outlined" label={`Santa version: ${device.lastPreflightPayload.santa_version}`} />}
+        {device.cleanSyncRequested && <Chip variant="outlined" label="Clean sync pending" />}
+      </Stack>
+    </Stack>
+  );
+}
+
+export default function DeviceDetails() {
+  const [expandedPreflightPanel, setExpandedPreflightPanel] = useState<string | null>(null);
+  const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useUserDetails(userId ?? "");
+  const { data, isLoading, error } = useDeviceDetails(deviceId ?? "");
   const details = data ?? null;
   const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
   useEffect(() => {
     if (error) {
-      console.error("Failed to load user details", error);
-      setToast({ open: true, message: "Failed to load user details.", severity: "error" });
+      console.error("Failed to load device details", error);
+      setToast({ open: true, message: "Failed to load device details.", severity: "error" });
     }
   }, [error]);
   const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
 
-  if (!userId) {
+  if (!deviceId) {
     return (
       <Card elevation={1}>
-        <CardHeader title="User Details" />
+        <CardHeader title="Device Details" />
         <CardContent>
           <Stack spacing={2}>
-            <Alert severity="error">Missing user identifier.</Alert>
+            <Alert severity="error">Missing device identifier.</Alert>
             <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
               Back
             </Button>
@@ -80,10 +96,10 @@ export default function UserDetails() {
   if (!isLoading && !error && !details) {
     return (
       <Card elevation={1}>
-        <CardHeader title="User Details" />
+        <CardHeader title="Device Details" />
         <CardContent>
           <Stack spacing={2}>
-            <Typography color="text.secondary">User not found.</Typography>
+            <Typography color="text.secondary">Device not found.</Typography>
             <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
               Back
             </Button>
@@ -94,15 +110,13 @@ export default function UserDetails() {
   }
 
   const {
-    user,
-    groups = [],
-    devices = [],
+    machine,
+    primary_user,
     recent_blocks: events = [],
     policies = [],
   } = details ?? {
-    user: undefined,
-    groups: [],
-    devices: [],
+    machine: undefined,
+    primary_user: undefined,
     recent_blocks: [],
     policies: [],
   };
@@ -115,72 +129,30 @@ export default function UserDetails() {
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
           Back
         </Button>
-        <Typography variant="h4">User Details</Typography>
+        <Typography variant="h4">Device Details</Typography>
       </Stack>
 
       <Card elevation={1}>
-        <CardHeader title={user?.displayName ?? "Loading user..."} subheader="View directory data, devices, events, and applied policies." />
-        <CardContent>{user ? <UserSummary user={user} /> : <Typography color="text.secondary">Loading user details…</Typography>}</CardContent>
+        <CardHeader
+          title={machine ? `${machine.hostname} - ${machine.serial}` : "Loading device..."}
+          subheader="View device data, primary user, events, and applied policies."
+        />
+        <CardContent>{machine ? <DeviceSummary device={machine} /> : <Typography color="text.secondary">Loading device details…</Typography>}</CardContent>
       </Card>
 
       <Card elevation={1}>
-        <CardHeader title="Group Assignments" />
+        <CardHeader title="Primary User" />
         <CardContent>
-          <Card elevation={2}>
-            <CardHeader title="Groups" />
-            <CardContent>
-              {groups.length === 0 ? (
-                <Alert severity="info">This user is not assigned to any groups.</Alert>
-              ) : (
-                <Stack direction="row" flexWrap="wrap" gap={1}>
-                  {groups.map((group) => (
-                    <Chip key={group.id} label={group.displayName} variant="outlined" />
-                  ))}
-                </Stack>
-              )}
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Devices" subheader="Santa agents that have associated telemetry with this user." />
-        <CardContent>
-          {devices.length === 0 ? (
-            <Alert severity="info">No devices have reported this user yet.</Alert>
+          {primary_user ? (
+            <UserSummary component="li" onClick={() => navigate(`/users/${primary_user.id}`)} sx={{ cursor: "pointer" }} user={primary_user} />
           ) : (
-            <TableContainer component={Paper} elevation={2}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Hostname</TableCell>
-                    <TableCell>Serial</TableCell>
-                    <TableCell>Machine ID</TableCell>
-                    <TableCell>Last Seen</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {devices.map((device) => (
-                    <TableRow component="li" onClick={() => navigate(`/devices/${device.id}`)} key={device.id} sx={{ cursor: "pointer" }} hover>
-                      <TableCell>{device.hostname || "—"}</TableCell>
-                      <TableCell>{device.serial || "—"}</TableCell>
-                      <TableCell>
-                        <Typography component="code" variant="body2">
-                          {device.id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{device.lastSeen ? formatDateTime(device.lastSeen) : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <Typography color="text.secondary">Loading user details...</Typography>
           )}
         </CardContent>
       </Card>
 
       <Card elevation={1}>
-        <CardHeader title="Recent Blocks" subheader="Latest Santa telemetry targeting this user." />
+        <CardHeader title="Recent Blocks" subheader="Latest Santa telemetry targeting this device." />
         <CardContent>
           {events.length === 0 ? (
             <Alert severity="info">No recent Santa blocks recorded for this user.</Alert>
@@ -212,7 +184,7 @@ export default function UserDetails() {
       </Card>
 
       <Card elevation={1}>
-        <CardHeader title="Policies Applied" subheader="Rules that currently impact this user." />
+        <CardHeader title="Policies Applied" subheader="Rules that currently impact this device's primary user." />
         <CardContent>
           {policies.length === 0 ? (
             <Alert severity="info">No policies currently target this user.</Alert>
@@ -249,7 +221,34 @@ export default function UserDetails() {
           )}
         </CardContent>
       </Card>
-
+      <Card elevation={1}>
+        <CardHeader title="Preflight Data" subheader="The last preflight recorded by the device" />
+        <CardContent>
+          {machine?.lastPreflightPayload ? (
+            <Accordion
+              elevation={2}
+              expanded={expandedPreflightPanel === "preflight"}
+              onChange={(_, isExpanded) => setExpandedPreflightPanel(isExpanded ? "preflight" : null)}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="preflight-content" id="preflight-header">
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Stack>
+                    <Typography fontWeight={600}>Data</Typography>
+                  </Stack>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={2}>
+                  {isLoading && <LinearProgress />}
+                  <PreflightPanel preflight={machine.lastPreflightPayload} />
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          ) : (
+            <Alert severity="info">No preflight recorded yet</Alert>
+          )}
+        </CardContent>
+      </Card>
       <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );

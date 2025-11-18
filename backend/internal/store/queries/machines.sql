@@ -10,6 +10,10 @@ DO UPDATE SET
   updated_at = NOW()
 RETURNING *;
 
+-- name: GetMachine :one
+SELECT * FROM machines
+WHERE id = $1;
+
 -- name: GetMachineByIdentifier :one
 SELECT * FROM machines WHERE machine_identifier = $1;
 

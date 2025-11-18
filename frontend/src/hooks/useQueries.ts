@@ -5,6 +5,7 @@ import {
   getUserDetails,
   listUsers,
   listDevices,
+  getDeviceDetails,
   listGroups,
   getSantaConfig,
   listEvents,
@@ -52,6 +53,7 @@ export const queryKeys = {
       typeof filters?.limit === "number" ? filters.limit : "default",
       typeof filters?.offset === "number" ? filters.offset : 0,
     ] as const,
+  device: (id: string) => ["device", id] as const,
   groups: (filters?: GroupQueryParams) => ["groups", filters?.search ?? ""] as const,
   santaConfig: ["santaConfig"] as const,
   currentUser: ["currentUser"] as const,
@@ -205,6 +207,14 @@ export function useDevices(filters: DeviceQueryParams = {}) {
     queryKey: queryKeys.devices(filters),
     queryFn: () => listDevices(filters),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useDeviceDetails(deviceId: string) {
+  return useQuery({
+    queryKey: queryKeys.device(deviceId),
+    queryFn: () => getDeviceDetails(deviceId),
+    enabled: !!deviceId,
   });
 }
 

@@ -132,9 +132,9 @@ export interface AppStatusResponse {
 }
 
 export interface BuildInfo {
-	version: string;
-	gitCommit: string;
-	buildDate: string;
+  version: string;
+  gitCommit: string;
+  buildDate: string;
 }
 
 export interface Device {
@@ -150,16 +150,17 @@ export interface Device {
   lastPostflightAt?: string;
   lastRulesReceived?: number;
   lastRulesProcessed?: number;
+  lastPreflightPayload?: Record<string, any>;
   ruleCursor?: string;
   syncCursor?: string;
 }
 
-// export interface DeviceDetailResponse {
-//   device: Device;
-// 	primaryUser: DirectoryUser;
-//   recent_events: DeviceEvent[];
-//   policies: DevicePolicy[];
-// }
+export interface DeviceDetailResponse {
+  machine: Device;
+  primary_user: DirectoryUser;
+  recent_blocks: EventRecord[];
+  policies: UserPolicy[];
+}
 
 export interface DeviceQueryParams {
   search?: string;
@@ -414,10 +415,10 @@ export async function listDevices(params: DeviceQueryParams = {}): Promise<Devic
   return handleResponse<Device[]>(res);
 }
 
-// export async function getDeviceDetails(deviceId: string): Promise<DeviceDetailResponse> {
-// 	const res = await fetch(`/api/devices/${deviceId}`, {credentials: "include"});
-// 	return handleResponse<DeviceDetailsResponse>(res);
-// }
+export async function getDeviceDetails(deviceId: string): Promise<DeviceDetailResponse> {
+  const res = await fetch(`/api/machines/${deviceId}`, { credentials: "include" });
+  return handleResponse<DeviceDetailResponse>(res);
+}
 
 export async function listEvents(limit = 50, offset = 0): Promise<EventRecord[]> {
   const params = new URLSearchParams({ limit: `${limit}`, offset: `${offset}` });
