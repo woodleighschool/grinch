@@ -47,6 +47,11 @@ func main() {
 		"build_date", buildInfo.BuildDate,
 	)
 
+	if cfg.AdminListenAddr == cfg.SantaListenAddr {
+		logger.Error("admin and santa listen addresses must differ", "addr", cfg.AdminListenAddr)
+		os.Exit(1)
+	}
+
 	db, err := store.Open(ctx, store.Options{
 		URL:             cfg.DatabaseURL(),
 		MaxConnections:  cfg.MaxConnections,
@@ -97,43 +102,60 @@ func main() {
 	scheduler.Start()
 	defer scheduler.Stop()
 
-	deps := httpapi.Deps{
+	adminRouter := httpapi.NewAdminRouter(cfg, httpapi.AdminDeps{
 		Store:         db,
 		Logger:        logger,
 		Sessions:      sessions,
 		SantaCompiler: compiler,
 		OIDCProvider:  oidcProvider,
 		BuildInfo:     buildInfo,
-	}
-	router := httpapi.NewRouter(cfg, deps)
+	})
+	santaRouter := httpapi.NewSantaRouter(httpapi.SantaDeps{
+		Store:     db,
+		Logger:    logger,
+		Compiler:  compiler,
+		BuildInfo: buildInfo,
+	})
 
-	server := &http.Server{
-		Addr:         cfg.ListenAddr,
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	adminServer := newHTTPServer(cfg.AdminListenAddr, adminRouter)
+	santaServer := newHTTPServer(cfg.SantaListenAddr, santaRouter)
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- server.ListenAndServe()
-	}()
+	adminErrCh := startServer(logger, "admin", adminServer)
+	santaErrCh := startServer(logger, "santa", santaServer)
+
+	var serveErr error
 
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received")
-	case err := <-errCh:
-		if err != nil && err != http.ErrServerClosed {
-			logger.Error("server error", "err", err)
-			os.Exit(1)
+	case err := <-adminErrCh:
+		if err != nil {
+			logger.Error("admin server error", "err", err)
+			serveErr = err
+		}
+	case err := <-santaErrCh:
+		if err != nil {
+			logger.Error("santa server error", "err", err)
+			serveErr = err
 		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful shutdown", "err", err)
+
+	if err := shutdownServer(shutdownCtx, logger, "admin", adminServer); err != nil {
+		serveErr = err
+	}
+	if err := shutdownServer(shutdownCtx, logger, "santa", santaServer); err != nil {
+		serveErr = err
+	}
+
+	// Ensure server goroutines exit before leaving main.
+	<-adminErrCh
+	<-santaErrCh
+
+	if serveErr != nil {
+		os.Exit(1)
 	}
 }
 
@@ -151,4 +173,40 @@ func newLogger(level string) *slog.Logger {
 	}
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})
 	return slog.New(handler)
+}
+
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+}
+
+func startServer(logger *slog.Logger, name string, server *http.Server) <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		logger.Info("listening", "server", name, "addr", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+			return
+		}
+		errCh <- nil
+	}()
+	return errCh
+}
+
+func shutdownServer(ctx context.Context, logger *slog.Logger, name string, server *http.Server) error {
+	if server == nil {
+		return nil
+	}
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("graceful shutdown failed", "server", name, "err", err)
+		return err
+	}
+	logger.Info("server stopped", "server", name)
+	return nil
 }

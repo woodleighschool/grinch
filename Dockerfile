@@ -47,7 +47,7 @@ COPY --from=backend /workspace/grinch .
 COPY --from=frontend /workspace/frontend/dist ./frontend
 
 USER 65532:65532
-EXPOSE 8080
+EXPOSE 8080 8081
 
 ENV FRONTEND_DIST_DIR=/frontend
 

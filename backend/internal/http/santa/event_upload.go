@@ -31,6 +31,7 @@ func (h *eventUploadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := decodeBody(r)
 	if err != nil {
+		h.logger.Error("decode event body", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid body")
 		return
 	}

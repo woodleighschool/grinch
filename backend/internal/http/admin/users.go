@@ -122,12 +122,12 @@ func (h Handler) userDetails(w http.ResponseWriter, r *http.Request) {
 	}
 	events, err := h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userID, Valid: true})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			events = nil
+		if !errors.Is(err, pgx.ErrNoRows) {
+			h.Logger.Error("get user block events", "err", err, "user", userID)
+			respondError(w, http.StatusInternalServerError, "failed to load blocked events")
+			return
 		}
-		h.Logger.Error("get user block events", "err", err, "user", userID)
-		respondError(w, http.StatusInternalServerError, "failed to load blocked events")
-		return
+		events = nil
 	}
 	assignments, err := h.Store.ListUserAssignments(ctx, userID)
 	if err != nil {

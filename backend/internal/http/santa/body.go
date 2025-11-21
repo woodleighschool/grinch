@@ -3,12 +3,13 @@ package santa
 import (
 	"compress/flate"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 )
 
-// TODO: check if this actuall works for the 3 options
+// decodeBody wraps the request body based on Content-Encoding.
 func decodeBody(r *http.Request) (io.ReadCloser, error) {
 	switch strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Encoding"))) {
 	case "", "identity":
@@ -22,6 +23,6 @@ func decodeBody(r *http.Request) (io.ReadCloser, error) {
 	case "deflate":
 		return flate.NewReader(r.Body), nil
 	default:
-		return r.Body, nil
+		return nil, fmt.Errorf("unsupported content encoding %q", r.Header.Get("Content-Encoding"))
 	}
 }

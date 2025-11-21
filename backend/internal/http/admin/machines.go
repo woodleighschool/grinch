@@ -82,32 +82,38 @@ func (h Handler) machineDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := uuid.Parse(machine.UserID.String())
-	if err != nil {
-		h.Logger.Error("parse machine primary user id", "err", err, "machine", machineID)
-		respondError(w, http.StatusInternalServerError, "failed to parse user id")
-	}
-	primaryUser, err := h.Store.GetUser(ctx, userId)
-	if err != nil {
-		h.Logger.Error("get machine primary user", "err", err, "machine", machine, "user", machine.PrimaryUser)
-		respondError(w, http.StatusInternalServerError, "failed to load machine primary user")
-		return
-	}
-	events, err := h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userId, Valid: true})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			events = nil
-		} else {
+	var (
+		primaryUser sqlc.User
+		events      []sqlc.ListBlocksByUserRow
+		assignments []sqlc.ListUserAssignmentsRow
+	)
+	if machine.UserID.Valid {
+		userID, err := uuid.FromBytes(machine.UserID.Bytes[:])
+		if err != nil {
+			h.Logger.Error("parse machine primary user id", "err", err, "machine", machineID)
+			respondError(w, http.StatusInternalServerError, "failed to parse user id")
+			return
+		}
+		primaryUser, err = h.Store.GetUser(ctx, userID)
+		if err != nil {
+			h.Logger.Error("get machine primary user", "err", err, "machine", machine, "user", machine.PrimaryUser)
+			respondError(w, http.StatusInternalServerError, "failed to load machine primary user")
+			return
+		}
+		events, err = h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			h.Logger.Error("get machine primary user block events", "err", err, "machine", machineID, "user", machine.PrimaryUser)
 			respondError(w, http.StatusInternalServerError, "failed to load machine primary user block events")
 			return
 		}
-	}
-	assignments, err := h.Store.ListUserAssignments(ctx, userId)
-	if err != nil {
-		h.Logger.Error("list machine primary user policies", "err", err, "machine", machineID, "user", machine.UserID)
-		respondError(w, http.StatusInternalServerError, "failed to load machine primary user policies")
-		return
+		assignments, err = h.Store.ListUserAssignments(ctx, userID)
+		if err != nil {
+			h.Logger.Error("list machine primary user policies", "err", err, "machine", machineID, "user", machine.UserID)
+			respondError(w, http.StatusInternalServerError, "failed to load machine primary user policies")
+			return
+		}
+	} else {
+		h.Logger.Warn("machine missing primary user", "machine", machineID)
 	}
 
 	resp := machineDetailsResponse{

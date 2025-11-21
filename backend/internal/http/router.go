@@ -20,7 +20,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
-type Deps struct {
+type AdminDeps struct {
 	Store         *store.Store
 	Logger        *slog.Logger
 	Sessions      *auth.SessionManager
@@ -29,18 +29,21 @@ type Deps struct {
 	BuildInfo     BuildInfo
 }
 
+type SantaDeps struct {
+	Store     *store.Store
+	Logger    *slog.Logger
+	Compiler  *rules.Compiler
+	BuildInfo BuildInfo
+}
+
 type BuildInfo struct {
 	Version   string `json:"version"`
 	GitCommit string `json:"git_commit"`
 	BuildDate string `json:"build_date"`
 }
 
-func Routes(cfg config.Config, deps Deps) http.Handler {
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
+func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
+	r := baseRouter()
 
 	r.Get("/api/status", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -48,14 +51,6 @@ func Routes(cfg config.Config, deps Deps) http.Handler {
 			"version": deps.BuildInfo,
 		})
 	})
-
-	santaRouter := chi.NewRouter()
-	santa.RegisterRoutes(santaRouter, santa.Dependencies{
-		Store:    deps.Store,
-		Logger:   deps.Logger,
-		Compiler: deps.SantaCompiler,
-	})
-	r.Mount("/santa", santaRouter)
 
 	api := chi.NewRouter()
 	api.Use(AdminAuth(deps.Sessions, deps.Logger))
@@ -66,15 +61,41 @@ func Routes(cfg config.Config, deps Deps) http.Handler {
 	authhttp.RegisterRoutes(authRoutes, cfg, deps.OIDCProvider, deps.Sessions, deps.Logger)
 	r.Mount("/api/auth", authRoutes)
 
+	handler := http.Handler(r)
+	if cfg.FrontendDistDir != "" {
+		handler = mountStatic(cfg.FrontendDistDir, handler)
+	}
+	return handler
+}
+
+func NewSantaRouter(deps SantaDeps) http.Handler {
+	r := baseRouter()
+
+	r.Get("/status", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "ok",
+			"version": deps.BuildInfo,
+		})
+	})
+
+	santaRouter := chi.NewRouter()
+	santa.RegisterRoutes(santaRouter, santa.Dependencies{
+		Store:    deps.Store,
+		Logger:   deps.Logger,
+		Compiler: deps.Compiler,
+	})
+	r.Mount("/santa", santaRouter)
+
 	return r
 }
 
-func NewRouter(cfg config.Config, deps Deps) http.Handler {
-	rootHandler := Routes(cfg, deps)
-	if cfg.FrontendDistDir != "" {
-		rootHandler = mountStatic(cfg.FrontendDistDir, rootHandler)
-	}
-	return rootHandler
+func baseRouter() *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
+	return r
 }
 
 func mountStatic(distDir string, apiHandler http.Handler) http.Handler {
