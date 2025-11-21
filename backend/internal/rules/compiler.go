@@ -62,7 +62,8 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 			})
 		}
 	}
-	return SyncPayload{Cursor: ComputeCursor(ruleRows), Rules: syncRules}
+	syncRules = normaliseSyncRules(syncRules)
+	return SyncPayload{Cursor: ComputeCursor(syncRules), Rules: syncRules}
 }
 
 func (c *Compiler) CompileAssignments(rule sqlc.Rule, scopes []sqlc.RuleScope, meta RuleMetadata, groupMembers map[uuid.UUID][]uuid.UUID) []sqlc.InsertRuleAssignmentParams {
@@ -178,26 +179,33 @@ func uuidToPgtype(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
 }
 
-func ComputeCursor(rules []sqlc.Rule) string {
-	type tuple struct {
-		ID    string
-		Stamp string
-	}
-	parts := make([]tuple, 0, len(rules))
-	for _, r := range rules {
-		var stamp string
-		if r.UpdatedAt.Valid {
-			stamp = r.UpdatedAt.Time.UTC().Format(time.RFC3339Nano)
-		}
-		parts = append(parts, tuple{ID: r.ID.String(), Stamp: stamp})
-	}
-	sort.Slice(parts, func(i, j int) bool { return parts[i].ID < parts[j].ID })
+func ComputeCursor(rules []SyncRule) string {
 	sum := sha256.New()
-	for _, p := range parts {
-		sum.Write([]byte(p.ID))
-		sum.Write([]byte(p.Stamp))
+	for _, r := range rules {
+		sum.Write(r.ID[:])
+		sum.Write([]byte(r.Target))
+		sum.Write([]byte(r.Name))
+		sum.Write([]byte(r.Type))
+		sum.Write([]byte(r.Scope))
+		sum.Write([]byte(r.Action))
+		sum.Write([]byte(r.CustomMsg))
+		sum.Write([]byte(r.CreatedAt.UTC().Format(time.RFC3339Nano)))
 	}
 	return hex.EncodeToString(sum.Sum(nil))
+}
+
+func normaliseSyncRules(rules []SyncRule) []SyncRule {
+	out := append([]SyncRule(nil), rules...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Target == out[j].Target {
+			if out[i].Action == out[j].Action {
+				return out[i].ID.String() < out[j].ID.String()
+			}
+			return out[i].Action < out[j].Action
+		}
+		return out[i].Target < out[j].Target
+	})
+	return out
 }
 
 func SerialiseMetadata(meta []byte) map[string]any {
