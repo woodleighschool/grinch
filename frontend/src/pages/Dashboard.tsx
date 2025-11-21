@@ -195,7 +195,7 @@ export default function Dashboard() {
                           </Typography>
                         </TableCell>
                         <TableCell>{event.hostname}</TableCell>
-                        <TableCell>{event.email || "-"}</TableCell>
+                        <TableCell>{event.email}</TableCell>
                         <TableCell>
                           <Chip label={reason} color={eventStatus} size="small" />
                         </TableCell>

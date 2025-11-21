@@ -37,8 +37,8 @@ var applicationIdentifierValidators = map[string]identifierValidator{
 		message: "Certificate identifiers must be a 64-character SHA-256 hash",
 	},
 	"SIGNINGID": {
-		regex:   regexp.MustCompile(`^[A-Z0-9]{10}:[a-zA-Z0-9.-]+$`),
-		message: "Signing IDs must follow TEAMID:bundle.identifier format",
+		regex:   regexp.MustCompile(`^(?:[A-Z0-9]{10}|platform):[a-zA-Z0-9.-]+$`),
+		message: "Signing IDs must follow TEAMID/platform:bundle.identifier format",
 	},
 	"TEAMID": {
 		regex:   regexp.MustCompile(`^[A-Z0-9]{10}$`),

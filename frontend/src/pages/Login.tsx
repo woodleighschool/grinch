@@ -109,14 +109,7 @@ export default function Login({ onLogin }: LoginProps) {
               <Divider />
 
               <Stack component="form" spacing={2} onSubmit={handleSubmit(handleLocalLogin)}>
-                <TextField
-                  label="Username"
-                  {...register("username")}
-                  error={!!errors.username}
-                  helperText={errors.username?.message}
-                  fullWidth
-                  required
-                />
+                <TextField label="Username" {...register("username")} error={!!errors.username} helperText={errors.username?.message} fullWidth required />
 
                 <TextField
                   label="Password"

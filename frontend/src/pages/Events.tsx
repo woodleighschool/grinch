@@ -81,7 +81,9 @@ export default function Events() {
             <GridActionsCellItem
               icon={<ArticleIcon />}
               label="Show details"
-              onClick={() => {setEventPayload(params.row.payload)}}
+              onClick={() => {
+                setEventPayload(params.row.payload);
+              }}
             />,
           );
           return actions;
@@ -138,7 +140,7 @@ export default function Events() {
       </CardContent>
       <Popover
         open={eventPayload != ""}
-        anchorPosition={{ top: parent.innerHeight/2 ,left: parent.innerWidth/2 }}
+        anchorPosition={{ top: parent.innerHeight / 2, left: parent.innerWidth / 2 }}
         onClose={handlePopoverClose}
         anchorOrigin={{
           vertical: "bottom",
