@@ -38,7 +38,7 @@ func NewRuleCompilerJob(store *store.Store, compiler *rules.Compiler, logger *sl
 			}
 			ruleScopes := scopeIndex[rule.ID]
 			memberMap := map[uuid.UUID][]uuid.UUID{}
-			for _, groupID := range collectGroupIDs(meta, ruleScopes) {
+			for _, groupID := range rules.CollectGroupIDs(meta, ruleScopes) {
 				if _, ok := groupCache[groupID]; !ok {
 					members, err := store.ListGroupMemberIDs(ctx, groupID)
 					if err != nil {
@@ -61,28 +61,4 @@ func NewRuleCompilerJob(store *store.Store, compiler *rules.Compiler, logger *sl
 		logger.Debug("rule compiler job complete", "rules", len(allRules))
 		return nil
 	}
-}
-
-func collectGroupIDs(meta rules.RuleMetadata, scopes []sqlc.RuleScope) []uuid.UUID {
-	seen := map[uuid.UUID]struct{}{}
-	var ids []uuid.UUID
-	for _, gid := range meta.Groups {
-		if _, ok := seen[gid]; ok {
-			continue
-		}
-		seen[gid] = struct{}{}
-		ids = append(ids, gid)
-	}
-	for _, scope := range scopes {
-		if scope.TargetType != "group" {
-			continue
-		}
-		gid := scope.TargetID
-		if _, ok := seen[gid]; ok {
-			continue
-		}
-		seen[gid] = struct{}{}
-		ids = append(ids, gid)
-	}
-	return ids
 }

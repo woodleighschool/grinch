@@ -18,6 +18,7 @@ import {
   createScope,
   deleteScope,
   getStatus,
+  type ApiUser,
   type Application,
   type ApplicationFilters,
   type DirectoryUser,
@@ -29,6 +30,8 @@ import {
   type EventRecord,
   type EventStat,
   type AppStatusResponse,
+  type ApplicationUpdatePayload,
+  type ScopePayload,
 } from "../api";
 
 // Query Keys
@@ -64,7 +67,7 @@ export const queryKeys = {
 
 // Current User Hook
 export function useCurrentUser() {
-  return useQuery({
+  return useQuery<ApiUser | null>({
     queryKey: queryKeys.currentUser,
     queryFn: getCurrentUser,
   });
@@ -114,7 +117,7 @@ export function useCreateApplication() {
   return useMutation({
     mutationFn: createApplication,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      void queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
   });
 }
@@ -123,17 +126,15 @@ export function useUpdateApplication() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ appId, payload }: { appId: string; payload: { enabled: boolean } }) => updateApplication(appId, payload),
+    mutationFn: ({ appId, payload }: { appId: string; payload: ApplicationUpdatePayload }) => updateApplication(appId, payload),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["applications"] });
-      if (variables?.appId) {
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const key = query.queryKey;
-            return Array.isArray(key) && key[0] === "applicationDetail" && key[1] === variables.appId;
-          },
-        });
-      }
+      void queryClient.invalidateQueries({ queryKey: ["applications"] });
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === "applicationDetail" && key[1] === variables.appId;
+        },
+      });
     },
   });
 }
@@ -144,7 +145,7 @@ export function useDeleteApplication() {
   return useMutation({
     mutationFn: deleteApplication,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      void queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
   });
 }
@@ -153,11 +154,10 @@ export function useCreateScope() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ appId, payload }: { appId: string; payload: { target_type: "group" | "user"; target_id: string; action: "allow" | "block" } }) =>
-      createScope(appId, payload),
+    mutationFn: ({ appId, payload }: { appId: string; payload: ScopePayload }) => createScope(appId, payload),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.applicationScopes(variables.appId) });
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: queryKeys.applicationScopes(variables.appId) });
+      void queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey;
           return Array.isArray(key) && key[0] === "applicationDetail" && key[1] === variables.appId;
@@ -173,8 +173,8 @@ export function useDeleteScope() {
   return useMutation({
     mutationFn: ({ appId, scopeId }: { appId: string; scopeId: string }) => deleteScope(appId, scopeId),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.applicationScopes(variables.appId) });
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: queryKeys.applicationScopes(variables.appId) });
+      void queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey;
           return Array.isArray(key) && key[0] === "applicationDetail" && key[1] === variables.appId;

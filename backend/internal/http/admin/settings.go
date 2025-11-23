@@ -2,7 +2,9 @@ package admin
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +26,12 @@ func (h Handler) getSantaConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	syncURL := base + "/santa"
+	if u, err := url.Parse(base); err == nil {
+		if _, port, err := net.SplitHostPort(h.Config.SantaListenAddr); err == nil {
+			u.Host = net.JoinHostPort(u.Hostname(), port)
+			syncURL = u.String() + "/santa"
+		}
+	}
 
 	var config strings.Builder
 	config.WriteString(fmt.Sprintf("<key>SyncBaseURL</key>\n<string>%s</string>\n", syncURL))

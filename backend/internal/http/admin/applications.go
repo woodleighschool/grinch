@@ -20,15 +20,16 @@ import (
 )
 
 type applicationDTO struct {
-	ID          uuid.UUID                     `json:"id"`
-	Name        string                        `json:"name"`
-	RuleType    string                        `json:"rule_type"`
-	Identifier  string                        `json:"identifier"`
-	Description string                        `json:"description,omitempty"`
-	Enabled     bool                          `json:"enabled"`
-	CreatedAt   time.Time                     `json:"created_at,omitempty"`
-	UpdatedAt   time.Time                     `json:"updated_at,omitempty"`
-	Stats       applicationAssignmentStatsDTO `json:"assignment_stats"`
+	ID           uuid.UUID                     `json:"id"`
+	Name         string                        `json:"name"`
+	RuleType     string                        `json:"rule_type"`
+	Identifier   string                        `json:"identifier"`
+	Description  string                        `json:"description,omitempty"`
+	BlockMessage string                        `json:"block_message,omitempty"`
+	Enabled      bool                          `json:"enabled"`
+	CreatedAt    time.Time                     `json:"created_at,omitempty"`
+	UpdatedAt    time.Time                     `json:"updated_at,omitempty"`
+	Stats        applicationAssignmentStatsDTO `json:"assignment_stats"`
 }
 
 type applicationScopeDTO struct {
@@ -65,16 +66,20 @@ type applicationAssignmentStatsDTO struct {
 }
 
 type createApplicationRequest struct {
-	Name        string `json:"name"`
-	RuleType    string `json:"rule_type"`
-	Identifier  string `json:"identifier"`
-	Description string `json:"description"`
+	Name         string `json:"name"`
+	RuleType     string `json:"rule_type"`
+	Identifier   string `json:"identifier"`
+	Description  string `json:"description"`
+	BlockMessage string `json:"block_message"`
 }
 
 type updateApplicationRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Enabled     *bool   `json:"enabled"`
+	Name         *string `json:"name"`
+	RuleType     *string `json:"rule_type"`
+	Identifier   *string `json:"identifier"`
+	Description  *string `json:"description"`
+	BlockMessage *string `json:"block_message"`
+	Enabled      *bool   `json:"enabled"`
 }
 
 type createScopeRequest struct {
@@ -83,7 +88,7 @@ type createScopeRequest struct {
 	Action     string `json:"action"`
 }
 
-func (h Handler) appsRoutes(r chi.Router) {
+func (h Handler) applicationsRoutes(r chi.Router) {
 	r.Get("/", h.listApplications)
 	r.Get("/check", h.checkApplication)
 	r.Post("/validate", h.validateApplication)
@@ -96,13 +101,10 @@ func (h Handler) appsRoutes(r chi.Router) {
 		r.Route("/scopes", func(r chi.Router) {
 			r.Get("/", h.listApplicationScopes)
 			r.Post("/", h.createApplicationScope)
+			r.Post("/validate", h.validateScopeForApplication)
 			r.Delete("/{scopeID}", h.deleteApplicationScope)
 		})
 	})
-}
-
-func (h Handler) scopesRoutes(r chi.Router) {
-	r.Post("/validate", h.validateScope)
 }
 
 func (h Handler) listApplications(w http.ResponseWriter, r *http.Request) {
@@ -173,7 +175,7 @@ func (h Handler) createApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	validated, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), body)
+	validated, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), applicationValidationInput(body), nil)
 	if err != nil {
 		h.Logger.Error("validate application", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to create application")
@@ -191,7 +193,8 @@ func (h Handler) createApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metaBytes, err := h.Store.MarshalRuleMetadata(map[string]any{
-		"description": validated.Description,
+		"description":   validated.Description,
+		"block_message": validated.BlockMessage,
 	})
 	if err != nil {
 		h.Logger.Error("marshal rule metadata", "err", err)
@@ -248,9 +251,46 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	meta, _ := rules.ParseMetadata(current.Metadata)
-	if body.Description != nil {
-		meta.Description = strings.TrimSpace(*body.Description)
+	payload := applicationValidationInput{
+		Name:         current.Name,
+		RuleType:     current.Type,
+		Identifier:   current.Target,
+		Description:  meta.Description,
+		BlockMessage: meta.BlockMessage,
 	}
+	if body.Name != nil {
+		payload.Name = *body.Name
+	}
+	if body.RuleType != nil {
+		payload.RuleType = *body.RuleType
+	}
+	if body.Identifier != nil {
+		payload.Identifier = *body.Identifier
+	}
+	if body.Description != nil {
+		payload.Description = *body.Description
+	}
+	if body.BlockMessage != nil {
+		payload.BlockMessage = *body.BlockMessage
+	}
+	validated, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), payload, &current.ID)
+	if err != nil {
+		h.Logger.Error("validate application update", "err", err)
+		respondError(w, http.StatusInternalServerError, "failed to update application")
+		return
+	}
+	if len(fieldErrs) > 0 {
+		code := errCodeValidationFailed
+		message := "Application validation failed"
+		if existing != nil {
+			code = errCodeDuplicateIdentifier
+			message = fmt.Sprintf("The identifier \"%s\" already belongs to \"%s\"", validated.Identifier, existing.Name)
+		}
+		respondValidationError(w, http.StatusUnprocessableEntity, code, message, fieldErrs, existing)
+		return
+	}
+	meta.Description = validated.Description
+	meta.BlockMessage = validated.BlockMessage
 	metaBytes, err := h.Store.MarshalRuleMetadata(meta)
 	if err != nil {
 		h.Logger.Error("marshal metadata", "err", err)
@@ -259,15 +299,12 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 	params := sqlc.UpdateRuleParams{
 		ID:       current.ID,
-		Name:     current.Name,
-		Type:     current.Type,
-		Target:   current.Target,
+		Name:     validated.Name,
+		Type:     strings.ToLower(validated.RuleType),
+		Target:   validated.Identifier,
 		Scope:    current.Scope,
 		Enabled:  current.Enabled,
 		Metadata: metaBytes,
-	}
-	if body.Name != nil {
-		params.Name = strings.TrimSpace(*body.Name)
 	}
 	if body.Enabled != nil {
 		params.Enabled = *body.Enabled
@@ -366,7 +403,8 @@ func (h Handler) createApplicationScope(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusBadRequest, "invalid application id")
 		return
 	}
-	if _, err := h.Store.GetRule(r.Context(), appID); err != nil {
+	rule, err := h.Store.GetRule(r.Context(), appID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			respondError(w, http.StatusNotFound, "application not found")
 		} else {
@@ -416,6 +454,7 @@ func (h Handler) createApplicationScope(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, "failed to create scope")
 		return
 	}
+	go h.recompileRuleAssignments(context.WithoutCancel(r.Context()), rule)
 	respondJSON(w, http.StatusCreated, mapScope(scope))
 }
 
@@ -552,14 +591,15 @@ func mapApplication(rule sqlc.Rule) applicationDTO {
 		updatedAt = rule.UpdatedAt.Time
 	}
 	return applicationDTO{
-		ID:          rule.ID,
-		Name:        rule.Name,
-		RuleType:    strings.ToUpper(rule.Type),
-		Identifier:  rule.Target,
-		Description: meta.Description,
-		Enabled:     rule.Enabled,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
+		ID:           rule.ID,
+		Name:         rule.Name,
+		RuleType:     strings.ToUpper(rule.Type),
+		Identifier:   rule.Target,
+		Description:  meta.Description,
+		BlockMessage: meta.BlockMessage,
+		Enabled:      rule.Enabled,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
 	}
 }
 

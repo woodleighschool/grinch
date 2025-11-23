@@ -29,3 +29,8 @@ RETURNING *;
 -- name: DeleteRuleScope :exec
 DELETE FROM rule_scopes
 WHERE id = $1;
+
+-- name: ListRulesByGroupTarget :many
+SELECT DISTINCT rule_id
+FROM rule_scopes
+WHERE target_type = 'group' AND target_id = $1;

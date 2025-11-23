@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -11,14 +10,14 @@ import (
 )
 
 type eventDTO struct {
-	ID        int64           `json:"id"`
-	Occurred  time.Time       `json:"occurredAt"`
-	Kind      string          `json:"kind"`
-	Payload   json.RawMessage `json:"payload"`
-	Hostname  string          `json:"hostname"`
-	MachineID string          `json:"machineId"`
-	Email     string          `json:"email"`
-	UserID    string          `json:"userId"`
+	ID        int64     `json:"id"`
+	Occurred  time.Time `json:"occurredAt"`
+	Kind      string    `json:"kind"`
+	Payload   any       `json:"payload"`
+	Hostname  string    `json:"hostname"`
+	MachineID string    `json:"machineId"`
+	Email     string    `json:"email"`
+	UserID    string    `json:"userId"`
 }
 
 func (h Handler) eventsRoutes(r chi.Router) {

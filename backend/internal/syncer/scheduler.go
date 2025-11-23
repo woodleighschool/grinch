@@ -22,9 +22,9 @@ func NewScheduler(logger *slog.Logger) *Scheduler {
 	}
 }
 
-func (s *Scheduler) Add(spec, name string, job Job) error {
+func (s *Scheduler) Add(spec, name string, timeout time.Duration, job Job) error {
 	_, err := s.cron.AddFunc(spec, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		if err := job(ctx); err != nil {
 			s.logger.Error("sync job failed", "job", name, "err", err)

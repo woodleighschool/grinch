@@ -45,7 +45,7 @@ type BuildInfo struct {
 func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
 	r := baseRouter()
 
-	r.Get("/api/status", func(w http.ResponseWriter, _ *http.Request) {
+	r.Get("/api/v1/status", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":  "ok",
 			"version": deps.BuildInfo,
@@ -54,7 +54,7 @@ func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
 
 	api := chi.NewRouter()
 	api.Use(AdminAuth(deps.Sessions, deps.Logger))
-	admin.RegisterRoutes(api, cfg, deps.Store, deps.Logger)
+	admin.RegisterRoutes(api, cfg, deps.Store, deps.Logger, deps.SantaCompiler)
 	r.Mount("/api", api)
 
 	authRoutes := chi.NewRouter()
@@ -70,13 +70,6 @@ func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
 
 func NewSantaRouter(deps SantaDeps) http.Handler {
 	r := baseRouter()
-
-	r.Get("/status", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"status":  "ok",
-			"version": deps.BuildInfo,
-		})
-	})
 
 	santaRouter := chi.NewRouter()
 	santa.RegisterRoutes(santaRouter, santa.Dependencies{

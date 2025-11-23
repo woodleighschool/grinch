@@ -1,17 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { formatDateTime, formatCompactDateTime } from "../utils/dates";
-import type { DirectoryUser } from "../api";
-import { useUserDetails } from "../hooks/useQueries";
 import {
   Alert,
-  Box,
-  Button,
   Card,
+  CardActionArea,
   CardContent,
-  CardHeader,
   Chip,
   Divider,
+  Grid,
   LinearProgress,
   Paper,
   Stack,
@@ -22,235 +18,314 @@ import {
   TableHead,
   TableRow,
   Typography,
-  type StackProps,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { PageSnackbar, type PageToast } from "../components";
 
-export function UserSummary({ user, ...props }: StackProps & { user: DirectoryUser }) {
+import { formatDateTime } from "../utils/dates";
+import type { Device, DirectoryGroup, UserPolicy } from "../api";
+import { useUserDetails } from "../hooks/useQueries";
+import { EmptyState, PageHeader, RecentBlocksList, SectionCard, UserSummary } from "../components";
+import { useToast } from "../hooks/useToast";
+
+interface GroupAssignmentChipsProps {
+  groups: DirectoryGroup[];
+}
+
+function GroupAssignmentChips({ groups }: GroupAssignmentChipsProps) {
+  if (groups.length === 0) {
+    return <Alert severity="info">This user is not assigned to any groups.</Alert>;
+  }
+
   return (
-    <Card {...(props as any)} key="primary-user" elevation={2}>
-      <CardContent>
-        <Stack spacing={2}>
-          <Typography font-weight={600}>{user.displayName}</Typography>
-          <Typography color="text.secondary">{user.upn}</Typography>
-          <Divider />
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            {user.createdAt && <Chip variant="outlined" label={`Created ${formatDateTime(user.createdAt)}`} />}
-            {user.updatedAt && <Chip variant="outlined" label={`Updated ${formatDateTime(user.updatedAt)}`} />}
-          </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
+    <Stack
+      direction="row"
+      flexWrap="wrap"
+      gap={1}
+    >
+      {groups.map((group) => (
+        <Chip
+          key={group.id}
+          label={group.displayName}
+          variant="outlined"
+          size="small"
+        />
+      ))}
+    </Stack>
+  );
+}
+
+interface DevicesTableProps {
+  devices: Device[];
+  onSelectDevice: (deviceId: string) => void;
+}
+
+function DevicesTable({ devices, onSelectDevice }: DevicesTableProps) {
+  if (devices.length === 0) {
+    return <Alert severity="info">No devices have reported this user yet.</Alert>;
+  }
+
+  return (
+    <TableContainer
+      component={Paper}
+      elevation={0}
+      variant="outlined"
+    >
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Hostname</TableCell>
+            <TableCell>Serial</TableCell>
+            <TableCell>Machine ID</TableCell>
+            <TableCell>Last Seen</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {devices.map((device) => (
+            <TableRow
+              key={device.id}
+              hover
+              sx={{ cursor: "pointer" }}
+              onClick={() => {
+                onSelectDevice(device.id);
+              }}
+            >
+              <TableCell>{device.hostname || "—"}</TableCell>
+              <TableCell>{device.serial || "—"}</TableCell>
+              <TableCell>
+                <Typography
+                  component="code"
+                  variant="body2"
+                >
+                  {device.id}
+                </Typography>
+              </TableCell>
+              <TableCell>{device.lastSeen ? formatDateTime(device.lastSeen) : "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+interface PoliciesListProps {
+  policies: UserPolicy[];
+  onSelectPolicy?: (applicationId: string) => void;
+}
+
+function PoliciesList({ policies, onSelectPolicy }: PoliciesListProps) {
+  if (policies.length === 0) {
+    return <Alert severity="info">No policies currently target this user.</Alert>;
+  }
+
+  return (
+    <Stack spacing={1.5}>
+      {policies.map((policy) => {
+        const action = policy.action;
+        const isAllow = action.toLowerCase() === "allow";
+        const canNavigate = Boolean(policy.application_id && onSelectPolicy);
+
+        return (
+          <Card
+            key={policy.scope_id}
+            elevation={0}
+            variant="outlined"
+          >
+            <CardActionArea
+              onClick={() => {
+                if (policy.application_id && onSelectPolicy) {
+                  onSelectPolicy(policy.application_id);
+                }
+              }}
+              disabled={!canNavigate}
+              sx={{ textAlign: "left" }}
+            >
+              <CardContent>
+                <Stack spacing={1.25}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    flexWrap="wrap"
+                  >
+                    <Typography fontWeight={600}>{policy.application_name}</Typography>
+
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      flexWrap="wrap"
+                    >
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={policy.rule_type}
+                      />
+                      <Chip
+                        size="small"
+                        color={isAllow ? "success" : "error"}
+                        label={action.toUpperCase()}
+                      />
+                      {policy.via_group && (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Via group: ${policy.target_name || policy.target_id}`}
+                        />
+                      )}
+                    </Stack>
+                  </Stack>
+
+                  <Typography variant="body2">
+                    Identifier:{" "}
+                    <Typography
+                      component="code"
+                      variant="body2"
+                    >
+                      {policy.identifier}
+                    </Typography>
+                  </Typography>
+
+                  {policy.target_type === "user" && !policy.via_group && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      Applied directly to this user.
+                    </Typography>
+                  )}
+                </Stack>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        );
+      })}
+    </Stack>
   );
 }
 
 export default function UserDetails() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const { data, isLoading, error } = useUserDetails(userId ?? "");
-  const details = data ?? null;
-  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
+  const user = data?.user;
 
   useEffect(() => {
-    if (error) {
-      console.error("Failed to load user details", error);
-      setToast({ open: true, message: "Failed to load user details.", severity: "error" });
-    }
-  }, [error]);
-  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
+    if (!error) return;
+
+    console.error("Failed to load user details", error);
+    showToast({
+      message: error instanceof Error ? error.message : "Failed to load user details.",
+      severity: "error",
+    });
+  }, [error, showToast]);
+
+  const pageTitle = user?.displayName ?? "User Details";
+  const pageSubtitle = user?.upn;
+  const breadcrumbs = [{ label: "Users", to: "/users" }, { label: pageTitle }];
+
+  let content: ReactNode = null;
 
   if (!userId) {
-    return (
-      <Card elevation={1}>
-        <CardHeader title="User Details" />
-        <CardContent>
-          <Stack spacing={2}>
-            <Alert severity="error">Missing user identifier.</Alert>
-            <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
-              Back
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+    content = <Alert severity="error">Missing user identifier.</Alert>;
+  } else if (isLoading) {
+    content = <LinearProgress />;
+  } else if (!data) {
+    content = (
+      <EmptyState
+        title="User not found"
+        description={`No user found with ID ${userId}`}
+      />
+    );
+  } else {
+    const { groups = [], devices = [], recent_blocks: events = [], policies = [] } = data;
+
+    const handleSelectDevice = (deviceId: string) => {
+      void navigate(`/devices/${deviceId}`);
+    };
+
+    content = (
+      <Stack spacing={3}>
+        <Grid
+          container
+          spacing={3}
+        >
+          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+            <SectionCard
+              title="User overview"
+              subheader="Directory details and group membership."
+            >
+              <UserSummary user={data.user} />
+
+              <Divider />
+
+              <Stack spacing={1}>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                >
+                  Group assignments
+                </Typography>
+                <GroupAssignmentChips groups={groups} />
+              </Stack>
+            </SectionCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
+            <SectionCard
+              title="Devices"
+              subheader="Santa agents that have associated telemetry with this user."
+            >
+              <DevicesTable
+                devices={devices}
+                onSelectDevice={handleSelectDevice}
+              />
+            </SectionCard>
+          </Grid>
+        </Grid>
+
+        <Grid
+          container
+          spacing={3}
+        >
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SectionCard
+              title="Recent blocks"
+              subheader="Latest Santa telemetry targeting this user."
+            >
+              <RecentBlocksList
+                events={events}
+                emptyMessage="No recent Santa blocks recorded for this user."
+              />
+            </SectionCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SectionCard
+              title="Policies applied"
+              subheader="Rules that currently impact this user."
+            >
+              <PoliciesList
+                policies={policies}
+                onSelectPolicy={(applicationId) => {
+                  void navigate(`/applications/${applicationId}`);
+                }}
+              />
+            </SectionCard>
+          </Grid>
+        </Grid>
+      </Stack>
     );
   }
-
-  if (!isLoading && !error && !details) {
-    return (
-      <Card elevation={1}>
-        <CardHeader title="User Details" />
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography color="text.secondary">User not found.</Typography>
-            <Button variant="contained" onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />}>
-              Back
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const {
-    user,
-    groups = [],
-    devices = [],
-    recent_blocks: events = [],
-    policies = [],
-  } = details ?? {
-    user: undefined,
-    groups: [],
-    devices: [],
-    recent_blocks: [],
-    policies: [],
-  };
 
   return (
     <Stack spacing={3}>
-      {isLoading && <LinearProgress />}
-
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
-          Back
-        </Button>
-        <Typography variant="h4">User Details</Typography>
-      </Stack>
-
-      <Card elevation={1}>
-        <CardHeader title={user?.displayName ?? "Loading user..."} subheader="View directory data, devices, events, and applied policies." />
-        <CardContent>{user ? <UserSummary user={user} /> : <Typography color="text.secondary">Loading user details…</Typography>}</CardContent>
-      </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Group Assignments" />
-        <CardContent>
-          <Card elevation={2}>
-            <CardHeader title="Groups" />
-            <CardContent>
-              {groups.length === 0 ? (
-                <Alert severity="info">This user is not assigned to any groups.</Alert>
-              ) : (
-                <Stack direction="row" flexWrap="wrap" gap={1}>
-                  {groups.map((group) => (
-                    <Chip key={group.id} label={group.displayName} variant="outlined" />
-                  ))}
-                </Stack>
-              )}
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Devices" subheader="Santa agents that have associated telemetry with this user." />
-        <CardContent>
-          {devices.length === 0 ? (
-            <Alert severity="info">No devices have reported this user yet.</Alert>
-          ) : (
-            <TableContainer component={Paper} elevation={2}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Hostname</TableCell>
-                    <TableCell>Serial</TableCell>
-                    <TableCell>Machine ID</TableCell>
-                    <TableCell>Last Seen</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {devices.map((device) => (
-                    <TableRow component="li" onClick={() => navigate(`/devices/${device.id}`)} key={device.id} sx={{ cursor: "pointer" }} hover>
-                      <TableCell>{device.hostname || "—"}</TableCell>
-                      <TableCell>{device.serial || "—"}</TableCell>
-                      <TableCell>
-                        <Typography component="code" variant="body2">
-                          {device.id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{device.lastSeen ? formatDateTime(device.lastSeen) : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Recent Blocks" subheader="Latest Santa telemetry targeting this user." />
-        <CardContent>
-          {events.length === 0 ? (
-            <Alert severity="info">No recent Santa blocks recorded for this user.</Alert>
-          ) : (
-            <Stack spacing={2}>
-              {events.map((event) => {
-                const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
-                const processPath = typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind;
-
-                return (
-                  <Card key={event.id} elevation={2}>
-                    <CardContent>
-                      <Stack spacing={1}>
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          <Typography fontWeight={600}>{processPath}</Typography>
-                          {event.kind && <Chip size="small" label={event.kind} color="error" />}
-                        </Stack>
-                        <Typography variant="body2" color="text.secondary">
-                          Host: {event.hostname || "—"} · {occurredAt}
-                        </Typography>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </Stack>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Policies Applied" subheader="Rules that currently impact this user." />
-        <CardContent>
-          {policies.length === 0 ? (
-            <Alert severity="info">No policies currently target this user.</Alert>
-          ) : (
-            <Stack spacing={2}>
-              {policies.map((policy) => (
-                <Card key={policy.scope_id} elevation={2}>
-                  <CardContent>
-                    <Stack spacing={1.5}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                        <Typography fontWeight={600}>{policy.application_name}</Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
-                          <Chip size="small" variant="outlined" label={policy.rule_type} />
-                          <Chip size="small" color={policy.action?.toLowerCase() === "allow" ? "success" : "error"} label={policy.action.toUpperCase()} />
-                          {policy.via_group && <Chip size="small" variant="outlined" label={`Via group: ${policy.target_name || policy.target_id}`} />}
-                        </Stack>
-                      </Stack>
-                      <Typography variant="body2">
-                        Identifier:{" "}
-                        <Typography component="code" variant="body2">
-                          {policy.identifier}
-                        </Typography>
-                      </Typography>
-                      {policy.target_type === "user" && !policy.via_group && (
-                        <Typography variant="body2" color="text.secondary">
-                          Applied directly to this user.
-                        </Typography>
-                      )}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
-          )}
-        </CardContent>
-      </Card>
-
-      <PageSnackbar toast={toast} onClose={handleToastClose} />
+      <PageHeader
+        title={pageTitle}
+        subtitle={pageSubtitle}
+        breadcrumbs={breadcrumbs}
+      />
+      {content}
     </Stack>
   );
 }

@@ -101,14 +101,26 @@ CREATE TABLE IF NOT EXISTS rule_assignments (
 );
 
 -----------------------------------------------------------------------
--- Events & cursors
+-- Files & events
 -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS files (
+  sha256        TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  signing_id    TEXT,
+  cdhash        TEXT,
+  signing_chain JSONB,
+  entitlements  JSONB,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,
   machine_id  UUID NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
   user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
   kind        TEXT NOT NULL,
   payload     JSONB NOT NULL,
+  file_sha256 TEXT REFERENCES files(sha256),
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -193,7 +205,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_rules_identifier_lower
 CREATE INDEX IF NOT EXISTS idx_rules_search_vector
   ON rules USING GIN (to_tsvector('simple',
     coalesce(name, '') || ' ' || coalesce(type, '') || ' ' || coalesce(target, '') || ' ' ||
-    coalesce(metadata ->> 'description', '')
+    coalesce(metadata ->> 'description', '') || ' ' ||
+    coalesce(metadata ->> 'block_message', '')
   ));
 
 -- Rule scopes / assignments
@@ -217,3 +230,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_rule_assignments_per_target
 -- Events
 CREATE INDEX IF NOT EXISTS idx_events_machine_time
   ON events (machine_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_file_sha256
+  ON events(file_sha256);

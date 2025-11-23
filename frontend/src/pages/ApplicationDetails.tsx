@@ -1,27 +1,26 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { formatDate } from "../utils/dates";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Fuse, { type IFuseOptions } from "fuse.js";
+import { useConfirm } from "material-ui-confirm";
+import { useNavigate, useParams } from "react-router-dom";
+import { Virtuoso } from "react-virtuoso";
+
 import type { Application, ApplicationScope, DirectoryGroup, DirectoryUser } from "../api";
 import { ApiValidationError, createScope, deleteApplication, deleteScope, validateScope } from "../api";
 import { useApplicationDetail, useGroups, useUsers } from "../hooks/useQueries";
-import { Virtuoso } from "react-virtuoso";
-import { useDebouncedValue } from "../hooks/useDebouncedValue";
+
 import {
   Alert,
   Avatar,
   Box,
-  Grid,
   Button,
   Card,
   CardContent,
   CardHeader,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
+  Grid,
+  InputAdornment,
+  LinearProgress,
   List,
   ListItem,
   ListItemAvatar,
@@ -34,18 +33,17 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
-  InputAdornment,
-  LinearProgress,
-  CircularProgress,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+
 import DeleteIcon from "@mui/icons-material/Delete";
 import GroupIcon from "@mui/icons-material/Groups";
 import PersonIcon from "@mui/icons-material/Person";
 import SearchIcon from "@mui/icons-material/Search";
-import { PageSnackbar, type PageToast } from "../components";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
+import { ApplicationDialog, EmptyState, PageHeader } from "../components";
+import { useToast, type ToastOptions } from "../hooks/useToast";
 
 export interface SelectedTarget {
   type: "group" | "user";
@@ -53,99 +51,131 @@ export interface SelectedTarget {
   name: string;
 }
 
+type ShowToast = (toast: ToastOptions) => void;
+
 interface ScopeAssignmentRowProps {
   scope: ApplicationScope;
   onDelete: () => void;
   disabled: boolean;
 }
 
-function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowProps) {
-  const memberUsers = Array.isArray(scope.effective_members) ? (scope.effective_members as DirectoryUser[]) : [];
-  const maxDisplayedMembers = 10;
-  const displayedMembers = memberUsers.slice(0, maxDisplayedMembers);
-  const remainingCount = Math.max((scope.effective_member_count ?? memberUsers.length) - displayedMembers.length, 0);
+function formatIdentifier(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toString();
+  return "unknown";
+}
 
-  const targetName = (() => {
-    if (scope.target_type === "group") return scope.target_display_name || `Group (${scope.target_id})`;
-    return scope.target_display_name || scope.target_upn || `User (${scope.target_id})`;
-  })();
+function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowProps) {
+  const totalMemberCount = scope.effective_member_count ?? (Array.isArray(scope.effective_members) ? scope.effective_members.length : 0);
 
   const isGroup = scope.target_type === "group";
+  const targetName = scope.target_display_name || (!isGroup && scope.target_upn) || `${isGroup ? "Group" : "User"} (${formatIdentifier(scope.target_id)})`;
+
+  const formattedMemberCount = totalMemberCount.toLocaleString();
+  const groupMemberCountLabel = isGroup && totalMemberCount > 0 ? `${formattedMemberCount} member${totalMemberCount === 1 ? "" : "s"}` : null;
 
   return (
     <ListItem
-      alignItems="flex-start"
+      alignItems="center"
       secondaryAction={
-        <Button size="small" color="error" variant="outlined" onClick={onDelete} disabled={disabled}>
+        <Button
+          size="small"
+          color="error"
+          variant="outlined"
+          onClick={onDelete}
+          disabled={disabled}
+        >
           Remove
         </Button>
       }
+      sx={{ py: 1 }}
     >
-      <ListItemAvatar>
+      <ListItemAvatar sx={{ minWidth: 44 }}>
         <Avatar>{isGroup ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}</Avatar>
       </ListItemAvatar>
-      <ListItemText
-        primary={
-          <Stack direction={{ sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-            <Typography variant="subtitle1" fontWeight={600}>
-              {targetName}
-            </Typography>
-            <Chip size="small" label={isGroup ? "Group" : "User"} variant="outlined" />
-            <Chip size="small" color={scope.action === "allow" ? "success" : "error"} label={scope.action.toUpperCase()} />
-          </Stack>
-        }
-        secondary={
-          <Stack spacing={1} mt={1} pr={2}>
-            <Typography variant="body2" color="text.secondary">
-              Added {formatDate(scope.created_at)}
-            </Typography>
-            {isGroup && (
-              <Box>
-                {memberUsers.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No users currently in this group.
-                  </Typography>
-                ) : (
-                  <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {displayedMembers.map((user) => (
-                      <Chip key={user.id} size="small" variant="outlined" label={user.displayName} />
-                    ))}
-                    {remainingCount > 0 && <Chip size="small" label={`+${remainingCount} more`} />}
-                  </Stack>
-                )}
-              </Box>
-            )}
-          </Stack>
-        }
-      />
+
+      <Box sx={{ flexGrow: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          flexWrap="wrap"
+        >
+          <Typography
+            variant="subtitle1"
+            fontWeight={600}
+          >
+            {targetName}
+          </Typography>
+
+          <Chip
+            size="small"
+            label={isGroup ? "Group" : "User"}
+            variant="outlined"
+          />
+          {groupMemberCountLabel && (
+            <Chip
+              size="small"
+              label={groupMemberCountLabel}
+              variant="outlined"
+            />
+          )}
+        </Stack>
+      </Box>
     </ListItem>
   );
 }
 
 interface AssignmentSectionProps {
-  label: string;
+  label: "ALLOW" | "BLOCK";
   scopes: ApplicationScope[];
   onDeleteScope: (scopeId: string) => void;
   deletingScopeId: string | null;
 }
 
 function AssignmentSection({ label, scopes, onDeleteScope, deletingScopeId }: AssignmentSectionProps) {
-  if (scopes.length === 0) return null;
+  if (!scopes.length) return null;
+
+  const isAllow = label === "ALLOW";
 
   return (
     <Box>
-      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-        <Chip label={label} color={label === "ALLOW" ? "success" : "error"} size="small" />
-        <Typography variant="body2" color="text.secondary">
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        mb={1.5}
+      >
+        <Chip
+          label={label}
+          color={isAllow ? "success" : "error"}
+          size="small"
+        />
+        <Typography
+          variant="body2"
+          color="text.secondary"
+        >
           {scopes.length} assignment{scopes.length === 1 ? "" : "s"}
         </Typography>
       </Stack>
+
       <Paper elevation={2}>
         <List disablePadding>
           {scopes.map((scope, index) => (
             <Fragment key={scope.id}>
-              <ScopeAssignmentRow scope={scope} onDelete={() => onDeleteScope(scope.id)} disabled={deletingScopeId === scope.id} />
-              {index < scopes.length - 1 && <Divider component="li" />}
+              <ScopeAssignmentRow
+                scope={scope}
+                onDelete={() => {
+                  onDeleteScope(scope.id);
+                }}
+                disabled={deletingScopeId === scope.id}
+              />
+              {index < scopes.length - 1 && (
+                <Divider
+                  component="li"
+                  role="presentation"
+                />
+              )}
             </Fragment>
           ))}
         </List>
@@ -162,52 +192,69 @@ interface TargetSelectorProps {
   disabled: boolean;
 }
 
+const groupFuseOptions: IFuseOptions<DirectoryGroup> = {
+  keys: [
+    { name: "displayName", weight: 0.7 },
+    { name: "description", weight: 0.3 },
+  ],
+  threshold: 0.3,
+  ignoreLocation: true,
+};
+
+const userFuseOptions: IFuseOptions<DirectoryUser> = {
+  keys: [
+    { name: "displayName", weight: 0.7 },
+    { name: "upn", weight: 0.3 },
+  ],
+  threshold: 0.3,
+  ignoreLocation: true,
+};
+
 function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disabled }: TargetSelectorProps) {
   const [activeTab, setActiveTab] = useState<"groups" | "users">("groups");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [userSearchTerm, setUserSearchTerm] = useState("");
-  const debouncedGroupSearch = useDebouncedValue(groupSearchTerm, 250);
-  const debouncedUserSearch = useDebouncedValue(userSearchTerm, 250);
 
-  const {
-    data: groupResults = [],
-    isFetching: groupLoading,
-    isError: groupError,
-    error: groupErrorObj,
-    isLoading: groupInitialLoading,
-    refetch: refetchGroups,
-  } = useGroups({ search: debouncedGroupSearch });
+  const groupFuse = useMemo(() => new Fuse(groups, groupFuseOptions), [groups]);
+  const userFuse = useMemo(() => new Fuse(users, userFuseOptions), [users]);
 
-  const {
-    data: userResults = [],
-    isFetching: userLoading,
-    isError: userError,
-    error: userErrorObj,
-    isLoading: userInitialLoading,
-    refetch: refetchUsers,
-  } = useUsers({ search: debouncedUserSearch });
+  const filterItems = (items: DirectoryGroup[] | DirectoryUser[], term: string) =>
+    !term.trim() ? items : (activeTab === "groups" ? groupFuse : userFuse).search(term.trim()).map((r) => r.item);
 
   const activeSearchTerm = activeTab === "groups" ? groupSearchTerm : userSearchTerm;
   const setActiveSearchTerm = activeTab === "groups" ? setGroupSearchTerm : setUserSearchTerm;
-  const activeItems = activeTab === "groups" ? groupResults : userResults;
-  const activeLoading = activeTab === "groups" ? groupLoading : userLoading;
-  const activeInitialLoading = activeTab === "groups" ? groupInitialLoading : userInitialLoading;
-  const activeErrorObj = activeTab === "groups" ? groupErrorObj : userErrorObj;
-  const activeRefetch = activeTab === "groups" ? refetchGroups : refetchUsers;
+
+  const activeItems =
+    activeTab === "groups" ? (filterItems(groups, groupSearchTerm) as DirectoryGroup[]) : (filterItems(users, userSearchTerm) as DirectoryUser[]);
+
+  const itemType: "group" | "user" = activeTab === "groups" ? "group" : "user";
   const trimmedActiveSearch = activeSearchTerm.trim();
 
   const handleSelectItem = (item: DirectoryGroup | DirectoryUser) => {
     if (disabled) return;
-    const type = activeTab === "groups" ? "group" : "user";
-    const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName;
-    onSelectTarget({ type, id: item.id, name });
+    onSelectTarget({ type: itemType, id: item.id, name: item.displayName });
   };
 
   return (
-    <Stack spacing={2}>
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label="Target type selector">
-        <Tab value="groups" label={`Groups (${groups.length})`} />
-        <Tab value="users" label={`Users (${users.length})`} />
+    <Stack
+      spacing={2}
+      sx={{ flex: 1, minHeight: 0 }}
+    >
+      <Tabs
+        value={activeTab}
+        onChange={(_, value: "groups" | "users" | null) => {
+          if (value) setActiveTab(value);
+        }}
+        aria-label="Target type selector"
+      >
+        <Tab
+          value="groups"
+          label={`Groups (${groups.length.toLocaleString()})`}
+        />
+        <Tab
+          value="users"
+          label={`Users (${users.length.toLocaleString()})`}
+        />
       </Tabs>
 
       <TextField
@@ -215,7 +262,10 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disable
         size="small"
         label={`Search ${activeTab}`}
         value={activeSearchTerm}
-        onChange={(e) => setActiveSearchTerm(e.target.value)}
+        onChange={(event) => {
+          setActiveSearchTerm(event.target.value);
+        }}
+        fullWidth
         slotProps={{
           input: {
             startAdornment: (
@@ -227,53 +277,83 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disable
         }}
       />
 
-      <Paper elevation={2}>
-        <Box style={{ height: 360, overflow: "hidden" }}>
-          {activeInitialLoading ? (
-            <LinearProgress />
-          ) : (groupError || userError) && activeErrorObj ? (
-            <Box p={2} textAlign="center">
-              <Typography color="error" variant="body2" gutterBottom>
-                {activeErrorObj instanceof Error ? activeErrorObj.message : `Failed to load ${activeTab}.`}
-              </Typography>
-              <Button size="small" variant="outlined" onClick={() => void activeRefetch()}>
-                Retry
-              </Button>
-            </Box>
-          ) : activeItems.length === 0 ? (
-            <Box p={2} textAlign="center">
-              <Typography variant="body2" color="text.secondary">
+      <Paper
+        elevation={2}
+        sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+      >
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {!activeItems.length ? (
+            <Box
+              p={2}
+              textAlign="center"
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
                 {trimmedActiveSearch ? `No ${activeTab} match “${trimmedActiveSearch}”` : `No ${activeTab} are available.`}
               </Typography>
             </Box>
           ) : (
             <Virtuoso<DirectoryGroup | DirectoryUser>
-              data={activeItems as Array<DirectoryGroup | DirectoryUser>}
-              overscan={200}
-              style={{ height: 360 }}
-              itemContent={(_, item) => {
-                const type = activeTab === "groups" ? "group" : "user";
-                const name = type === "group" ? (item as DirectoryGroup).displayName : (item as DirectoryUser).displayName;
-                const subtitle = type === "group" ? (item as DirectoryGroup).description : (item as DirectoryUser).upn;
-                const isSelected = selectedTarget?.id === item.id && selectedTarget.type === type;
+              key={activeTab}
+              data={activeItems}
+              increaseViewportBy={{ top: 128, bottom: 256 }}
+              style={{ height: "100%", width: "100%" }}
+              itemContent={(index, item) => {
+                const typedItem = item;
+                const name = typedItem.displayName;
+                const subtitle = itemType === "group" ? (typedItem as DirectoryGroup).description : (typedItem as DirectoryUser).upn;
+                const isSelected = selectedTarget?.id === typedItem.id && selectedTarget.type === itemType;
+
                 return (
-                  <ListItem disablePadding divider>
-                    <ListItemButton onClick={() => handleSelectItem(item)} selected={isSelected} disabled={disabled}>
+                  <ListItem
+                    component="div"
+                    disablePadding
+                    sx={(theme) => ({
+                      borderBottom: index < activeItems.length - 1 ? `1px solid ${theme.palette.divider}` : "none",
+                    })}
+                  >
+                    <ListItemButton
+                      onClick={() => {
+                        handleSelectItem(item);
+                      }}
+                      selected={isSelected}
+                      disabled={disabled}
+                    >
                       <ListItemAvatar>
-                        <Avatar>{type === "group" ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}</Avatar>
+                        <Avatar>{itemType === "group" ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}</Avatar>
                       </ListItemAvatar>
+
                       <ListItemText
+                        disableTypography
                         primary={
-                          <Stack direction={{ sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                            <Typography variant="body2" fontWeight={600}>
-                              {name}
-                            </Typography>
-                            {activeLoading && <CircularProgress size={16} />}
-                          </Stack>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            noWrap
+                          >
+                            {name}
+                          </Typography>
                         }
-                        secondary={<Typography variant="body2">{subtitle}</Typography>}
+                        secondary={
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            noWrap
+                          >
+                            {subtitle}
+                          </Typography>
+                        }
                       />
-                      {isSelected && <Chip label="Selected" size="small" color="primary" />}
+
+                      {isSelected && (
+                        <Chip
+                          label="Selected"
+                          size="small"
+                          color="primary"
+                        />
+                      )}
                     </ListItemButton>
                   </ListItem>
                 );
@@ -286,236 +366,460 @@ function TargetSelector({ groups, users, onSelectTarget, selectedTarget, disable
   );
 }
 
-export default function ApplicationDetails() {
-  const { appId } = useParams<{ appId: string }>();
-  const navigate = useNavigate();
+interface AssignmentManagerCardProps {
+  assignment: AssignmentManagerState;
+  groups: DirectoryGroup[];
+  users: DirectoryUser[];
+}
 
+function AssignmentManagerCard({ assignment, groups, users }: AssignmentManagerCardProps) {
+  const { selectedTarget, selectTarget, selectedAction, changeAction, assignmentError, clearAssignmentError, assignmentBusy, assignRule } = assignment;
+
+  return (
+    <Card
+      elevation={1}
+      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <CardHeader title="Assign to Groups or Users" />
+      <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, p: 2 }}>
+        <Stack
+          spacing={2}
+          sx={{ flex: 1, minHeight: 0 }}
+        >
+          {assignmentError && (
+            <Alert
+              severity="error"
+              onClose={clearAssignmentError}
+            >
+              {assignmentError}
+            </Alert>
+          )}
+
+          <TargetSelector
+            groups={groups}
+            users={users}
+            onSelectTarget={selectTarget}
+            selectedTarget={selectedTarget}
+            disabled={assignmentBusy}
+          />
+
+          <Box sx={{ mt: "auto", pt: 2 }}>
+            {selectedTarget && (
+              <Alert
+                severity="info"
+                variant="outlined"
+                sx={{ mb: 2 }}
+              >
+                Assigning{" "}
+                <strong>
+                  {selectedTarget.name} ({selectedTarget.type})
+                </strong>{" "}
+                with action <strong>{selectedAction.toUpperCase()}</strong>.
+              </Alert>
+            )}
+
+            <Stack
+              direction="row"
+              spacing={2}
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <ToggleButtonGroup
+                exclusive
+                value={selectedAction}
+                onChange={(_, value: "allow" | "block" | null) => {
+                  if (value) changeAction(value);
+                }}
+                size="small"
+              >
+                <ToggleButton
+                  value="allow"
+                  color="success"
+                >
+                  Allow
+                </ToggleButton>
+                <ToggleButton
+                  value="block"
+                  color="error"
+                >
+                  Block
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              <Button
+                variant="contained"
+                onClick={() => void assignRule()}
+                disabled={assignmentBusy || !selectedTarget}
+              >
+                {assignmentBusy ? "Assigning..." : "Assign Rule"}
+              </Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface AssignmentsCardProps {
+  allowScopes: ApplicationScope[];
+  blockScopes: ApplicationScope[];
+  onDeleteScope: (scopeId: string) => void;
+  deletingScopeId: string | null;
+}
+
+function AssignmentsCard({ allowScopes, blockScopes, onDeleteScope, deletingScopeId }: AssignmentsCardProps) {
+  const hasAssignments = allowScopes.length > 0 || blockScopes.length > 0;
+
+  return (
+    <Card
+      elevation={1}
+      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <CardHeader
+        title="Current Assignments"
+        subheader="Allow and block scopes."
+      />
+      <CardContent sx={{ overflowY: "auto", flex: 1 }}>
+        <Stack spacing={3}>
+          <AssignmentSection
+            label="ALLOW"
+            scopes={allowScopes}
+            onDeleteScope={onDeleteScope}
+            deletingScopeId={deletingScopeId}
+          />
+          <AssignmentSection
+            label="BLOCK"
+            scopes={blockScopes}
+            onDeleteScope={onDeleteScope}
+            deletingScopeId={deletingScopeId}
+          />
+          {!hasAssignments && <Alert severity="info">No assignments yet.</Alert>}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface AssignmentManagerHookParams {
+  app: Application | null;
+  appId: string | undefined;
+  refetch: () => Promise<unknown>;
+  showToast: ShowToast;
+}
+
+interface AssignmentManagerState {
+  selectedTarget: SelectedTarget | null;
+  selectTarget: (target: SelectedTarget | null) => void;
+  selectedAction: "allow" | "block";
+  changeAction: (action: "allow" | "block") => void;
+  assignmentError: string | null;
+  clearAssignmentError: () => void;
+  assignmentBusy: boolean;
+  deletingScopeId: string | null;
+  assignRule: () => Promise<void>;
+  removeScope: (scopeId: string) => void;
+}
+
+function useAssignmentManager({ app, appId, refetch, showToast }: AssignmentManagerHookParams): AssignmentManagerState {
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
   const [selectedAction, setSelectedAction] = useState<"allow" | "block">("allow");
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [deletingScopeId, setDeletingScopeId] = useState<string | null>(null);
-  const [confirmDeleteApp, setConfirmDeleteApp] = useState<{ appId: string; appName: string } | null>(null);
-  const [deletingApp, setDeletingApp] = useState(false);
-  const [toast, setToast] = useState<PageToast>({ open: false, message: "", severity: "error" });
 
-  const { data: groups = [] } = useGroups();
-  const { data: users = [] } = useUsers();
-  const { data: applicationDetail, isLoading, error, refetch } = useApplicationDetail(appId, { includeMembers: true });
-
-  const app: Application | null = applicationDetail?.application ?? null;
-  const scopes: ApplicationScope[] = applicationDetail?.scopes ?? [];
-  const allowScopes = useMemo(() => scopes.filter((s) => s.action === "allow"), [scopes]);
-  const blockScopes = useMemo(() => scopes.filter((s) => s.action === "block"), [scopes]);
-  const totalAssignments = scopes.length;
-
-  useEffect(() => {
-    if (error) {
-      console.error("Application detail load failed", error);
-      setToast({ open: true, message: "Failed to load application details.", severity: "error" });
-    }
-  }, [error]);
-
-  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
+  const applicationId = app?.id ?? appId;
 
   useEffect(() => {
     if (assignmentError && selectedTarget) setAssignmentError(null);
-  }, [selectedTarget, assignmentError]);
+  }, [assignmentError, selectedTarget]);
 
-  async function handleAssignRule() {
+  const assignRule = useCallback(async () => {
     if (!selectedTarget) {
       setAssignmentError("Please select a user or group first.");
       return;
     }
-    const targetAppId = app?.id ?? appId;
-    if (!targetAppId) {
+
+    if (!applicationId) {
       setAssignmentError("Missing application identifier.");
       return;
     }
 
     setAssignmentBusy(true);
+
     try {
-      const validation = await validateScope({
-        application_id: targetAppId,
+      const validation = await validateScope(applicationId, {
         target_type: selectedTarget.type,
         target_id: selectedTarget.id,
         action: selectedAction,
       });
-      const n = validation.normalised;
-      await createScope(targetAppId, { target_type: n.target_type, target_id: n.target_id, action: n.action });
+
+      const { target_type, target_id, action } = validation.normalised;
+
+      await createScope(applicationId, {
+        target_type,
+        target_id,
+        action,
+      });
+
       await refetch();
       setSelectedTarget(null);
-      setToast({ open: true, message: "Assignment created.", severity: "success" });
-    } catch (err) {
-      console.error("Assign rule failed", err);
-      if (err instanceof ApiValidationError) setAssignmentError(err.fieldErrors.target_id ?? err.message);
-      else setAssignmentError(err instanceof Error ? err.message : "Failed to assign rule.");
+
+      showToast({ message: "Assignment created.", severity: "success" });
+    } catch (error) {
+      console.error("Assign rule failed", error);
+      if (error instanceof ApiValidationError) {
+        setAssignmentError(error.fieldErrors.target_id ?? error.message);
+      } else {
+        setAssignmentError(error instanceof Error ? error.message : "Failed to assign rule.");
+      }
     } finally {
       setAssignmentBusy(false);
     }
-  }
+  }, [selectedTarget, selectedAction, applicationId, refetch, showToast]);
 
-  async function handleDeleteScope(scopeId: string) {
+  const handleDeleteScope = useCallback(
+    async (scopeId: string) => {
+      if (!applicationId) return;
+
+      setDeletingScopeId(scopeId);
+
+      try {
+        await deleteScope(applicationId, scopeId);
+        await refetch();
+
+        showToast({ message: "Assignment removed.", severity: "success" });
+      } catch (error) {
+        console.error("Delete scope failed", error);
+        setAssignmentError(error instanceof Error ? error.message : "Failed to remove assignment.");
+      } finally {
+        setDeletingScopeId(null);
+      }
+    },
+    [applicationId, refetch, showToast],
+  );
+
+  return {
+    selectedTarget,
+    selectTarget: setSelectedTarget,
+    selectedAction,
+    changeAction: setSelectedAction,
+    assignmentError,
+    clearAssignmentError: () => {
+      setAssignmentError(null);
+    },
+    assignmentBusy,
+    deletingScopeId,
+    assignRule,
+    removeScope: (scopeId) => {
+      void handleDeleteScope(scopeId);
+    },
+  };
+}
+
+export default function ApplicationDetails() {
+  const { appId } = useParams<{ appId: string }>();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+
+  const [deletingApp, setDeletingApp] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  const { showToast } = useToast();
+
+  const { data: groups = [] } = useGroups();
+  const { data: users = [] } = useUsers();
+  const {
+    data: applicationDetail,
+    isLoading,
+    error,
+    refetch,
+  } = useApplicationDetail(appId, {
+    includeMembers: true,
+  });
+
+  const app = applicationDetail?.application ?? null;
+  const scopes = applicationDetail?.scopes ?? [];
+
+  const allowScopes = scopes.filter((scope) => scope.action === "allow");
+  const blockScopes = scopes.filter((scope) => scope.action === "block");
+
+  const assignedGroupIds = new Set(scopes.filter((scope) => scope.target_type === "group").map((scope) => scope.target_id));
+  const assignedUserIds = new Set(scopes.filter((scope) => scope.target_type === "user").map((scope) => scope.target_id));
+
+  const availableGroups = groups.filter((group) => !assignedGroupIds.has(group.id));
+  const availableUsers = users.filter((user) => !assignedUserIds.has(user.id));
+
+  const assignment = useAssignmentManager({
+    app,
+    appId,
+    refetch,
+    showToast,
+  });
+
+  useEffect(() => {
+    if (!error) return;
+    console.error("Application detail load failed", error);
+    showToast({
+      message: error instanceof Error ? error.message : "Failed to load application details.",
+      severity: "error",
+    });
+  }, [error, showToast]);
+
+  const handleEditSuccess = useCallback(() => {
+    showToast({ message: "Application updated.", severity: "success" });
+    void refetch();
+  }, [showToast, refetch]);
+
+  const handleDeleteApplication = useCallback(async () => {
     const targetAppId = app?.id ?? appId;
-    if (!targetAppId) return;
-
-    setDeletingScopeId(scopeId);
-    try {
-      await deleteScope(targetAppId, scopeId);
-      await refetch();
-      setToast({ open: true, message: "Assignment removed.", severity: "success" });
-    } catch (err) {
-      console.error("Delete scope failed", err);
-      setAssignmentError(err instanceof Error ? err.message : "Failed to remove assignment.");
-    } finally {
-      setDeletingScopeId(null);
-    }
-  }
-
-  async function handleDeleteApplication() {
-    const targetAppId = confirmDeleteApp?.appId ?? app?.id ?? appId;
     if (!targetAppId) return;
 
     setDeletingApp(true);
     try {
       await deleteApplication(targetAppId);
-      navigate("/applications", { replace: true });
-    } catch (err) {
-      console.error("Delete application failed", err);
-      setAssignmentError(err instanceof Error ? err.message : "Failed to delete application.");
-      setDeletingApp(false);
+      void navigate("/applications", { replace: true });
+    } catch (error) {
+      console.error("Delete application failed", error);
+      showToast({
+        message: error instanceof Error ? error.message : "Failed to delete application.",
+        severity: "error",
+      });
     } finally {
-      setConfirmDeleteApp(null);
+      setDeletingApp(false);
     }
-  }
+  }, [app, appId, navigate, showToast]);
+
+  const action = useMemo<ReactNode | undefined>(() => {
+    if (!app) return undefined;
+
+    return (
+      <Stack
+        direction="row"
+        spacing={1}
+      >
+        <Button
+          variant="contained"
+          onClick={() => {
+            setEditDialogOpen(true);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          color="error"
+          variant="outlined"
+          startIcon={<DeleteIcon />}
+          onClick={() =>
+            void confirm({
+              title: "Delete Application",
+              description: `Are you sure you want to delete "${app.name}"? This action cannot be undone.`,
+              cancellationText: "Cancel",
+              confirmationText: "Delete",
+              confirmationButtonProps: { color: "error", variant: "contained" },
+            })
+              .then(() => void handleDeleteApplication())
+              .catch(() => {})
+          }
+          disabled={deletingApp}
+        >
+          Delete
+        </Button>
+      </Stack>
+    );
+  }, [app, deletingApp, confirm, handleDeleteApplication]);
+
+  const pageTitle = app?.name ?? "Application Details";
+  const subtitleParts = [app?.rule_type, app?.identifier].filter(Boolean) as string[];
+  const pageSubtitle = subtitleParts.length ? subtitleParts.join(" • ") : undefined;
+
+  const breadcrumbs = [{ label: "Applications", to: "/applications" }, { label: pageTitle }];
+
+  let content: ReactNode = null;
 
   if (!appId) {
-    return (
-      <Card elevation={1}>
-        <CardHeader title="Application Details" />
-        <CardContent>
-          <Stack spacing={2}>
-            <Alert severity="error">Missing application identifier.</Alert>
-            <Button component={RouterLink} to="/applications" variant="contained">
-              Back to applications
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+    content = <Alert severity="error">Missing application identifier.</Alert>;
+  } else if (isLoading) {
+    content = <LinearProgress />;
+  } else if (error) {
+    content = <Alert severity="error">{error instanceof Error ? error.message : "Failed to load application details."}</Alert>;
+  } else if (!app) {
+    content = (
+      <EmptyState
+        title="Application not found"
+        description="The requested application could not be found."
+      />
+    );
+  } else {
+    content = (
+      <Stack spacing={2}>
+        <Alert
+          severity="info"
+          variant="outlined"
+          icon={<InfoOutlinedIcon fontSize="small" />}
+        >
+          Applications are scoped based on the device&apos;s <strong>primary user</strong> received during preflight, not the currently logged-in user.
+        </Alert>
+
+        <Grid
+          container
+          spacing={2}
+          sx={{ height: "calc(100vh - 280px)", minHeight: 500 }}
+        >
+          <Grid
+            size={{ xs: 12, lg: 7 }}
+            sx={{ height: "100%" }}
+          >
+            <AssignmentManagerCard
+              assignment={assignment}
+              groups={availableGroups}
+              users={availableUsers}
+            />
+          </Grid>
+
+          <Grid
+            size={{ xs: 12, lg: 5 }}
+            sx={{ height: "100%" }}
+          >
+            <AssignmentsCard
+              allowScopes={allowScopes}
+              blockScopes={blockScopes}
+              onDeleteScope={assignment.removeScope}
+              deletingScopeId={assignment.deletingScopeId}
+            />
+          </Grid>
+        </Grid>
+      </Stack>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
-          Back
-        </Button>
-        <Typography variant="h4">Application Details</Typography>
+    <>
+      <Stack spacing={3}>
+        <PageHeader
+          title={pageTitle}
+          subtitle={pageSubtitle}
+          breadcrumbs={breadcrumbs}
+          action={action}
+        />
+        {content}
       </Stack>
 
-      <Card elevation={1}>
-        <CardHeader
-          title={app?.name || "Loading..."}
-          subheader="Manage assignments, view current scopes, and adjust access for this application."
-          action={
-            <Tooltip title="Delete application">
-              <span>
-                <Button
-                  color="error"
-                  variant="outlined"
-                  startIcon={<DeleteIcon />}
-                  onClick={() => app && setConfirmDeleteApp({ appId: app.id, appName: app.name })}
-                  disabled={!app || deletingApp}
-                >
-                  Delete
-                </Button>
-              </span>
-            </Tooltip>
-          }
-        />
-        {isLoading && <LinearProgress />}
-        <CardContent>
-          {app ? (
-            <Stack spacing={2}>
-              <Stack direction="row" flexWrap="wrap" gap={1.5}>
-                <Chip label={app.rule_type} variant="outlined" />
-                <Chip label={app.identifier ?? "—"} variant="outlined" />
-                <Chip label={`Assignments: ${totalAssignments}`} />
-              </Stack>
-              {app.description && <Typography color="text.secondary">{app.description}</Typography>}
-            </Stack>
-          ) : (
-            !error && <Typography color="text.secondary">Loading application...</Typography>
-          )}
-        </CardContent>
-      </Card>
-
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Card elevation={1}>
-            <CardHeader title="Assign to Groups or Users" />
-            <CardContent>
-              <Stack spacing={3}>
-                {assignmentError && (
-                  <Alert severity="error" onClose={() => setAssignmentError(null)}>
-                    {assignmentError}
-                  </Alert>
-                )}
-                <TargetSelector groups={groups} users={users} onSelectTarget={setSelectedTarget} selectedTarget={selectedTarget} disabled={assignmentBusy} />
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Action
-                  </Typography>
-                  <ToggleButtonGroup exclusive value={selectedAction} onChange={(_, v) => v && setSelectedAction(v)} size="small">
-                    <ToggleButton value="allow" color="success">
-                      Allow
-                    </ToggleButton>
-                    <ToggleButton value="block" color="error">
-                      Block
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
-                {/* TODO: Do something better on validation/duplicate error */}
-                <Button variant="contained" onClick={handleAssignRule} disabled={assignmentBusy || !selectedTarget}>
-                  Assign Rule
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Card elevation={1}>
-            <CardHeader title="Current Assignments" subheader="Allow and block scopes targeting this application." />
-            <CardContent>
-              {/* TODO: To infinity and beyond... these needs to be a scrollable list */}
-              <Stack spacing={3}>
-                <AssignmentSection label="ALLOW" scopes={allowScopes} onDeleteScope={handleDeleteScope} deletingScopeId={deletingScopeId} />
-                <AssignmentSection label="BLOCK" scopes={blockScopes} onDeleteScope={handleDeleteScope} deletingScopeId={deletingScopeId} />
-                {allowScopes.length === 0 && blockScopes.length === 0 && <Alert severity="info">No assignments yet. Use the controls above to add one.</Alert>}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      <Dialog open={!!confirmDeleteApp} onClose={() => setConfirmDeleteApp(null)} aria-labelledby="confirm-delete-title">
-        <DialogTitle id="confirm-delete-title">Delete Application</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Are you sure you want to delete "{confirmDeleteApp?.appName}"? This action cannot be undone.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmDeleteApp(null)} disabled={deletingApp}>
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteApplication} color="error" variant="contained" disabled={deletingApp}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <PageSnackbar toast={toast} onClose={handleToastClose} autoHideDuration={3500} />
-    </Stack>
+      <ApplicationDialog
+        open={editDialogOpen}
+        mode="edit"
+        application={app ?? null}
+        onClose={() => {
+          setEditDialogOpen(false);
+        }}
+        onSuccess={handleEditSuccess}
+        onError={(message) => {
+          showToast({
+            message,
+            severity: "error",
+          });
+        }}
+      />
+    </>
   );
 }

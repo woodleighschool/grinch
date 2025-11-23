@@ -31,11 +31,13 @@ WHERE CASE
                 coalesce(name, '') || ' ' ||
                 coalesce(type, '') || ' ' ||
                 coalesce(target, '') || ' ' ||
-                coalesce(metadata ->> 'description', '')
+                coalesce(metadata ->> 'description', '') || ' ' ||
+                coalesce(metadata ->> 'block_message', '')
             ) @@ websearch_to_tsquery('simple', sqlc.arg(search)::text)
             OR name ILIKE '%' || sqlc.arg(search)::text || '%'
             OR target ILIKE '%' || sqlc.arg(search)::text || '%'
             OR coalesce(metadata ->> 'description', '') ILIKE '%' || sqlc.arg(search)::text || '%'
+            OR coalesce(metadata ->> 'block_message', '') ILIKE '%' || sqlc.arg(search)::text || '%'
         )
      END
   AND (sqlc.arg(rule_type)::text = '' OR LOWER(type) = LOWER(sqlc.arg(rule_type)::text))

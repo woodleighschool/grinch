@@ -53,10 +53,19 @@ var applicationIdentifierValidators = map[string]identifierValidator{
 type fieldErrors map[string]string
 
 type applicationValidationResult struct {
-	Name        string `json:"name"`
-	RuleType    string `json:"rule_type"`
-	Identifier  string `json:"identifier"`
-	Description string `json:"description,omitempty"`
+	Name         string `json:"name"`
+	RuleType     string `json:"rule_type"`
+	Identifier   string `json:"identifier"`
+	Description  string `json:"description,omitempty"`
+	BlockMessage string `json:"block_message,omitempty"`
+}
+
+type applicationValidationInput struct {
+	Name         string
+	RuleType     string
+	Identifier   string
+	Description  string
+	BlockMessage string
 }
 
 type scopeValidationResult struct {
@@ -76,13 +85,6 @@ type apiErrorResponse struct {
 type validationSuccessResponse[T any] struct {
 	Valid      bool `json:"valid"`
 	Normalised T    `json:"normalised"`
-}
-
-type scopeValidationRequest struct {
-	ApplicationID string `json:"application_id"`
-	TargetType    string `json:"target_type"`
-	TargetID      string `json:"target_id"`
-	Action        string `json:"action"`
 }
 
 func respondValidationError(w http.ResponseWriter, status int, code, message string, fields fieldErrors, existing *applicationDTO) {
@@ -112,7 +114,7 @@ func (h Handler) validateApplication(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	result, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), body)
+	result, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), applicationValidationInput(body), nil)
 	if err != nil {
 		h.Logger.Error("validate application payload", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to validate application")
@@ -131,27 +133,22 @@ func (h Handler) validateApplication(w http.ResponseWriter, r *http.Request) {
 	respondValidationSuccess(w, result)
 }
 
-func (h Handler) validateScope(w http.ResponseWriter, r *http.Request) {
-	var body scopeValidationRequest
+func (h Handler) validateScopeForApplication(w http.ResponseWriter, r *http.Request) {
+	appID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+	var body createScopeRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		respondError(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	appIDStr := strings.TrimSpace(body.ApplicationID)
-	if appIDStr == "" {
-		respondValidationError(w, http.StatusUnprocessableEntity, errCodeValidationFailed, "Scope validation failed", fieldErrors{
-			"application_id": "application_id is required",
-		}, nil)
-		return
-	}
-	appID, err := uuid.Parse(appIDStr)
-	if err != nil {
-		respondValidationError(w, http.StatusUnprocessableEntity, errCodeValidationFailed, "Scope validation failed", fieldErrors{
-			"application_id": "application_id must be a valid UUID",
-		}, nil)
-		return
-	}
-	if _, err := h.Store.GetRule(r.Context(), appID); err != nil {
+	h.runScopeValidation(r.Context(), w, appID, body)
+}
+
+func (h Handler) runScopeValidation(ctx context.Context, w http.ResponseWriter, appID uuid.UUID, body createScopeRequest) {
+	if _, err := h.Store.GetRule(ctx, appID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			respondValidationError(w, http.StatusUnprocessableEntity, errCodeValidationFailed, "Scope validation failed", fieldErrors{
 				"application_id": "application not found",
@@ -162,12 +159,7 @@ func (h Handler) validateScope(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to validate scope")
 		return
 	}
-	createBody := createScopeRequest{
-		TargetType: body.TargetType,
-		TargetID:   body.TargetID,
-		Action:     body.Action,
-	}
-	result, fieldErrs, duplicate, err := h.validateScopeInput(r.Context(), appID, createBody)
+	result, fieldErrs, duplicate, err := h.validateScopeInput(ctx, appID, body)
 	if err != nil {
 		h.Logger.Error("validate scope payload", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to validate scope")
@@ -186,11 +178,11 @@ func (h Handler) validateScope(w http.ResponseWriter, r *http.Request) {
 	respondValidationSuccess(w, result)
 }
 
-func (h Handler) validateApplicationInput(ctx context.Context, body createApplicationRequest) (applicationValidationResult, fieldErrors, *applicationDTO, error) {
+func (h Handler) validateApplicationInput(ctx context.Context, input applicationValidationInput, excludeID *uuid.UUID) (applicationValidationResult, fieldErrors, *applicationDTO, error) {
 	errs := fieldErrors{}
 	result := applicationValidationResult{}
 
-	name := strings.TrimSpace(body.Name)
+	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		errs["name"] = "Application name is required"
 	} else if utf8.RuneCountInString(name) > 100 {
@@ -198,7 +190,7 @@ func (h Handler) validateApplicationInput(ctx context.Context, body createApplic
 	}
 	result.Name = name
 
-	ruleType := strings.ToUpper(strings.TrimSpace(body.RuleType))
+	ruleType := strings.ToUpper(strings.TrimSpace(input.RuleType))
 	if ruleType == "" {
 		errs["rule_type"] = "Rule type is required"
 	} else if _, ok := applicationIdentifierValidators[ruleType]; !ok {
@@ -206,7 +198,7 @@ func (h Handler) validateApplicationInput(ctx context.Context, body createApplic
 	}
 	result.RuleType = ruleType
 
-	identifier := strings.TrimSpace(body.Identifier)
+	identifier := strings.TrimSpace(input.Identifier)
 	if identifier == "" {
 		errs["identifier"] = "Identifier is required"
 	} else if validator, ok := applicationIdentifierValidators[ruleType]; ok && !validator.regex.MatchString(identifier) {
@@ -214,7 +206,11 @@ func (h Handler) validateApplicationInput(ctx context.Context, body createApplic
 	}
 	result.Identifier = identifier
 
-	result.Description = strings.TrimSpace(body.Description)
+	result.Description = strings.TrimSpace(input.Description)
+	result.BlockMessage = strings.TrimSpace(input.BlockMessage)
+	if utf8.RuneCountInString(result.BlockMessage) > 500 {
+		errs["block_message"] = "Block message must be 500 characters or fewer"
+	}
 
 	if len(errs) > 0 {
 		return result, errs, nil, nil
@@ -226,6 +222,9 @@ func (h Handler) validateApplicationInput(ctx context.Context, body createApplic
 			return result, nil, nil, nil
 		}
 		return result, nil, nil, err
+	}
+	if excludeID != nil && rule.ID == *excludeID {
+		return result, nil, nil, nil
 	}
 	dto := mapApplication(rule)
 	return result, fieldErrors{

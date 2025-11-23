@@ -1,8 +1,8 @@
 package santa
 
 import (
-	"compress/flate"
 	"compress/gzip"
+	"compress/zlib"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,7 +21,7 @@ func decodeBody(r *http.Request) (io.ReadCloser, error) {
 		}
 		return reader, nil
 	case "deflate":
-		return flate.NewReader(r.Body), nil
+		return zlib.NewReader(r.Body)
 	default:
 		return nil, fmt.Errorf("unsupported content encoding %q", r.Header.Get("Content-Encoding"))
 	}

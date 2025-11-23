@@ -2,8 +2,10 @@ import React, { type ErrorInfo, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider, CssBaseline, useMediaQuery } from "@mui/material";
-import type { PaletteMode } from "@mui/material";
+import { ThemeProvider, CssBaseline, useMediaQuery, type PaletteMode } from "@mui/material";
+import { ConfirmProvider } from "material-ui-confirm";
+import { SnackbarProvider } from "notistack";
+
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { createAppTheme } from "./styles/theme";
@@ -21,17 +23,25 @@ const handleError = (error: Error, info: ErrorInfo) => {
   console.error("App error", { error, info });
 };
 
-function Root() {
+export function Root() {
   const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
-  const paletteMode: PaletteMode = prefersDark ? "dark" : "light";
-  const theme = useMemo(() => createAppTheme(paletteMode), [paletteMode]);
+  const mode: PaletteMode = prefersDark ? "dark" : "light";
+
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ConfirmProvider>
+        <SnackbarProvider
+          maxSnack={3}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </SnackbarProvider>
+      </ConfirmProvider>
     </ThemeProvider>
   );
 }

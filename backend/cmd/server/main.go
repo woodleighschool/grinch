@@ -89,14 +89,14 @@ func main() {
 		logger.Warn("graph client", "err", err)
 	}
 	if graphClient != nil && graphClient.Enabled() {
-		if err := scheduler.Add(cfg.SyncCron, "entra-users", syncer.NewUserJob(db, graphClient, logger)); err != nil {
+		if err := scheduler.Add(cfg.SyncCron, "entra-users", 15*time.Minute, syncer.NewUserJob(db, graphClient, logger)); err != nil {
 			logger.Warn("schedule users", "err", err)
 		}
-		if err := scheduler.Add(cfg.SyncCron, "entra-groups", syncer.NewGroupJob(db, graphClient, logger)); err != nil {
+		if err := scheduler.Add(cfg.SyncCron, "entra-groups", 15*time.Minute, syncer.NewGroupJob(db, graphClient, logger)); err != nil {
 			logger.Warn("schedule groups", "err", err)
 		}
 	}
-	if err := scheduler.Add("@every 10m", "rule-compiler", syncer.NewRuleCompilerJob(db, compiler, logger)); err != nil {
+	if err := scheduler.Add("@every 10m", "rule-compiler", 5*time.Minute, syncer.NewRuleCompilerJob(db, compiler, logger)); err != nil {
 		logger.Warn("schedule compiler", "err", err)
 	}
 	scheduler.Start()

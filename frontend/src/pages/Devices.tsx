@@ -1,92 +1,108 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link as RouterLink } from "react-router-dom";
-import { Box, Button, Card, CardContent, CardHeader } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Paper, Stack } from "@mui/material";
+import { DataGrid, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
+import DevicesOtherIcon from "@mui/icons-material/DevicesOther";
 
+import { EmptyState, PageHeader } from "../components";
 import { useDevices } from "../hooks/useQueries";
+import { useToast } from "../hooks/useToast";
 import { formatDateTime } from "../utils/dates";
-import { PageSnackbar, type PageToast } from "../components";
+
+type DeviceRow = {
+  id: string;
+  hostname: string;
+  serial: string;
+  primaryUser: string | undefined;
+  clientMode: string | undefined;
+  lastSeen: string | undefined;
+};
+
+const deviceColumns: GridColDef<DeviceRow>[] = [
+  {
+    field: "hostname",
+    headerName: "Hostname",
+    flex: 1,
+  },
+  {
+    field: "serial",
+    headerName: "Serial",
+    flex: 1,
+  },
+  {
+    field: "primaryUser",
+    headerName: "Primary user",
+    flex: 1,
+  },
+  {
+    field: "clientMode",
+    headerName: "Mode",
+    flex: 1,
+  },
+  {
+    field: "lastSeen",
+    headerName: "Last seen",
+    flex: 1,
+    valueFormatter: (value) => formatDateTime(value as string),
+  },
+];
 
 export default function Devices() {
+  const navigate = useNavigate();
   const { data: devices = [], isLoading, error } = useDevices({});
-
-  const [toast, setToast] = useState<PageToast>({
-    open: false,
-    message: "",
-    severity: "error",
-  });
+  const { showToast } = useToast();
 
   useEffect(() => {
-    if (error) {
-      setToast({
-        open: true,
-        message: error instanceof Error ? error.message : "Failed to load devices",
-        severity: "error",
-      });
-    }
-  }, [error]);
+    if (!error) return;
 
-  const columns = useMemo<GridColDef[]>(
-    () => [
-      { field: "hostname", headerName: "Hostname", flex: 1 },
-      { field: "serial", headerName: "Serial", flex: 1 },
-      { field: "primaryUser", headerName: "Primary user", flex: 1 },
-      { field: "clientMode", headerName: "Mode", flex: 1 },
-      {
-        field: "lastSeen",
-        headerName: "Last seen",
-        flex: 1,
-        valueFormatter: (value) => formatDateTime(value as string),
-      },
-      {
-        field: "actions",
-        headerName: "Actions",
-        flex: 1,
-        sortable: false,
-        filterable: false,
-        renderCell: ({ row }) => (
-          <Button component={RouterLink} to={`/devices/${row.id}`} size="small" variant="outlined">
-            View details
-          </Button>
-        ),
-      },
-    ],
-    [],
-  );
+    showToast({
+      message: error instanceof Error ? error.message : "Failed to load devices",
+      severity: "error",
+    });
+  }, [error, showToast]);
 
-  const rows = useMemo(
-    () =>
-      devices.map((device) => ({
-        id: device.id,
-        hostname: device.hostname,
-        serial: device.serial,
-        primaryUser: device.primaryUser,
-        clientMode: device.clientMode,
-        lastSeen: device.lastSeen,
-        machineIdentifier: device.machineIdentifier,
-      })),
-    [devices],
-  );
+  const rows: DeviceRow[] = devices.map((device) => ({
+    id: device.id,
+    hostname: device.hostname,
+    serial: device.serial,
+    primaryUser: device.primaryUser,
+    clientMode: device.clientMode,
+    lastSeen: device.lastSeen,
+  }));
 
   return (
-    <Card elevation={1}>
-      <CardHeader title="Devices" subheader="Monitor Santa agents across your fleet." />
-      {/* TODO: add device overview Chips? */}
-      <CardContent>
-        <Box height={600}>
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            showToolbar
-            loading={isLoading}
-            initialState={{
-              sorting: { sortModel: [{ field: "hostname", sort: "asc" }] },
-            }}
-          />
-        </Box>
+    <Stack spacing={3}>
+      <PageHeader
+        title="Devices"
+        subtitle="Monitor Santa agents across your fleet."
+      />
 
-        <PageSnackbar toast={toast} onClose={() => setToast((prev) => ({ ...prev, open: false }))} />
-      </CardContent>
-    </Card>
+      <Paper sx={{ height: 640, width: "100%" }}>
+        <DataGrid
+          rows={rows}
+          columns={deviceColumns}
+          showToolbar
+          loading={isLoading}
+          disableRowSelectionOnClick
+          onRowClick={(params: GridRowParams<DeviceRow>) => {
+            void navigate(`/devices/${String(params.id)}`);
+          }}
+          initialState={{
+            sorting: {
+              sortModel: [{ field: "hostname", sort: "asc" }],
+            },
+          }}
+          slots={{
+            noRowsOverlay: () => (
+              <EmptyState
+                title="No Devices Found"
+                description="No devices have checked in yet. Ensure your MDM profile is deployed."
+                icon={<DevicesOtherIcon fontSize="inherit" />}
+              />
+            ),
+          }}
+        />
+      </Paper>
+    </Stack>
   );
 }

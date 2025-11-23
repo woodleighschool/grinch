@@ -57,11 +57,13 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	serialNumber := strings.TrimSpace(req.GetSerialNumber())
 	if serialNumber == "" {
-		respondError(w, http.StatusBadRequest, "serial_num required")
-		return
+		// Fallback to machine identifier if serial number is missing, for testing in UTM.
+		h.logger.Warn("preflight missing serial number, using machine identifier")
+		serialNumber = machineIdentifier
 	}
 	primaryUser := strings.TrimSpace(req.GetPrimaryUser())
 	if primaryUser == "" {
+		h.logger.Error("preflight missing primary user")
 		respondError(w, http.StatusBadRequest, "primary_user required")
 		return
 	}

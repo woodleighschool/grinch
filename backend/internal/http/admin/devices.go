@@ -15,7 +15,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
-type machineDTO struct {
+type deviceDTO struct {
 	ID                   string          `json:"id"`
 	MachineIdentifier    string          `json:"machineIdentifier"`
 	Serial               string          `json:"serial"`
@@ -34,51 +34,51 @@ type machineDTO struct {
 	SyncCursor           string          `json:"syncCursor"`
 }
 
-type machineDetailsResponse struct {
-	Machine      machineDTO   `json:"machine"`
+type deviceDetailsResponse struct {
+	Device       deviceDTO    `json:"device"`
 	PrimaryUser  userDTO      `json:"primary_user"`
 	RecentBlocks []eventDTO   `json:"recent_blocks"`
 	Policies     []userPolicy `json:"policies"`
 }
 
-func (h Handler) machinesRoutes(r chi.Router) {
-	r.Get("/", h.listMachines)
-	r.Get("/{id}", h.machineDetails)
+func (h Handler) devicesRoutes(r chi.Router) {
+	r.Get("/", h.listDevices)
+	r.Get("/{id}", h.deviceDetails)
 }
 
-func (h Handler) listMachines(w http.ResponseWriter, r *http.Request) {
+func (h Handler) listDevices(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 50)
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 	machines, err := h.Store.ListMachines(r.Context(), int32(limit), int32(offset), search)
 	if err != nil {
-		h.Logger.Error("list machines", "err", err)
-		respondError(w, http.StatusInternalServerError, "failed to list machines")
+		h.Logger.Error("list devices", "err", err)
+		respondError(w, http.StatusInternalServerError, "failed to list devices")
 		return
 	}
-	resp := make([]machineDTO, 0, len(machines))
+	resp := make([]deviceDTO, 0, len(machines))
 	for _, m := range machines {
-		resp = append(resp, mapMachine(m))
+		resp = append(resp, mapDevice(m))
 	}
 	respondJSON(w, http.StatusOK, resp)
 }
 
-func (h Handler) machineDetails(w http.ResponseWriter, r *http.Request) {
+func (h Handler) deviceDetails(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	machineID, err := uuid.Parse(idParam)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "invalid machine id")
+		respondError(w, http.StatusBadRequest, "invalid device id")
 		return
 	}
 	ctx := r.Context()
 	machine, err := h.Store.GetMachine(ctx, machineID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			respondError(w, http.StatusNotFound, "machine not found")
+			respondError(w, http.StatusNotFound, "device not found")
 			return
 		}
-		h.Logger.Error("get machine", "err", err, "machine", machineID)
-		respondError(w, http.StatusInternalServerError, "failed to load machine")
+		h.Logger.Error("get device", "err", err, "device", machineID)
+		respondError(w, http.StatusInternalServerError, "failed to load device")
 		return
 	}
 
@@ -90,34 +90,34 @@ func (h Handler) machineDetails(w http.ResponseWriter, r *http.Request) {
 	if machine.UserID.Valid {
 		userID, err := uuid.FromBytes(machine.UserID.Bytes[:])
 		if err != nil {
-			h.Logger.Error("parse machine primary user id", "err", err, "machine", machineID)
+			h.Logger.Error("parse device primary user id", "err", err, "device", machineID)
 			respondError(w, http.StatusInternalServerError, "failed to parse user id")
 			return
 		}
 		primaryUser, err = h.Store.GetUser(ctx, userID)
 		if err != nil {
-			h.Logger.Error("get machine primary user", "err", err, "machine", machine, "user", machine.PrimaryUser)
-			respondError(w, http.StatusInternalServerError, "failed to load machine primary user")
+			h.Logger.Error("get device primary user", "err", err, "device", machine, "user", machine.PrimaryUser)
+			respondError(w, http.StatusInternalServerError, "failed to load device primary user")
 			return
 		}
 		events, err = h.Store.ListBlocksByUser(ctx, pgtype.UUID{Bytes: userID, Valid: true})
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			h.Logger.Error("get machine primary user block events", "err", err, "machine", machineID, "user", machine.PrimaryUser)
-			respondError(w, http.StatusInternalServerError, "failed to load machine primary user block events")
+			h.Logger.Error("get device primary user block events", "err", err, "device", machineID, "user", machine.PrimaryUser)
+			respondError(w, http.StatusInternalServerError, "failed to load device primary user block events")
 			return
 		}
 		assignments, err = h.Store.ListUserAssignments(ctx, userID)
 		if err != nil {
-			h.Logger.Error("list machine primary user policies", "err", err, "machine", machineID, "user", machine.UserID)
-			respondError(w, http.StatusInternalServerError, "failed to load machine primary user policies")
+			h.Logger.Error("list device primary user policies", "err", err, "device", machineID, "user", machine.UserID)
+			respondError(w, http.StatusInternalServerError, "failed to load device primary user policies")
 			return
 		}
 	} else {
-		h.Logger.Warn("machine missing primary user", "machine", machineID)
+		h.Logger.Warn("device missing primary user", "device", machineID)
 	}
 
-	resp := machineDetailsResponse{
-		Machine:      mapMachine(machine),
+	resp := deviceDetailsResponse{
+		Device:       mapDevice(machine),
 		PrimaryUser:  mapUserDTO(primaryUser),
 		RecentBlocks: mapUserBlocks(events),
 		Policies:     mapUserPolicies(assignments, primaryUser),
@@ -125,7 +125,7 @@ func (h Handler) machineDetails(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
-func mapMachine(m sqlc.Machine) machineDTO {
+func mapDevice(m sqlc.Machine) deviceDTO {
 	var lastSeen time.Time
 	if m.LastSeen.Valid {
 		lastSeen = m.LastSeen.Time
@@ -138,7 +138,7 @@ func mapMachine(m sqlc.Machine) machineDTO {
 	if m.LastPostflightAt.Valid {
 		lastPostflight = m.LastPostflightAt.Time
 	}
-	return machineDTO{
+	return deviceDTO{
 		ID:                   m.ID.String(),
 		MachineIdentifier:    m.MachineIdentifier,
 		Serial:               m.Serial,

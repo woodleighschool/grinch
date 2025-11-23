@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -25,6 +26,7 @@ func (h Handler) groupsRoutes(r chi.Router) {
 	r.Get("/", h.listGroups)
 	r.Post("/", h.upsertGroup)
 	r.Delete("/{id}", h.deleteGroup)
+	r.Get("/{id}/members", h.groupEffectiveMembers)
 	r.Get("/{id}/effective-members", h.groupEffectiveMembers)
 }
 
@@ -72,6 +74,7 @@ func (h Handler) upsertGroup(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusInternalServerError, "members update failed")
 			return
 		}
+		go h.recompileGroupRules(context.WithoutCancel(r.Context()), body.ID)
 	}
 	respondJSON(w, http.StatusOK, groupDTO{
 		ID:          group.ID,

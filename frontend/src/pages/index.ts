@@ -10,3 +10,5 @@ export { default as ApplicationDetails } from "./ApplicationDetails";
 export { default as UserDetails } from "./UserDetails";
 
 export type { SelectedTarget } from "./ApplicationDetails";
+
+export { default as Events } from "./Events";

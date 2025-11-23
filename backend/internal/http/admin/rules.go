@@ -1,12 +1,14 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/woodleighschool/grinch/internal/rules"
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
@@ -69,6 +71,7 @@ func (h Handler) createRule(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "create failed")
 		return
 	}
+	go h.recompileRuleAssignments(context.WithoutCancel(r.Context()), rule)
 	respondJSON(w, http.StatusCreated, mapRule(rule))
 }
 
@@ -102,6 +105,7 @@ func (h Handler) updateRule(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "update failed")
 		return
 	}
+	go h.recompileRuleAssignments(context.WithoutCancel(r.Context()), rule)
 	respondJSON(w, http.StatusOK, mapRule(rule))
 }
 
@@ -116,19 +120,59 @@ func (h Handler) deleteRule(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "delete failed")
 		return
 	}
-	respondJSON(w, http.StatusNoContent, nil)
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func mapRule(rule sqlc.Rule) ruleDTO {
-	var metadata map[string]any
-	_ = json.Unmarshal(rule.Metadata, &metadata)
+func (h Handler) recompileRuleAssignments(ctx context.Context, rule sqlc.Rule) {
+	meta, err := rules.ParseMetadata(rule.Metadata)
+	if err != nil {
+		h.Logger.Warn("skip rule metadata", "rule", rule.ID, "err", err)
+		return
+	}
+	ruleScopes, err := h.Store.ListRuleScopes(ctx, rule.ID)
+	if err != nil {
+		h.Logger.Error("list rule scopes", "rule", rule.ID, "err", err)
+		return
+	}
+	memberMap := map[uuid.UUID][]uuid.UUID{}
+	for _, groupID := range rules.CollectGroupIDs(meta, ruleScopes) {
+		members, err := h.Store.ListGroupMemberIDs(ctx, groupID)
+		if err != nil {
+			h.Logger.Warn("list group members", "group", groupID, "err", err)
+			continue
+		}
+		memberMap[groupID] = members
+	}
+	assignments := h.Compiler.CompileAssignments(rule, ruleScopes, meta, memberMap)
+	if err := h.Store.ReplaceRuleAssignments(ctx, rule.ID, assignments); err != nil {
+		h.Logger.Error("replace rule assignments", "rule", rule.ID, "err", err)
+	}
+}
+
+func (h Handler) recompileGroupRules(ctx context.Context, groupID uuid.UUID) {
+	ruleIDs, err := h.Store.ListRulesByGroupTarget(ctx, groupID)
+	if err != nil {
+		h.Logger.Error("list rules by group target", "group", groupID, "err", err)
+		return
+	}
+	for _, ruleID := range ruleIDs {
+		rule, err := h.Store.GetRule(ctx, ruleID)
+		if err != nil {
+			h.Logger.Error("get rule for recompilation", "rule", ruleID, "err", err)
+			continue
+		}
+		h.recompileRuleAssignments(ctx, rule)
+	}
+}
+
+func mapRule(r sqlc.Rule) ruleDTO {
 	return ruleDTO{
-		ID:       rule.ID,
-		Name:     rule.Name,
-		Type:     rule.Type,
-		Target:   rule.Target,
-		Scope:    rule.Scope,
-		Enabled:  rule.Enabled,
-		Metadata: metadata,
+		ID:       r.ID,
+		Name:     r.Name,
+		Type:     r.Type,
+		Target:   r.Target,
+		Scope:    r.Scope,
+		Enabled:  r.Enabled,
+		Metadata: rules.SerialiseMetadata(r.Metadata),
 	}
 }

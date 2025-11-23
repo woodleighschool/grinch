@@ -1,26 +1,13 @@
-import { useMemo, useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { format, isValid, parseISO } from "date-fns";
-import { useBlockedEvents, useEventStats } from "../hooks/useQueries";
-import { formatDateTime } from "../utils/dates";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
-  LinearProgress,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { group } from "d3-array";
+import { Card, CardContent, CardHeader, LinearProgress, Stack, Typography, useTheme } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
-import { PageSnackbar, type PageToast } from "../components";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+
+import { EmptyState, PageHeader } from "../components";
+import { useEventStats } from "../hooks/useQueries";
+import { useToast } from "../hooks/useToast";
 
 type ChartDay = {
   day: string;
@@ -29,23 +16,31 @@ type ChartDay = {
   total: number;
 };
 
-type EventVolumeChartProps = {
+interface EventVolumeChartProps {
   dataset: ChartDay[];
   kinds: string[];
   totalEvents: number;
   colorForKind: (kind: string) => string;
-};
+}
 
 function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVolumeChartProps) {
   if (dataset.length === 0 || kinds.length === 0) {
-    return <Typography color="text.secondary">Not enough event history yet.</Typography>;
+    return (
+      <EmptyState
+        title="No Data Available"
+        description="Not enough event history yet to display trends."
+        icon={<EventNoteIcon fontSize="inherit" />}
+      />
+    );
   }
 
   const chartDataset = dataset.map((day) => {
     const base: Record<string, number | string> = { label: day.label };
+
     kinds.forEach((kind) => {
       base[kind] = day.counts[kind] ?? 0;
     });
+
     return base;
   });
 
@@ -65,10 +60,17 @@ function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVo
         series={series}
         margin={{ top: 16, bottom: 80, left: 48, right: 24 }}
         slotProps={{
-          legend: { direction: "horizontal", position: { vertical: "bottom", horizontal: "start" } },
+          legend: {
+            direction: "horizontal",
+            position: { vertical: "bottom", horizontal: "start" },
+          },
         }}
       />
-      <Typography variant="body2" color="text.secondary">
+
+      <Typography
+        variant="body2"
+        color="text.secondary"
+      >
         {totalEvents.toLocaleString()} total events (last 14 days)
       </Typography>
     </Stack>
@@ -76,46 +78,67 @@ function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVo
 }
 
 export default function Dashboard() {
-  const { events, loading, error } = useBlockedEvents();
-  const { stats, loading: statsLoading, error: statsError } = useEventStats(14);
   const theme = useTheme();
-
-  const [toast, setToast] = useState<PageToast>({ open: false, message: "" });
-
-  useEffect(() => {
-    if (error) {
-      console.error("Recent events load failed", error);
-      setToast({ open: true, message: "Failed to load recent events." });
-    }
-  }, [error]);
+  const { stats, loading: statsLoading, error: statsError } = useEventStats(14);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    if (statsError) {
-      console.error("Event stats load failed", statsError);
-      setToast({ open: true, message: "Failed to load policy outcome trends." });
-    }
-  }, [statsError]);
+    if (statsError == null) return;
+
+    console.error("Event stats load failed", statsError);
+    const message = statsError || "Failed to load policy outcome trends.";
+    showToast({
+      message,
+      severity: "error",
+    });
+  }, [statsError, showToast]);
 
   const chartData = useMemo(() => {
-    if (!stats || stats.length === 0) {
-      return { dataset: [] as ChartDay[], kinds: [] as string[], totalEvents: 0 };
+    if (stats.length === 0) {
+      return {
+        dataset: [] as ChartDay[],
+        kinds: [] as string[],
+        totalEvents: 0,
+      };
     }
 
-    const dayMap = new Map<string, ChartDay>();
     const kindSet = new Set<string>();
-
-    stats.forEach(({ bucket, kind, total }) => {
+    const grouped = group(stats, ({ bucket }) => {
       const parsed = parseISO(bucket);
-      const dayKey = isValid(parsed) ? format(parsed, "yyyy-MM-dd") : bucket;
-      const label = isValid(parsed) ? format(parsed, "MMM d") : bucket;
-      const existing = dayMap.get(dayKey) ?? { day: dayKey, label, counts: {}, total: 0 };
-      existing.counts[kind] = (existing.counts[kind] ?? 0) + total;
-      existing.total += total;
-      dayMap.set(dayKey, existing);
-      kindSet.add(kind);
+      return isValid(parsed) ? format(parsed, "yyyy-MM-dd") : bucket;
     });
 
-    const dataset = Array.from(dayMap.values()).sort((a, b) => a.day.localeCompare(b.day));
+    const dataset: ChartDay[] = [];
+
+    grouped.forEach((entries, dayKey) => {
+      const entryArray = Array.from(entries);
+      if (entryArray.length === 0) return;
+
+      const firstEntry = entryArray[0];
+      if (!firstEntry) return;
+      const parsed = parseISO(firstEntry.bucket);
+      const label = isValid(parsed) ? format(parsed, "MMM d") : firstEntry.bucket;
+      const counts: Record<string, number> = {};
+      let total = 0;
+
+      entryArray.forEach(({ kind, total: entryTotal }) => {
+        counts[kind] = (counts[kind] ?? 0) + entryTotal;
+        total += entryTotal;
+        kindSet.add(kind);
+      });
+
+      if (total === 0) return;
+
+      dataset.push({
+        day: dayKey,
+        label,
+        counts,
+        total,
+      });
+    });
+
+    dataset.sort((a, b) => a.day.localeCompare(b.day));
+
     const priority: Record<string, number> = {
       BLOCKLIST: 0,
       BLOCK_BINARY: 0,
@@ -125,7 +148,9 @@ export default function Dashboard() {
       ALLOW_BINARY: 3,
       ALLOW_CERTIFICATE: 3,
     };
+
     const kinds = Array.from(kindSet).sort((a, b) => (priority[a] ?? 99) - (priority[b] ?? 99) || a.localeCompare(b));
+
     const totalEvents = dataset.reduce((sum, day) => sum + day.total, 0);
 
     return { dataset, kinds, totalEvents };
@@ -135,80 +160,39 @@ export default function Dashboard() {
     if (kind.includes("BLOCK")) {
       return kind.includes("SILENT") ? theme.palette.warning.main : theme.palette.error.main;
     }
+
     if (kind.includes("ALLOW")) {
       return kind.includes("UNKNOWN") ? theme.palette.warning.main : theme.palette.success.main;
     }
+
     return theme.palette.info.main;
   };
 
-  const handleToastClose = () => setToast((prev) => ({ ...prev, open: false }));
-
   return (
     <Stack spacing={3}>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Overview of recent activity and policy outcomes."
+      />
+
       <Card elevation={1}>
-        <CardHeader title="Policy Outcomes" subheader="Stacked daily totals from the last 14 days" />
+        <CardHeader
+          title="Policy Outcomes"
+          subheader="Stacked daily totals from the last 14 days."
+        />
         {statsLoading && <LinearProgress />}
+
         <CardContent>
           {!statsLoading && (
-            <EventVolumeChart dataset={chartData.dataset} kinds={chartData.kinds} totalEvents={chartData.totalEvents} colorForKind={colorForKind} />
+            <EventVolumeChart
+              dataset={chartData.dataset}
+              kinds={chartData.kinds}
+              totalEvents={chartData.totalEvents}
+              colorForKind={colorForKind}
+            />
           )}
         </CardContent>
       </Card>
-
-      <Card elevation={1}>
-        <CardHeader title="Recent Santa Events" subheader="Incoming telemetry from Santa agents appears as it is ingested." />
-        {loading && <LinearProgress />}
-        <CardContent>
-          {!loading && events.length === 0 && <Typography color="text.secondary">No events recorded yet.</Typography>}
-          {events.length > 0 && (
-            <TableContainer component={Paper}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Occurred</TableCell>
-                    <TableCell>Process</TableCell>
-                    <TableCell>Machine</TableCell>
-                    <TableCell>User</TableCell>
-                    <TableCell>Result</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {events.map((event) => {
-                    const occurredAt = event.occurredAt ? formatDateTime(event.occurredAt) : "—";
-                    const processPath = typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind;
-                    const reason = typeof event.payload?.decision === "string" ? event.payload.decision : event.kind;
-                    var eventStatus: "warning" | "success" | "error" | "info";
-                    if (reason.includes("ALLOW")) {
-                      eventStatus = reason.includes("UNKNOWN") ? "warning" : "success";
-                    } else if (reason.includes("BLOCK")) {
-                      eventStatus = reason.includes("UNKNOWN") ? "warning" : "error";
-                    } else {
-                      eventStatus = "info";
-                    }
-
-                    return (
-                      <TableRow key={event.id} hover>
-                        <TableCell>{occurredAt}</TableCell>
-                        <TableCell>
-                          <Typography noWrap title={processPath} variant="body2">
-                            {processPath}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{event.hostname}</TableCell>
-                        <TableCell>{event.email}</TableCell>
-                        <TableCell>
-                          <Chip label={reason} color={eventStatus} size="small" />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
-      <PageSnackbar toast={toast} onClose={handleToastClose} />
     </Stack>
   );
 }

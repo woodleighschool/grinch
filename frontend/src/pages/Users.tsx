@@ -1,78 +1,79 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link as RouterLink } from "react-router-dom";
-import { Box, Button, Card, CardContent, CardHeader } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Paper, Stack } from "@mui/material";
+import { DataGrid, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
+import GroupOffIcon from "@mui/icons-material/GroupOff";
 
+import { PageHeader, EmptyState } from "../components";
+import { useToast } from "../hooks/useToast";
 import { useUsers } from "../hooks/useQueries";
-import { PageSnackbar, type PageToast } from "../components";
+
+type UserRow = {
+  id: string;
+  displayName: string;
+  upn: string;
+};
+
+const columns: GridColDef<UserRow>[] = [
+  { field: "displayName", headerName: "Name", flex: 1 },
+  { field: "upn", headerName: "UPN", flex: 1 },
+];
 
 export default function Users() {
+  const navigate = useNavigate();
   const { data: users = [], isLoading, error } = useUsers({});
-
-  const [toast, setToast] = useState<PageToast>({
-    open: false,
-    message: "",
-    severity: "error",
-  });
+  const { showToast } = useToast();
 
   useEffect(() => {
-    if (error) {
-      setToast({
-        open: true,
-        message: error instanceof Error ? error.message : "Failed to load users",
-        severity: "error",
-      });
-    }
-  }, [error]);
+    if (!error) return;
 
-  const columns = useMemo<GridColDef[]>(
-    () => [
-      { field: "displayName", headerName: "Name", flex: 1 },
-      { field: "upn", headerName: "UPN", flex: 1 },
-      {
-        field: "actions",
-        headerName: "Actions",
-        flex: 1,
-        sortable: false,
-        filterable: false,
-        renderCell: ({ row }) => (
-          <Button component={RouterLink} to={`/users/${row.id}`} size="small" variant="outlined">
-            View details
-          </Button>
-        ),
-      },
-    ],
-    [],
-  );
+    showToast({
+      message: error instanceof Error ? error.message : "Failed to load users",
+      severity: "error",
+    });
+  }, [error, showToast]);
 
-  const rows = useMemo(
-    () =>
-      users.map((user) => ({
-        id: user.id,
-        displayName: user.displayName,
-        upn: user.upn,
-      })),
-    [users],
-  );
+  const handleRowClick = (params: GridRowParams<UserRow>) => {
+    void navigate(`/users/${String(params.id)}`);
+  };
+
+  const rows: UserRow[] = users.map((user) => ({
+    id: user.id,
+    displayName: user.displayName,
+    upn: user.upn,
+  }));
 
   return (
-    <Card elevation={1}>
-      <CardHeader title="Users" subheader="Manage user access from your Entra ID directory." />
-      <CardContent>
-        <Box height={600}>
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            showToolbar
-            loading={isLoading}
-            initialState={{
-              sorting: { sortModel: [{ field: "displayName", sort: "asc" }] },
-            }}
-          />
-        </Box>
+    <Stack spacing={3}>
+      <PageHeader
+        title="Users"
+        subtitle="Manage user access from your Entra ID directory."
+      />
 
-        <PageSnackbar toast={toast} onClose={() => setToast((prev) => ({ ...prev, open: false }))} />
-      </CardContent>
-    </Card>
+      <Paper sx={{ height: 640 }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          showToolbar
+          loading={isLoading}
+          disableRowSelectionOnClick
+          onRowClick={handleRowClick}
+          initialState={{
+            sorting: {
+              sortModel: [{ field: "displayName", sort: "asc" }],
+            },
+          }}
+          slots={{
+            noRowsOverlay: () => (
+              <EmptyState
+                title="No Users Found"
+                description="No users are available yet. Try again after syncing with your directory."
+                icon={<GroupOffIcon fontSize="inherit" />}
+              />
+            ),
+          }}
+        />
+      </Paper>
+    </Stack>
   );
 }

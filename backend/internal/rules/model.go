@@ -2,6 +2,7 @@ package rules
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,9 +32,10 @@ const (
 )
 
 type RuleMetadata struct {
-	Description string      `json:"description"`
-	Users       []uuid.UUID `json:"users"`
-	Groups      []uuid.UUID `json:"groups"`
+	Description  string      `json:"description"`
+	BlockMessage string      `json:"block_message"`
+	Users        []uuid.UUID `json:"users"`
+	Groups       []uuid.UUID `json:"groups"`
 }
 
 type SyncRule struct {
@@ -57,17 +59,19 @@ func ParseMetadata(raw []byte) (RuleMetadata, error) {
 		return RuleMetadata{}, nil
 	}
 	var wire struct {
-		Description string   `json:"description"`
-		Users       []string `json:"users"`
-		Groups      []string `json:"groups"`
+		Description  string   `json:"description"`
+		BlockMessage string   `json:"block_message"`
+		Users        []string `json:"users"`
+		Groups       []string `json:"groups"`
 	}
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return RuleMetadata{}, err
 	}
 	return RuleMetadata{
-		Description: wire.Description,
-		Users:       parseUUIDs(wire.Users),
-		Groups:      parseUUIDs(wire.Groups),
+		Description:  strings.TrimSpace(wire.Description),
+		BlockMessage: strings.TrimSpace(wire.BlockMessage),
+		Users:        parseUUIDs(wire.Users),
+		Groups:       parseUUIDs(wire.Groups),
 	}, nil
 }
 

@@ -43,7 +43,7 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 				Target:    row.Target,
 				Scope:     RuleScopeGlobal,
 				Action:    RuleActionAllow,
-				CustomMsg: meta.Description,
+				CustomMsg: meta.BlockMessage,
 				CreatedAt: createdAt,
 			})
 			continue
@@ -57,12 +57,28 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 				Target:    row.Target,
 				Scope:     scopeFromTargetType(assignment.TargetType),
 				Action:    RuleAction(assignment.Action),
-				CustomMsg: meta.Description,
+				CustomMsg: meta.BlockMessage,
 				CreatedAt: createdAt,
 			})
 		}
 	}
 	syncRules = normaliseSyncRules(syncRules)
+
+	if len(syncRules) == 0 {
+		// Santa ignores empty rule lists during sync, so we must provide at least one rule.
+		// TODO: This rule is not removed when rules are re-added
+		syncRules = append(syncRules, SyncRule{
+			ID:        uuid.Nil,
+			Name:      "NOOP",
+			Type:      RuleTypeBinary,
+			Target:    "0000000000000000000000000000000000000000000000000000000000000000",
+			Scope:     RuleScopeGlobal,
+			Action:    RuleActionAllow,
+			CustomMsg: "NOOP",
+			CreatedAt: time.Time{},
+		})
+	}
+
 	return SyncPayload{Cursor: ComputeCursor(syncRules), Rules: syncRules}
 }
 
@@ -215,4 +231,28 @@ func SerialiseMetadata(meta []byte) map[string]any {
 	var out map[string]any
 	_ = json.Unmarshal(meta, &out)
 	return out
+}
+
+func CollectGroupIDs(meta RuleMetadata, scopes []sqlc.RuleScope) []uuid.UUID {
+	seen := map[uuid.UUID]struct{}{}
+	var ids []uuid.UUID
+	for _, gid := range meta.Groups {
+		if _, ok := seen[gid]; ok {
+			continue
+		}
+		seen[gid] = struct{}{}
+		ids = append(ids, gid)
+	}
+	for _, scope := range scopes {
+		if scope.TargetType != "group" {
+			continue
+		}
+		gid := scope.TargetID
+		if _, ok := seen[gid]; ok {
+			continue
+		}
+		seen[gid] = struct{}{}
+		ids = append(ids, gid)
+	}
+	return ids
 }

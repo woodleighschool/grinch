@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -67,11 +69,34 @@ func (h *eventUploadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		if evt == nil {
 			continue
 		}
-		payload, err := marshalProtoJSON(evt)
+		fullPayload, err := marshalProtoJSON(evt)
 		if err != nil {
 			h.logger.Warn("skip event marshal", "machine", machineIdentifier, "index", idx, "err", err)
 			continue
 		}
+
+		fileMeta, strippedPayload, err := splitEventPayload(evt, fullPayload)
+		if err != nil {
+			h.logger.Warn("skip event payload", "machine", machineIdentifier, "index", idx, "err", err)
+			continue
+		}
+
+		if fileMeta.SHA256 != "" {
+			if err := h.store.UpsertFile(ctx, sqlc.UpsertFileParams{
+				Sha256:       fileMeta.SHA256,
+				Name:         fileMeta.Name,
+				SigningID:    pgtype.Text{String: fileMeta.SigningID, Valid: fileMeta.SigningID != ""},
+				Cdhash:       pgtype.Text{String: fileMeta.CDHash, Valid: fileMeta.CDHash != ""},
+				SigningChain: fileMeta.SigningChain,
+				Entitlements: fileMeta.Entitlements,
+			}); err != nil {
+				h.logger.Error("upsert file", "sha", fileMeta.SHA256, "err", err)
+			}
+		}
+		if len(strippedPayload) == 0 {
+			strippedPayload = []byte("{}")
+		}
+
 		userID := resolveUserID(ctx, h.store, h.logger, evt.GetExecutingUser())
 		var occurred pgtype.Timestamptz
 		if ts := timestampFromFloat(evt.GetExecutionTime()); !ts.IsZero() {
@@ -81,8 +106,9 @@ func (h *eventUploadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			MachineID:  machine.ID,
 			UserID:     uuidPtrToPgtype(userID),
 			Kind:       evt.GetDecision().String(),
-			Payload:    payload,
+			Payload:    strippedPayload,
 			OccurredAt: occurred,
+			FileSha256: pgtype.Text{String: fileMeta.SHA256, Valid: fileMeta.SHA256 != ""},
 		}); err != nil {
 			h.logger.Error("insert event", "err", err)
 			respondError(w, http.StatusInternalServerError, "persist failed")
@@ -103,4 +129,58 @@ func timestampFromFloat(value float64) time.Time {
 	sec := int64(integer)
 	nsec := int64(frac * float64(time.Second))
 	return time.Unix(sec, nsec).UTC()
+}
+
+type eventFileMetadata struct {
+	SHA256       string
+	Name         string
+	SigningID    string
+	CDHash       string
+	SigningChain []byte
+	Entitlements []byte
+}
+
+func splitEventPayload(evt *syncv1.Event, payload []byte) (eventFileMetadata, []byte, error) {
+	meta := eventFileMetadata{
+		SHA256:    evt.GetFileSha256(),
+		Name:      evt.GetFileName(),
+		SigningID: evt.GetSigningId(),
+		CDHash:    evt.GetCdhash(),
+	}
+	if len(payload) == 0 {
+		return meta, []byte("{}"), nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return eventFileMetadata{}, nil, err
+	}
+	if v, ok := raw["signing_chain"]; ok {
+		meta.SigningChain = cloneRawJSON(v)
+	}
+	if v, ok := raw["entitlement_info"]; ok {
+		meta.Entitlements = cloneRawJSON(v)
+	}
+	for _, key := range []string{"signing_chain", "entitlement_info"} {
+		delete(raw, key)
+	}
+	var stripped []byte
+	if len(raw) == 0 {
+		stripped = []byte("{}")
+	} else {
+		var err error
+		stripped, err = json.Marshal(raw)
+		if err != nil {
+			return eventFileMetadata{}, nil, err
+		}
+	}
+	return meta, stripped, nil
+}
+
+func cloneRawJSON(msg json.RawMessage) []byte {
+	if len(msg) == 0 {
+		return nil
+	}
+	dup := make([]byte, len(msg))
+	copy(dup, msg)
+	return dup
 }

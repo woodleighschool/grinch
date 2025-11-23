@@ -26,7 +26,7 @@ type userDTO struct {
 type userDetailResponse struct {
 	User         userDTO      `json:"user"`
 	Groups       []groupDTO   `json:"groups"`
-	Devices      []machineDTO `json:"devices"`
+	Devices      []deviceDTO  `json:"devices"`
 	RecentBlocks []eventDTO   `json:"recent_blocks"`
 	Policies     []userPolicy `json:"policies"`
 }
@@ -49,6 +49,7 @@ func (h Handler) usersRoutes(r chi.Router) {
 	r.Get("/", h.listUsers)
 	r.Post("/", h.upsertUser)
 	r.Get("/{id}", h.userDetails)
+	r.Get("/{id}/policies", h.userEffectivePolicies)
 	r.Get("/{id}/effective-policies", h.userEffectivePolicies)
 }
 
@@ -139,7 +140,7 @@ func (h Handler) userDetails(w http.ResponseWriter, r *http.Request) {
 	resp := userDetailResponse{
 		User:         mapUserDTO(user),
 		Groups:       mapGroups(groups),
-		Devices:      mapMachines(machines),
+		Devices:      mapDevices(machines),
 		RecentBlocks: mapUserBlocks(events),
 		Policies:     mapUserPolicies(assignments, user),
 	}
@@ -183,10 +184,10 @@ func mapGroups(groups []sqlc.Group) []groupDTO {
 	return resp
 }
 
-func mapMachines(machines []sqlc.Machine) []machineDTO {
-	resp := make([]machineDTO, 0, len(machines))
+func mapDevices(machines []sqlc.Machine) []deviceDTO {
+	resp := make([]deviceDTO, 0, len(machines))
 	for _, m := range machines {
-		resp = append(resp, mapMachine(m))
+		resp = append(resp, mapDevice(m))
 	}
 	return resp
 }

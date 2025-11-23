@@ -12,21 +12,12 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
-// TODO: Assess whether system users should be excluded
-var systemAccounts = map[string]struct{}{
-	"root": {},
-	// TODO: add more as discovered
-}
-
 func resolveUserID(ctx context.Context, store *store.Store, logger *slog.Logger, reported string) *uuid.UUID {
 	reported = strings.TrimSpace(reported)
 	if reported == "" {
 		return nil
 	}
 	lower := strings.ToLower(reported)
-	if _, blocked := systemAccounts[lower]; blocked {
-		return nil
-	}
 
 	// TODO: This requires machines are configured in such the local user's username is the prefix of the UPN.
 	// This may not always be the case. Maybe find a better way to do this?

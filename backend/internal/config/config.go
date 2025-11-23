@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	AdminListenAddr      string        `env:"ADMIN_LISTEN_ADDR"`
+	AdminListenAddr      string        `env:"ADMIN_LISTEN_ADDR" envDefault:":8080"`
 	SantaListenAddr      string        `env:"SANTA_LISTEN_ADDR" envDefault:":8081"`
 	DatabaseHost         string        `env:"DATABASE_HOST,required"`
 	DatabasePort         string        `env:"DATABASE_PORT" envDefault:"5432"`

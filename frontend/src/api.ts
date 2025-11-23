@@ -2,14 +2,16 @@ export interface ApiUser {
   display_name: string;
 }
 
+export interface ExistingApplicationSummary {
+  id: string;
+  name: string;
+}
+
 export interface ApiErrorResponse {
   error?: string;
   message?: string;
   field_errors?: Record<string, string>;
-  existing_application?: {
-    id: string;
-    name: string;
-  };
+  existing_application?: ExistingApplicationSummary;
 }
 
 export class ApiValidationError extends Error {
@@ -18,7 +20,7 @@ export class ApiValidationError extends Error {
     public code: string,
     public fieldErrors: Record<string, string>,
     public status: number,
-    public existingApplication?: { id: string; name: string },
+    public existingApplication?: ExistingApplicationSummary,
   ) {
     super(message);
     this.name = "ApiValidationError";
@@ -29,7 +31,7 @@ export interface EventRecord {
   id: string;
   occurredAt?: string;
   kind: string;
-  payload: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   hostname: string;
   machineId: string;
   email?: string;
@@ -48,6 +50,7 @@ export interface Application {
   rule_type: string;
   identifier: string;
   description?: string;
+  block_message?: string;
   enabled: boolean;
   assignment_stats?: ApplicationAssignmentStats;
 }
@@ -79,7 +82,7 @@ export interface ApplicationScope {
   target_description?: string;
   target_upn?: string;
   effective_member_ids: string[];
-  effective_member_count: number;
+  effective_member_count?: number;
   effective_members?: DirectoryUser[];
 }
 
@@ -150,14 +153,14 @@ export interface Device {
   lastPostflightAt?: string;
   lastRulesReceived?: number;
   lastRulesProcessed?: number;
-  lastPreflightPayload?: Record<string, any>;
+  lastPreflightPayload?: Record<string, unknown>;
   ruleCursor?: string;
   syncCursor?: string;
 }
 
 export interface DeviceDetailResponse {
-  machine: Device;
-  primary_user: DirectoryUser;
+  device: Device;
+  primary_user?: DirectoryUser | null;
   recent_blocks: EventRecord[];
   policies: UserPolicy[];
 }
@@ -200,62 +203,108 @@ export interface ValidationSuccess<T> {
   normalised: T;
 }
 
-export interface ScopeValidationRequest {
-  application_id: string;
-  target_type: "group" | "user";
-  target_id: string;
-  action: "allow" | "block";
-}
+// Application payloads
 
-export interface ScopeValidationResponse {
-  application_id: string;
-  target_type: "group" | "user";
-  target_id: string;
-  action: "allow" | "block";
-}
-
-export interface ApplicationValidationPayload {
+export interface ApplicationPayload {
   name: string;
   rule_type: string;
   identifier: string;
   description?: string;
+  block_message?: string;
+}
+
+export type ApplicationValidationPayload = ApplicationPayload;
+export type ApplicationCreatePayload = ApplicationPayload;
+
+export interface ApplicationUpdatePayload extends Partial<ApplicationPayload> {
+  enabled?: boolean;
+}
+
+// Scope payloads
+
+export interface ScopePayload {
+  target_type: "group" | "user";
+  target_id: string;
+  action: "allow" | "block";
+}
+
+export type ScopeValidationRequest = ScopePayload;
+export interface ScopeValidationResponse extends ScopePayload {
+  application_id: string;
+}
+
+const API_BASE = "/api/v1";
+
+function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const hasMessage = typeof candidate.message === "string";
+  const hasError = typeof candidate.error === "string";
+  const hasFieldErrors = candidate.field_errors !== undefined;
+
+  return hasMessage || hasError || hasFieldErrors;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
+
     try {
-      const errorData: ApiErrorResponse = JSON.parse(text);
-      if (errorData.field_errors) {
-        throw new ApiValidationError(
-          errorData.message || "Validation failed",
-          errorData.error || "VALIDATION_FAILED",
-          errorData.field_errors,
-          res.status,
-          errorData.existing_application,
-        );
+      const parsed: unknown = JSON.parse(text);
+
+      if (isApiErrorResponse(parsed)) {
+        const errorData = parsed;
+
+        if (errorData.field_errors) {
+          throw new ApiValidationError(
+            errorData.message || "Validation failed",
+            errorData.error || "VALIDATION_FAILED",
+            errorData.field_errors,
+            res.status,
+            errorData.existing_application,
+          );
+        }
+
+        throw new Error(errorData.message || errorData.error || text || res.statusText);
       }
-      throw new Error(errorData.message || errorData.error || text || res.statusText);
+
+      throw new Error(text || res.statusText);
     } catch (parseError) {
       if (parseError instanceof ApiValidationError) {
         throw parseError;
       }
+
       throw new Error(text || res.statusText);
     }
   }
+
   if (res.status === 204) {
     return undefined as T;
   }
+
   return res.json() as Promise<T>;
 }
+
+async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { credentials: "include", ...options });
+  return handleResponse<T>(res);
+}
+
+// Auth
 
 export async function getCurrentUser(): Promise<ApiUser | null> {
   const res = await fetch("/api/auth/me", {
     credentials: "include",
   });
+
   if (res.status === 401) {
     return null;
   }
+
   return handleResponse<ApiUser>(res);
 }
 
@@ -263,185 +312,173 @@ export async function getAuthProviders(): Promise<AuthProviders> {
   const res = await fetch("/api/auth/providers", {
     credentials: "include",
   });
+
   return handleResponse<AuthProviders>(res);
 }
 
+// Applications
+
 export async function listApplications(filters: ApplicationFilters = {}): Promise<Application[]> {
   const params = new URLSearchParams();
+
   if (filters.search?.trim()) params.set("search", filters.search.trim());
   if (filters.rule_type?.trim()) params.set("rule_type", filters.rule_type.trim());
   if (filters.identifier?.trim()) params.set("identifier", filters.identifier.trim());
   if (filters.enabled !== undefined) params.set("enabled", String(filters.enabled));
+
   const query = params.toString();
-  const res = await fetch(`/api/apps${query ? `?${query}` : ""}`, { credentials: "include" });
-  return handleResponse<Application[]>(res);
+  return apiRequest<Application[]>(`/applications${query ? `?${query}` : ""}`);
 }
 
 export async function validateApplication(payload: ApplicationValidationPayload): Promise<ValidationSuccess<ApplicationValidationPayload>> {
-  const res = await fetch("/api/apps/validate", {
+  return apiRequest<ValidationSuccess<ApplicationValidationPayload>>("/applications/validate", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse<ValidationSuccess<ApplicationValidationPayload>>(res);
 }
 
-export async function createApplication(payload: { name: string; rule_type: string; identifier: string; description?: string }): Promise<Application> {
-  const res = await fetch("/api/apps", {
+export async function createApplication(payload: ApplicationCreatePayload): Promise<Application> {
+  return apiRequest<Application>("/applications", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse<Application>(res);
 }
 
 export async function deleteApplication(appId: string): Promise<void> {
-  const res = await fetch(`/api/apps/${appId}`, {
+  const res = await fetch(`${API_BASE}/applications/${appId}`, {
     method: "DELETE",
     credentials: "include",
   });
+
   if (!res.ok && res.status !== 404) {
     throw new Error("Failed to delete application");
   }
 }
 
-export async function updateApplication(appId: string, payload: { enabled: boolean }): Promise<Application> {
-  const res = await fetch(`/api/apps/${appId}`, {
+export async function updateApplication(appId: string, payload: ApplicationUpdatePayload): Promise<Application> {
+  return apiRequest<Application>(`/applications/${appId}`, {
     method: "PATCH",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse<Application>(res);
 }
+
+// Scopes
 
 export async function listScopes(appId: string, options?: { includeMembers?: boolean }): Promise<ApplicationScope[]> {
   const params = new URLSearchParams();
+
   if (options?.includeMembers) params.set("include_members", "true");
+
   const query = params.toString();
-  const res = await fetch(`/api/apps/${appId}/scopes${query ? `?${query}` : ""}`, {
-    credentials: "include",
-  });
-  return handleResponse<ApplicationScope[]>(res);
+  return apiRequest<ApplicationScope[]>(`/applications/${appId}/scopes${query ? `?${query}` : ""}`);
 }
 
 export async function getApplicationDetail(appId: string, options?: { includeMembers?: boolean }): Promise<ApplicationDetailResponse> {
   const params = new URLSearchParams();
+
   if (options?.includeMembers) params.set("include_members", "true");
+
   const query = params.toString();
-  const res = await fetch(`/api/apps/${appId}${query ? `?${query}` : ""}`, {
-    credentials: "include",
-  });
-  return handleResponse<ApplicationDetailResponse>(res);
+  return apiRequest<ApplicationDetailResponse>(`/applications/${appId}${query ? `?${query}` : ""}`);
 }
 
-export async function createScope(
-  appId: string,
-  payload: {
-    target_type: "group" | "user";
-    target_id: string;
-    action: "allow" | "block";
-  },
-): Promise<ApplicationScope> {
-  const res = await fetch(`/api/apps/${appId}/scopes`, {
+export async function createScope(appId: string, payload: ScopePayload): Promise<ApplicationScope> {
+  return apiRequest<ApplicationScope>(`/applications/${appId}/scopes`, {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse<ApplicationScope>(res);
 }
 
-export async function validateScope(payload: ScopeValidationRequest): Promise<ValidationSuccess<ScopeValidationResponse>> {
-  const res = await fetch("/api/scopes/validate", {
+export async function validateScope(appId: string, payload: ScopeValidationRequest): Promise<ValidationSuccess<ScopeValidationResponse>> {
+  return apiRequest<ValidationSuccess<ScopeValidationResponse>>(`/applications/${appId}/scopes/validate`, {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse<ValidationSuccess<ScopeValidationResponse>>(res);
 }
 
 export async function deleteScope(appId: string, scopeId: string): Promise<void> {
-  const res = await fetch(`/api/apps/${appId}/scopes/${scopeId}`, {
+  const res = await fetch(`${API_BASE}/applications/${appId}/scopes/${scopeId}`, {
     method: "DELETE",
     credentials: "include",
   });
+
   if (!res.ok && res.status !== 404) {
     throw new Error("Failed to delete scope");
   }
 }
 
+// Groups
+
 export async function listGroups(params: GroupQueryParams = {}): Promise<DirectoryGroup[]> {
   const search = params.search?.trim();
-  const url = search ? `/api/groups?search=${encodeURIComponent(search)}` : "/api/groups";
-  const res = await fetch(url, { credentials: "include" });
-  return handleResponse<DirectoryGroup[]>(res);
+  const url = search ? `/groups?search=${encodeURIComponent(search)}` : "/groups";
+  return apiRequest<DirectoryGroup[]>(url);
 }
 
 export async function getGroupEffectiveMembers(groupId: string): Promise<GroupEffectiveMembersResponse> {
-  const res = await fetch(`/api/groups/${groupId}/effective-members`, {
-    credentials: "include",
-  });
-  return handleResponse<GroupEffectiveMembersResponse>(res);
+  return apiRequest<GroupEffectiveMembersResponse>(`/groups/${groupId}/members`);
 }
+
+// Users
 
 export async function listUsers(params: UserQueryParams = {}): Promise<DirectoryUser[]> {
   const search = params.search?.trim();
-  const url = search ? `/api/users?search=${encodeURIComponent(search)}` : "/api/users";
-  const res = await fetch(url, { credentials: "include" });
-  return handleResponse<DirectoryUser[]>(res);
+  const url = search ? `/users?search=${encodeURIComponent(search)}` : "/users";
+  return apiRequest<DirectoryUser[]>(url);
 }
 
 export async function getUserEffectivePolicies(userId: string): Promise<UserEffectivePoliciesResponse> {
-  const res = await fetch(`/api/users/${userId}/effective-policies`, { credentials: "include" });
-  return handleResponse<UserEffectivePoliciesResponse>(res);
+  return apiRequest<UserEffectivePoliciesResponse>(`/users/${userId}/policies`);
 }
 
 export async function getUserDetails(userId: string): Promise<UserDetailResponse> {
-  const res = await fetch(`/api/users/${userId}`, { credentials: "include" });
-  return handleResponse<UserDetailResponse>(res);
+  return apiRequest<UserDetailResponse>(`/users/${userId}`);
 }
+
+// Devices
 
 export async function listDevices(params: DeviceQueryParams = {}): Promise<Device[]> {
   const query = new URLSearchParams();
-  if (typeof params.limit === "number") query.set("limit", `${params.limit}`);
-  if (typeof params.offset === "number") query.set("offset", `${params.offset}`);
+
+  if (typeof params.limit === "number") query.set("limit", String(params.limit));
+  if (typeof params.offset === "number") query.set("offset", String(params.offset));
   if (params.search?.trim()) query.set("search", params.search.trim());
+
   const qs = query.toString();
-  const res = await fetch(`/api/machines${qs ? `?${qs}` : ""}`, { credentials: "include" });
-  return handleResponse<Device[]>(res);
+  return apiRequest<Device[]>(`/devices${qs ? `?${qs}` : ""}`);
 }
 
 export async function getDeviceDetails(deviceId: string): Promise<DeviceDetailResponse> {
-  const res = await fetch(`/api/machines/${deviceId}`, { credentials: "include" });
-  return handleResponse<DeviceDetailResponse>(res);
+  return apiRequest<DeviceDetailResponse>(`/devices/${deviceId}`);
 }
 
+// Events
+
 export async function listEvents(limit = 50, offset = 0): Promise<EventRecord[]> {
-  const params = new URLSearchParams({ limit: `${limit}`, offset: `${offset}` });
-  const res = await fetch(`/api/events?${params.toString()}`, { credentials: "include" });
-  return handleResponse<EventRecord[]>(res);
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  return apiRequest<EventRecord[]>(`/events?${params.toString()}`);
 }
 
 export async function getEventStats(days = 14): Promise<EventStat[]> {
-  const params = new URLSearchParams({ days: `${days}` });
-  const res = await fetch(`/api/events/stats?${params.toString()}`, { credentials: "include" });
-  return handleResponse<EventStat[]>(res);
+  const params = new URLSearchParams({ days: String(days) });
+  return apiRequest<EventStat[]>(`/events/stats?${params.toString()}`);
 }
 
+// Status / settings
+
 export async function getStatus(): Promise<AppStatusResponse> {
-  const res = await fetch("/api/status", {
-    credentials: "include",
-  });
-  return handleResponse<AppStatusResponse>(res);
+  return apiRequest<AppStatusResponse>("/status");
 }
 
 export async function getSantaConfig(): Promise<SantaConfig> {
-  const res = await fetch("/api/settings/santa-config", {
-    credentials: "include",
-  });
-  return handleResponse<SantaConfig>(res);
+  return apiRequest<SantaConfig>("/settings/santa-config");
 }

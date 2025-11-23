@@ -176,6 +176,10 @@ func (s *Store) ListRuleScopes(ctx context.Context, ruleID uuid.UUID) ([]sqlc.Ru
 	return s.queries.ListRuleScopes(ctx, ruleID)
 }
 
+func (s *Store) ListRulesByGroupTarget(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error) {
+	return s.queries.ListRulesByGroupTarget(ctx, groupID)
+}
+
 func (s *Store) ListAllRuleScopes(ctx context.Context) ([]sqlc.RuleScope, error) {
 	return s.queries.ListAllRuleScopes(ctx)
 }
@@ -267,4 +271,16 @@ func (s *Store) MarshalRuleMetadata(meta any) ([]byte, error) {
 		return nil, nil
 	}
 	return json.Marshal(meta)
+}
+
+func (s *Store) UpsertFile(ctx context.Context, params sqlc.UpsertFileParams) error {
+	return s.queries.UpsertFile(ctx, params)
+}
+
+func (s *Store) GetFile(ctx context.Context, sha256 string) (sqlc.File, error) {
+	return s.queries.GetFile(ctx, sha256)
+}
+
+func (s *Store) ListFiles(ctx context.Context, limit, offset int32) ([]sqlc.ListFilesRow, error) {
+	return s.queries.ListFiles(ctx, sqlc.ListFilesParams{Limit: limit, Offset: offset})
 }
