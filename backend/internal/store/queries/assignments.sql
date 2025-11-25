@@ -67,6 +67,15 @@ user_counts AS (
     ) expanded
     WHERE user_id IS NOT NULL
     GROUP BY rule_id
+),
+machine_counts AS (
+    SELECT
+        ra.rule_id,
+        COUNT(DISTINCT m.id) AS total_machines,
+        COUNT(DISTINCT m.id) FILTER (WHERE m.last_rules_processed IS NOT NULL AND m.last_rules_processed > 0) AS synced_machines
+    FROM rule_assignments ra
+    JOIN machines m ON m.user_id = ra.user_id
+    GROUP BY ra.rule_id
 )
 SELECT
     sc.rule_id,
@@ -77,6 +86,9 @@ SELECT
     COALESCE(uc.allow_users, 0) AS allow_users,
     COALESCE(uc.block_users, 0) AS block_users,
     COALESCE(uc.cel_users, 0) AS cel_users,
-    COALESCE(uc.total_users, 0) AS total_users
+    COALESCE(uc.total_users, 0) AS total_users,
+    COALESCE(mc.total_machines, 0) AS total_machines,
+    COALESCE(mc.synced_machines, 0) AS synced_machines
 FROM scope_counts sc
-LEFT JOIN user_counts uc USING (rule_id);
+LEFT JOIN user_counts uc USING (rule_id)
+LEFT JOIN machine_counts mc USING (rule_id);

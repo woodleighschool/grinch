@@ -66,6 +66,8 @@ export interface ApplicationAssignmentStats {
   block_users: number;
   cel_users: number;
   total_users: number;
+  total_machines: number;
+  synced_machines: number;
 }
 
 export interface ApplicationFilters {

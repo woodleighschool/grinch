@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import { Button, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { useConfirm } from "material-ui-confirm";
 import { DataGrid, GridActionsCellItem, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
@@ -207,13 +207,43 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
     },
     {
       field: "assignment_stats",
-      headerName: "Total Scope",
+      headerName: "Machine Coverage",
       flex: 1,
       renderCell: (params) => {
         const stats = params.row.assignment_stats;
-        const totalUsers = stats?.total_users ?? 0;
+        const totalMachines = stats?.total_machines ?? 0;
+        const syncedMachines = stats?.synced_machines ?? 0;
 
-        return totalUsers;
+        if (totalMachines === 0) {
+          return <Typography variant="body2">No enrolled machines targeted</Typography>;
+        }
+
+        // TODO: reliability TBD?
+        const deploymentPercent = Math.min(100, Math.max(0, (syncedMachines / totalMachines) * 100));
+
+        return (
+          <Stack
+            spacing={0.5}
+            width="100%"
+          >
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="body2">
+                {totalMachines} machine{totalMachines === 1 ? "" : "s"}
+              </Typography>
+              <Typography variant="body2">{syncedMachines} synced</Typography>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={deploymentPercent}
+              sx={{ height: 6, borderRadius: 999 }}
+            />
+            <Typography variant="caption">{deploymentPercent.toFixed(0)}% deployed</Typography>
+          </Stack>
+        );
       },
     },
     {

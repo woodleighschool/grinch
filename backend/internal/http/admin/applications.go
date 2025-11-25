@@ -59,14 +59,16 @@ type applicationDetailResponse struct {
 }
 
 type applicationAssignmentStatsDTO struct {
-	AllowScopes int `json:"allow_scopes"`
-	BlockScopes int `json:"block_scopes"`
-	CelScopes   int `json:"cel_scopes"`
-	TotalScopes int `json:"total_scopes"`
-	AllowUsers  int `json:"allow_users"`
-	BlockUsers  int `json:"block_users"`
-	CelUsers    int `json:"cel_users"`
-	TotalUsers  int `json:"total_users"`
+	AllowScopes    int `json:"allow_scopes"`
+	BlockScopes    int `json:"block_scopes"`
+	CelScopes      int `json:"cel_scopes"`
+	TotalScopes    int `json:"total_scopes"`
+	AllowUsers     int `json:"allow_users"`
+	BlockUsers     int `json:"block_users"`
+	CelUsers       int `json:"cel_users"`
+	TotalUsers     int `json:"total_users"`
+	TotalMachines  int `json:"total_machines"`
+	SyncedMachines int `json:"synced_machines"`
 }
 
 type createApplicationRequest struct {
@@ -633,14 +635,16 @@ func mapApplication(rule sqlc.Rule) applicationDTO {
 
 func mapAssignmentStats(row sqlc.ListApplicationAssignmentStatsRow) applicationAssignmentStatsDTO {
 	return applicationAssignmentStatsDTO{
-		AllowScopes: int(row.AllowScopes),
-		BlockScopes: int(row.BlockScopes),
-		CelScopes:   int(row.CelScopes),
-		TotalScopes: int(row.TotalScopes),
-		AllowUsers:  int(row.AllowUsers),
-		BlockUsers:  int(row.BlockUsers),
-		CelUsers:    int(row.CelUsers),
-		TotalUsers:  int(row.TotalUsers),
+		AllowScopes:    int(row.AllowScopes),
+		BlockScopes:    int(row.BlockScopes),
+		CelScopes:      int(row.CelScopes),
+		TotalScopes:    int(row.TotalScopes),
+		AllowUsers:     int(row.AllowUsers),
+		BlockUsers:     int(row.BlockUsers),
+		CelUsers:       int(row.CelUsers),
+		TotalUsers:     int(row.TotalUsers),
+		TotalMachines:  int(row.TotalMachines),
+		SyncedMachines: int(row.SyncedMachines),
 	}
 }
 
@@ -679,6 +683,8 @@ func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAs
 	stats.BlockUsers = len(blockUsers)
 	stats.CelUsers = len(celUsers)
 	stats.TotalUsers = len(totalUsers)
+	stats.TotalMachines = 0
+	stats.SyncedMachines = 0
 	return stats
 }
 
