@@ -27,6 +27,7 @@ func (h *postflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "machine id required")
 		return
 	}
+	format := requestWireFormat(r)
 	body, err := decodeBody(r)
 	if err != nil {
 		h.logger.Error("decode postflight body", "err", err)
@@ -45,7 +46,7 @@ func (h *postflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req syncv1.PostflightRequest
-	if err := unmarshalProtoJSON(bodyBytes, &req); err != nil {
+	if err := decodeWireMessage(format, bodyBytes, &req); err != nil {
 		h.logger.Error("decode postflight payload", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid payload")
 		return
@@ -74,7 +75,7 @@ func (h *postflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.store.TouchMachine(ctx, machine.ID, machine.ClientVersion.String, machine.SyncCursor.String, machine.RuleCursor.String); err != nil {
 		h.logger.Warn("touch machine", "err", err)
 	}
-	respondProtoJSON(w, http.StatusOK, &syncv1.PostflightResponse{})
+	respondProto(w, r, http.StatusOK, &syncv1.PostflightResponse{})
 }
 
 func uint32ToInt4(value uint32) pgtype.Int4 {

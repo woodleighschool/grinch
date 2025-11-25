@@ -32,6 +32,7 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "machine id required")
 		return
 	}
+	format := requestWireFormat(r)
 	body, err := decodeBody(r)
 	if err != nil {
 		h.logger.Error("decode preflight body", "err", err)
@@ -50,7 +51,7 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req syncv1.PreflightRequest
-	if err := unmarshalProtoJSON(bodyBytes, &req); err != nil {
+	if err := decodeWireMessage(format, bodyBytes, &req); err != nil {
 		h.logger.Error("decode preflight payload", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid payload")
 		return
@@ -115,7 +116,7 @@ func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.store.TouchMachine(ctx, machine.ID, machine.ClientVersion.String, machine.SyncCursor.String, machine.RuleCursor.String); err != nil {
 		h.logger.Warn("touch machine", "err", err)
 	}
-	respondProtoJSON(w, http.StatusOK, resp)
+	respondProto(w, r, http.StatusOK, resp)
 }
 
 func normaliseClientMode(mode syncv1.ClientMode) syncv1.ClientMode {

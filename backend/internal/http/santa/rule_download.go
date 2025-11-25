@@ -27,6 +27,7 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "machine id required")
 		return
 	}
+	format := requestWireFormat(r)
 	body, err := decodeBody(r)
 	if err != nil {
 		h.logger.Error("decode rule download body", "err", err)
@@ -45,7 +46,7 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req syncv1.RuleDownloadRequest
-	if err := unmarshalProtoJSON(bodyBytes, &req); err != nil {
+	if err := decodeWireMessage(format, bodyBytes, &req); err != nil {
 		h.logger.Error("decode rule download payload", "err", err)
 		respondError(w, http.StatusBadRequest, "invalid payload")
 		return
@@ -75,7 +76,7 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := h.compiler.BuildPayload(machine, ruleRows, assignments)
 	if machine.RuleCursor.Valid && machine.RuleCursor.String == payload.Cursor {
-		respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{})
+		respondProto(w, r, http.StatusOK, &syncv1.RuleDownloadResponse{})
 		return
 	}
 	wireRules := make([]*syncv1.Rule, 0, len(payload.Rules))
@@ -85,7 +86,7 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.store.TouchMachine(ctx, machine.ID, machine.ClientVersion.String, machine.SyncCursor.String, payload.Cursor); err != nil {
 		h.logger.Warn("touch machine", "err", err)
 	}
-	respondProtoJSON(w, http.StatusOK, &syncv1.RuleDownloadResponse{Rules: wireRules})
+	respondProto(w, r, http.StatusOK, &syncv1.RuleDownloadResponse{Rules: wireRules})
 }
 
 func convertRule(rule rules.SyncRule) *syncv1.Rule {
