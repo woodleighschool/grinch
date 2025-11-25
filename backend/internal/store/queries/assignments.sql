@@ -42,6 +42,7 @@ WITH scope_counts AS (
         rule_id,
         COUNT(*) FILTER (WHERE action = 'allow') AS allow_scopes,
         COUNT(*) FILTER (WHERE action = 'block') AS block_scopes,
+        COUNT(*) FILTER (WHERE action = 'cel') AS cel_scopes,
         COUNT(*) AS total_scopes
     FROM rule_scopes
     GROUP BY rule_id
@@ -51,6 +52,7 @@ user_counts AS (
         rule_id,
         COUNT(DISTINCT user_id) FILTER (WHERE action = 'allow') AS allow_users,
         COUNT(DISTINCT user_id) FILTER (WHERE action = 'block') AS block_users,
+        COUNT(DISTINCT user_id) FILTER (WHERE action = 'cel') AS cel_users,
         COUNT(DISTINCT user_id) AS total_users
     FROM (
         SELECT
@@ -70,9 +72,11 @@ SELECT
     sc.rule_id,
     sc.allow_scopes,
     sc.block_scopes,
+    sc.cel_scopes,
     sc.total_scopes,
     COALESCE(uc.allow_users, 0) AS allow_users,
     COALESCE(uc.block_users, 0) AS block_users,
+    COALESCE(uc.cel_users, 0) AS cel_users,
     COALESCE(uc.total_users, 0) AS total_users
 FROM scope_counts sc
 LEFT JOIN user_counts uc USING (rule_id);

@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
+	"github.com/google/cel-go/cel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/woodleighschool/grinch/internal/rules"
+	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
 const (
@@ -53,19 +56,23 @@ var applicationIdentifierValidators = map[string]identifierValidator{
 type fieldErrors map[string]string
 
 type applicationValidationResult struct {
-	Name         string `json:"name"`
-	RuleType     string `json:"rule_type"`
-	Identifier   string `json:"identifier"`
-	Description  string `json:"description,omitempty"`
-	BlockMessage string `json:"block_message,omitempty"`
+	Name          string `json:"name"`
+	RuleType      string `json:"rule_type"`
+	Identifier    string `json:"identifier"`
+	Description   string `json:"description,omitempty"`
+	BlockMessage  string `json:"block_message,omitempty"`
+	CelEnabled    bool   `json:"cel_enabled"`
+	CelExpression string `json:"cel_expression,omitempty"`
 }
 
 type applicationValidationInput struct {
-	Name         string
-	RuleType     string
-	Identifier   string
-	Description  string
-	BlockMessage string
+	Name          string
+	RuleType      string
+	Identifier    string
+	Description   string
+	BlockMessage  string
+	CelEnabled    bool
+	CelExpression string
 }
 
 type scopeValidationResult struct {
@@ -73,6 +80,34 @@ type scopeValidationResult struct {
 	TargetType    string    `json:"target_type"`
 	TargetID      uuid.UUID `json:"target_id"`
 	Action        string    `json:"action"`
+}
+
+var (
+	celEnvOnce sync.Once
+	celEnv     *cel.Env
+	celEnvErr  error
+)
+
+func celValidationEnv() (*cel.Env, error) {
+	celEnvOnce.Do(func() {
+		celEnv, celEnvErr = cel.NewEnv()
+	})
+	return celEnv, celEnvErr
+}
+
+func validateCELExpression(expr string) error {
+	trimmed := strings.TrimSpace(expr)
+	if trimmed == "" {
+		return errors.New("CEL expression cannot be empty")
+	}
+	env, err := celValidationEnv()
+	if err != nil {
+		return fmt.Errorf("cel parser unavailable: %w", err)
+	}
+	if _, issues := env.Parse(trimmed); issues != nil && issues.Err() != nil {
+		return fmt.Errorf("invalid CEL expression: %w", issues.Err())
+	}
+	return nil
 }
 
 type apiErrorResponse struct {
@@ -148,7 +183,8 @@ func (h Handler) validateScopeForApplication(w http.ResponseWriter, r *http.Requ
 }
 
 func (h Handler) runScopeValidation(ctx context.Context, w http.ResponseWriter, appID uuid.UUID, body createScopeRequest) {
-	if _, err := h.Store.GetRule(ctx, appID); err != nil {
+	rule, err := h.Store.GetRule(ctx, appID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			respondValidationError(w, http.StatusUnprocessableEntity, errCodeValidationFailed, "Scope validation failed", fieldErrors{
 				"application_id": "application not found",
@@ -159,7 +195,7 @@ func (h Handler) runScopeValidation(ctx context.Context, w http.ResponseWriter, 
 		respondError(w, http.StatusInternalServerError, "failed to validate scope")
 		return
 	}
-	result, fieldErrs, duplicate, err := h.validateScopeInput(ctx, appID, body)
+	result, fieldErrs, duplicate, err := h.validateScopeInput(ctx, rule, body)
 	if err != nil {
 		h.Logger.Error("validate scope payload", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to validate scope")
@@ -212,6 +248,19 @@ func (h Handler) validateApplicationInput(ctx context.Context, input application
 		errs["block_message"] = "Block message must be 500 characters or fewer"
 	}
 
+	result.CelEnabled = input.CelEnabled
+	rawCel := strings.TrimSpace(input.CelExpression)
+	if result.CelEnabled {
+		if rawCel == "" {
+			errs["cel_expression"] = "CEL expression is required when CEL mode is enabled"
+		} else if err := validateCELExpression(rawCel); err != nil {
+			errs["cel_expression"] = err.Error()
+		}
+		result.CelExpression = rawCel
+	} else {
+		result.CelExpression = ""
+	}
+
 	if len(errs) > 0 {
 		return result, errs, nil, nil
 	}
@@ -232,9 +281,15 @@ func (h Handler) validateApplicationInput(ctx context.Context, input application
 	}, &dto, nil
 }
 
-func (h Handler) validateScopeInput(ctx context.Context, appID uuid.UUID, body createScopeRequest) (scopeValidationResult, fieldErrors, bool, error) {
+func (h Handler) validateScopeInput(ctx context.Context, rule sqlc.Rule, body createScopeRequest) (scopeValidationResult, fieldErrors, bool, error) {
 	errs := fieldErrors{}
-	result := scopeValidationResult{ApplicationID: appID}
+	result := scopeValidationResult{ApplicationID: rule.ID}
+
+	meta, err := rules.ParseMetadata(rule.Metadata)
+	if err != nil {
+		h.Logger.Warn("parse rule metadata for scope validation", "rule", rule.ID, "err", err)
+	}
+	celEnabled := meta.CelEnabled
 
 	targetType := strings.ToLower(strings.TrimSpace(body.TargetType))
 	if targetType != "group" && targetType != "user" {
@@ -253,17 +308,28 @@ func (h Handler) validateScopeInput(ctx context.Context, appID uuid.UUID, body c
 	}
 
 	action := strings.ToLower(strings.TrimSpace(body.Action))
-	if action != string(rules.RuleActionAllow) && action != string(rules.RuleActionBlock) {
-		errs["action"] = "action must be allow or block"
-	} else {
-		result.Action = action
+	switch action {
+	case string(rules.RuleActionAllow), string(rules.RuleActionBlock):
+		if celEnabled {
+			errs["action"] = "CEL-enabled applications must use the CEL action"
+		} else {
+			result.Action = action
+		}
+	case string(rules.RuleActionCel):
+		if !celEnabled {
+			errs["action"] = "action \"cel\" requires CEL mode to be enabled on the application"
+		} else {
+			result.Action = action
+		}
+	default:
+		errs["action"] = "action must be allow, block, or cel"
 	}
 
 	if len(errs) > 0 {
 		return result, errs, false, nil
 	}
 
-	if _, err := h.Store.GetRuleScopeByTarget(ctx, appID, targetType, result.TargetID); err != nil {
+	if _, err := h.Store.GetRuleScopeByTarget(ctx, rule.ID, targetType, result.TargetID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return result, nil, false, nil
 		}

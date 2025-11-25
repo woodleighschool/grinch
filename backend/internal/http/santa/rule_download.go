@@ -90,18 +90,24 @@ func (h *ruleDownloadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func convertRule(rule rules.SyncRule) *syncv1.Rule {
-	return &syncv1.Rule{
+	wire := &syncv1.Rule{
 		Identifier: rule.Target,
 		Policy:     mapPolicy(rule.Action),
 		RuleType:   mapRuleType(rule.Type),
 		CustomMsg:  rule.CustomMsg,
 	}
+	if rule.Action == rules.RuleActionCel {
+		wire.CelExpr = rule.CelExpression
+	}
+	return wire
 }
 
 func mapPolicy(action rules.RuleAction) syncv1.Policy {
 	switch action {
 	case rules.RuleActionBlock:
 		return syncv1.Policy_BLOCKLIST
+	case rules.RuleActionCel:
+		return syncv1.Policy_CEL
 	default:
 		return syncv1.Policy_ALLOWLIST
 	}

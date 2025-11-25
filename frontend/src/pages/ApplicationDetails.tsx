@@ -127,7 +127,7 @@ function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowPro
 }
 
 interface AssignmentSectionProps {
-  label: "ALLOW" | "BLOCK";
+  label: "ALLOW" | "BLOCK" | "CEL";
   scopes: ApplicationScope[];
   onDeleteScope: (scopeId: string) => void;
   deletingScopeId: string | null;
@@ -136,7 +136,7 @@ interface AssignmentSectionProps {
 function AssignmentSection({ label, scopes, onDeleteScope, deletingScopeId }: AssignmentSectionProps) {
   if (!scopes.length) return null;
 
-  const isAllow = label === "ALLOW";
+  const chipColor = label === "ALLOW" ? "success" : label === "BLOCK" ? "error" : "info";
 
   return (
     <Box>
@@ -148,7 +148,7 @@ function AssignmentSection({ label, scopes, onDeleteScope, deletingScopeId }: As
       >
         <Chip
           label={label}
-          color={isAllow ? "success" : "error"}
+          color={chipColor}
           size="small"
         />
         <Typography
@@ -404,20 +404,6 @@ function AssignmentManagerCard({ assignment, groups, users }: AssignmentManagerC
           />
 
           <Box sx={{ mt: "auto", pt: 2 }}>
-            {selectedTarget && (
-              <Alert
-                severity="info"
-                variant="outlined"
-                sx={{ mb: 2 }}
-              >
-                Assigning{" "}
-                <strong>
-                  {selectedTarget.name} ({selectedTarget.type})
-                </strong>{" "}
-                with action <strong>{selectedAction.toUpperCase()}</strong>.
-              </Alert>
-            )}
-
             <Stack
               direction="row"
               spacing={2}
@@ -427,7 +413,7 @@ function AssignmentManagerCard({ assignment, groups, users }: AssignmentManagerC
               <ToggleButtonGroup
                 exclusive
                 value={selectedAction}
-                onChange={(_, value: "allow" | "block" | null) => {
+                onChange={(_, value: "allow" | "block" | "cel" | null) => {
                   if (value) changeAction(value);
                 }}
                 size="small"
@@ -435,14 +421,23 @@ function AssignmentManagerCard({ assignment, groups, users }: AssignmentManagerC
                 <ToggleButton
                   value="allow"
                   color="success"
+                  disabled={assignment.celActionEnabled}
                 >
                   Allow
                 </ToggleButton>
                 <ToggleButton
                   value="block"
                   color="error"
+                  disabled={assignment.celActionEnabled}
                 >
                   Block
+                </ToggleButton>
+                <ToggleButton
+                  value="cel"
+                  color="info"
+                  disabled={!assignment.celActionEnabled}
+                >
+                  CEL
                 </ToggleButton>
               </ToggleButtonGroup>
 
@@ -464,12 +459,13 @@ function AssignmentManagerCard({ assignment, groups, users }: AssignmentManagerC
 interface AssignmentsCardProps {
   allowScopes: ApplicationScope[];
   blockScopes: ApplicationScope[];
+  celScopes: ApplicationScope[];
   onDeleteScope: (scopeId: string) => void;
   deletingScopeId: string | null;
 }
 
-function AssignmentsCard({ allowScopes, blockScopes, onDeleteScope, deletingScopeId }: AssignmentsCardProps) {
-  const hasAssignments = allowScopes.length > 0 || blockScopes.length > 0;
+function AssignmentsCard({ allowScopes, blockScopes, celScopes, onDeleteScope, deletingScopeId }: AssignmentsCardProps) {
+  const hasAssignments = allowScopes.length > 0 || blockScopes.length > 0 || celScopes.length > 0;
 
   return (
     <Card
@@ -494,6 +490,12 @@ function AssignmentsCard({ allowScopes, blockScopes, onDeleteScope, deletingScop
             onDeleteScope={onDeleteScope}
             deletingScopeId={deletingScopeId}
           />
+          <AssignmentSection
+            label="CEL"
+            scopes={celScopes}
+            onDeleteScope={onDeleteScope}
+            deletingScopeId={deletingScopeId}
+          />
           {!hasAssignments && <Alert severity="info">No assignments yet.</Alert>}
         </Stack>
       </CardContent>
@@ -511,8 +513,9 @@ interface AssignmentManagerHookParams {
 interface AssignmentManagerState {
   selectedTarget: SelectedTarget | null;
   selectTarget: (target: SelectedTarget | null) => void;
-  selectedAction: "allow" | "block";
-  changeAction: (action: "allow" | "block") => void;
+  selectedAction: "allow" | "block" | "cel";
+  changeAction: (action: "allow" | "block" | "cel") => void;
+  celActionEnabled: boolean;
   assignmentError: string | null;
   clearAssignmentError: () => void;
   assignmentBusy: boolean;
@@ -523,16 +526,25 @@ interface AssignmentManagerState {
 
 function useAssignmentManager({ app, appId, refetch, showToast }: AssignmentManagerHookParams): AssignmentManagerState {
   const [selectedTarget, setSelectedTarget] = useState<SelectedTarget | null>(null);
-  const [selectedAction, setSelectedAction] = useState<"allow" | "block">("allow");
+  const [selectedAction, setSelectedAction] = useState<"allow" | "block" | "cel">("allow");
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [deletingScopeId, setDeletingScopeId] = useState<string | null>(null);
 
   const applicationId = app?.id ?? appId;
+  const celActionEnabled = Boolean(app?.cel_enabled);
 
   useEffect(() => {
     if (assignmentError && selectedTarget) setAssignmentError(null);
   }, [assignmentError, selectedTarget]);
+
+  useEffect(() => {
+    if (celActionEnabled) {
+      setSelectedAction("cel");
+    } else if (selectedAction === "cel") {
+      setSelectedAction("allow");
+    }
+  }, [celActionEnabled, selectedAction]);
 
   const assignRule = useCallback(async () => {
     if (!selectedTarget) {
@@ -604,6 +616,7 @@ function useAssignmentManager({ app, appId, refetch, showToast }: AssignmentMana
     selectTarget: setSelectedTarget,
     selectedAction,
     changeAction: setSelectedAction,
+    celActionEnabled,
     assignmentError,
     clearAssignmentError: () => {
       setAssignmentError(null);
@@ -643,6 +656,7 @@ export default function ApplicationDetails() {
 
   const allowScopes = scopes.filter((scope) => scope.action === "allow");
   const blockScopes = scopes.filter((scope) => scope.action === "block");
+  const celScopes = scopes.filter((scope) => scope.action === "cel");
 
   const assignedGroupIds = new Set(scopes.filter((scope) => scope.target_type === "group").map((scope) => scope.target_id));
   const assignedUserIds = new Set(scopes.filter((scope) => scope.target_type === "user").map((scope) => scope.target_id));
@@ -758,7 +772,7 @@ export default function ApplicationDetails() {
           variant="outlined"
           icon={<InfoOutlinedIcon fontSize="small" />}
         >
-          Applications are scoped based on the device&apos;s <strong>primary user</strong> received during preflight, not the currently logged-in user.
+          Assignments are scoped based on the device&apos;s <strong>primary user</strong> received during preflight, not the currently logged-in user.
         </Alert>
 
         <Grid
@@ -784,6 +798,7 @@ export default function ApplicationDetails() {
             <AssignmentsCard
               allowScopes={allowScopes}
               blockScopes={blockScopes}
+              celScopes={celScopes}
               onDeleteScope={assignment.removeScope}
               deletingScopeId={assignment.deletingScopeId}
             />

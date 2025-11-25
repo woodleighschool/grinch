@@ -29,24 +29,28 @@ type RuleAction string
 const (
 	RuleActionAllow RuleAction = "allow"
 	RuleActionBlock RuleAction = "block"
+	RuleActionCel   RuleAction = "cel"
 )
 
 type RuleMetadata struct {
-	Description  string      `json:"description"`
-	BlockMessage string      `json:"block_message"`
-	Users        []uuid.UUID `json:"users"`
-	Groups       []uuid.UUID `json:"groups"`
+	Description   string      `json:"description"`
+	BlockMessage  string      `json:"block_message"`
+	CelEnabled    bool        `json:"cel_enabled"`
+	CelExpression string      `json:"cel_expression"`
+	Users         []uuid.UUID `json:"users"`
+	Groups        []uuid.UUID `json:"groups"`
 }
 
 type SyncRule struct {
-	ID        uuid.UUID  `json:"id"`
-	Name      string     `json:"name"`
-	Type      RuleType   `json:"type"`
-	Target    string     `json:"target"`
-	Scope     RuleScope  `json:"scope"`
-	Action    RuleAction `json:"action"`
-	CustomMsg string     `json:"custom_msg"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	Type          RuleType   `json:"type"`
+	Target        string     `json:"target"`
+	Scope         RuleScope  `json:"scope"`
+	Action        RuleAction `json:"action"`
+	CustomMsg     string     `json:"custom_msg"`
+	CelExpression string     `json:"cel_expression"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 type SyncPayload struct {
@@ -59,19 +63,23 @@ func ParseMetadata(raw []byte) (RuleMetadata, error) {
 		return RuleMetadata{}, nil
 	}
 	var wire struct {
-		Description  string   `json:"description"`
-		BlockMessage string   `json:"block_message"`
-		Users        []string `json:"users"`
-		Groups       []string `json:"groups"`
+		Description   string   `json:"description"`
+		BlockMessage  string   `json:"block_message"`
+		CelEnabled    bool     `json:"cel_enabled"`
+		CelExpression string   `json:"cel_expression"`
+		Users         []string `json:"users"`
+		Groups        []string `json:"groups"`
 	}
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return RuleMetadata{}, err
 	}
 	return RuleMetadata{
-		Description:  strings.TrimSpace(wire.Description),
-		BlockMessage: strings.TrimSpace(wire.BlockMessage),
-		Users:        parseUUIDs(wire.Users),
-		Groups:       parseUUIDs(wire.Groups),
+		Description:   strings.TrimSpace(wire.Description),
+		BlockMessage:  strings.TrimSpace(wire.BlockMessage),
+		CelEnabled:    wire.CelEnabled,
+		CelExpression: strings.TrimSpace(wire.CelExpression),
+		Users:         parseUUIDs(wire.Users),
+		Groups:        parseUUIDs(wire.Groups),
 	}, nil
 }
 

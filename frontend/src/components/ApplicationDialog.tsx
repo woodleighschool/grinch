@@ -10,6 +10,9 @@ import {
   Stack,
   LinearProgress,
   TextField,
+  Switch,
+  FormControlLabel,
+  FormHelperText,
   FormControl,
   InputLabel,
   Select,
@@ -43,6 +46,8 @@ const applicationSchema = z.object({
   identifier: z.string().trim().min(1, "Identifier is required."),
   description: optionalText,
   block_message: optionalText,
+  cel_enabled: z.boolean(),
+  cel_expression: optionalText,
 });
 
 export type ApplicationFormValues = z.infer<typeof applicationSchema>;
@@ -54,6 +59,8 @@ const defaultValues: ApplicationFormValues = {
   identifier: "",
   description: "",
   block_message: "",
+  cel_enabled: false,
+  cel_expression: "",
 };
 
 interface ApplicationDialogProps {
@@ -73,12 +80,14 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
     defaultValues,
     resolver: zodResolver(applicationSchema),
   });
+
   const {
     register,
     control,
     handleSubmit,
     watch,
     reset,
+    setValue,
     setError,
     clearErrors,
     formState: { isSubmitting, errors },
@@ -87,25 +96,39 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
   const getHelperText = (value: unknown) => (typeof value === "string" ? value : undefined);
 
   useEffect(() => {
-    if (open) {
-      if (mode === "edit" && application) {
-        reset({
-          name: application.name,
-          rule_type: application.rule_type as ApplicationFormValues["rule_type"],
-          identifier: application.identifier,
-          description: application.description ?? "",
-          block_message: application.block_message ?? "",
-        });
-      } else {
-        reset(defaultValues);
-      }
-      clearErrors();
+    if (!open) return;
+
+    if (mode === "edit" && application) {
+      reset({
+        name: application.name,
+        rule_type: application.rule_type as ApplicationFormValues["rule_type"],
+        identifier: application.identifier,
+        description: application.description ?? "",
+        block_message: application.block_message ?? "",
+        cel_enabled: application.cel_enabled,
+        cel_expression: application.cel_expression ?? "",
+      });
+    } else {
+      reset(defaultValues);
     }
+
+    clearErrors();
   }, [open, mode, application, reset, clearErrors]);
 
   const watchedRuleType = watch("rule_type");
+  const watchedCelEnabled = watch("cel_enabled");
+
+  const celLocked = mode === "edit" && Boolean(application?.cel_enabled);
+
+  useEffect(() => {
+    if (celLocked) return;
+    if (!watchedCelEnabled) {
+      setValue("cel_expression", "");
+    }
+  }, [watchedCelEnabled, celLocked, setValue]);
+
   const identifierPlaceholder = applicationRuleTypeMetadata[watchedRuleType].placeholder;
-  const dialogTitle = mode === "edit" ? "Edit Application Rule" : "Add Application Rule";
+  const dialogTitle = mode === "edit" ? "Edit Application Rule" : "Create Application Rule";
   const submitLabel = mode === "edit" ? "Save Changes" : "Create";
   const submittingLabel = mode === "edit" ? "Saving..." : "Creating...";
 
@@ -114,21 +137,29 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
       name: string;
       rule_type: ApplicationRuleType;
       identifier: string;
+      cel_enabled: boolean;
       description?: string;
       block_message?: string;
+      cel_expression?: string;
     } = {
       name: values.name.trim(),
       rule_type: values.rule_type,
       identifier: values.identifier.trim(),
+      cel_enabled: values.cel_enabled,
     };
 
     if (values.description) payload.description = values.description;
     if (values.block_message) payload.block_message = values.block_message;
+    if (values.cel_enabled && values.cel_expression) {
+      payload.cel_expression = values.cel_expression;
+    }
+
     return payload;
   };
 
   const onSubmit = async (formData: ApplicationFormValues) => {
     clearErrors();
+
     try {
       const payload = buildPayload(formData);
 
@@ -147,12 +178,24 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
     } catch (err) {
       if (err instanceof ApiValidationError) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {
-          if (field === "name" || field === "rule_type" || field === "identifier" || field === "description" || field === "block_message") {
-            setError(field, { type: "server", message });
+          if (
+            field === "name" ||
+            field === "rule_type" ||
+            field === "identifier" ||
+            field === "description" ||
+            field === "block_message" ||
+            field === "cel_enabled" ||
+            field === "cel_expression"
+          ) {
+            setError(field, {
+              type: "server",
+              message,
+            });
           }
         });
         return;
       }
+
       console.error("Application dialog failed", err);
       onError(mode === "edit" ? "Failed to update application rule." : "Failed to create application rule.");
     }
@@ -165,8 +208,68 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
       maxWidth="md"
       fullWidth
     >
-      <DialogTitle>{dialogTitle}</DialogTitle>
+      <DialogTitle>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={2}
+        >
+          <Typography variant="h6">{dialogTitle}</Typography>
+
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+          >
+            <FormControlLabel
+              label={
+                <Typography
+                  variant="body2"
+                  component="span"
+                >
+                  CEL Mode
+                </Typography>
+              }
+              control={
+                <Controller
+                  name="cel_enabled"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      {...field}
+                      checked={field.value}
+                      onChange={(event) => {
+                        if (celLocked) return;
+                        field.onChange(event.target.checked);
+                      }}
+                      disabled={celLocked}
+                      slotProps={{ input: { "aria-label": "Enable CEL mode" } }}
+                    />
+                  )}
+                />
+              }
+            />
+            <Tooltip
+              arrow
+              title={
+                celLocked
+                  ? "CEL mode is permanently enabled for this rule. To disable it, delete and recreate the rule."
+                  : "Enable CEL mode to control this rule using a CEL expression. Once created with CEL mode enabled, it cannot be disabled without deleting and recreating the rule."
+              }
+            >
+              <HelpOutlineIcon
+                fontSize="small"
+                color="action"
+                sx={{ cursor: "default" }}
+              />
+            </Tooltip>
+          </Stack>
+        </Stack>
+      </DialogTitle>
+
       {isSubmitting && <LinearProgress />}
+
       <DialogContent dividers>
         <form
           id="application-form"
@@ -175,6 +278,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={3}
+            alignItems={{ xs: "stretch", md: "flex-start" }}
           >
             <Stack
               spacing={2.5}
@@ -217,14 +321,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
                     </Select>
                   )}
                 />
-                {errors.rule_type && (
-                  <Typography
-                    variant="caption"
-                    color="error"
-                  >
-                    {getHelperText(errors.rule_type.message)}
-                  </Typography>
-                )}
+                {errors.rule_type && <FormHelperText>{getHelperText(errors.rule_type.message)}</FormHelperText>}
               </FormControl>
 
               <TextField
@@ -241,7 +338,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
 
               <TextField
                 label="Description"
-                placeholder="Explain why this rule exists..."
+                placeholder="Describe what this rule does and why it exists."
                 {...register("description")}
                 error={!!errors.description}
                 helperText={getHelperText(errors.description?.message)}
@@ -252,7 +349,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
 
               <TextField
                 label="Block Message"
-                placeholder="Message displayed when blocked..."
+                placeholder="Message shown when this rule blocks an application."
                 {...register("block_message")}
                 error={!!errors.block_message}
                 helperText={getHelperText(errors.block_message?.message)}
@@ -263,8 +360,8 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
             </Stack>
 
             <Card
-              sx={{ xs: "auto", md: 2 }}
               elevation={1}
+              sx={{ alignSelf: "flex-start" }}
             >
               <CardHeader
                 title="Field Reference Guide"
@@ -345,8 +442,29 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
               </CardContent>
             </Card>
           </Stack>
+
+          {watchedCelEnabled && (
+            <Stack
+              mt={3}
+              spacing={1}
+            >
+              <TextField
+                label="CEL expression"
+                placeholder={`args.exists(arg, arg in ["--foo"]) ? BLOCKLIST : ALLOWLIST`}
+                {...register("cel_expression")}
+                error={!!errors.cel_expression}
+                helperText={getHelperText(errors.cel_expression?.message) ?? "Define the rule using Common Expression Language (CEL)."}
+                multiline
+                minRows={4}
+                required
+                fullWidth
+                slotProps={{ input: { style: { fontFamily: "monospace" } } }}
+              />
+            </Stack>
+          )}
         </form>
       </DialogContent>
+
       <DialogActions>
         <Button
           onClick={onClose}

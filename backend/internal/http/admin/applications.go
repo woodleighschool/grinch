@@ -20,16 +20,18 @@ import (
 )
 
 type applicationDTO struct {
-	ID           uuid.UUID                     `json:"id"`
-	Name         string                        `json:"name"`
-	RuleType     string                        `json:"rule_type"`
-	Identifier   string                        `json:"identifier"`
-	Description  string                        `json:"description,omitempty"`
-	BlockMessage string                        `json:"block_message,omitempty"`
-	Enabled      bool                          `json:"enabled"`
-	CreatedAt    time.Time                     `json:"created_at,omitempty"`
-	UpdatedAt    time.Time                     `json:"updated_at,omitempty"`
-	Stats        applicationAssignmentStatsDTO `json:"assignment_stats"`
+	ID            uuid.UUID                     `json:"id"`
+	Name          string                        `json:"name"`
+	RuleType      string                        `json:"rule_type"`
+	Identifier    string                        `json:"identifier"`
+	Description   string                        `json:"description,omitempty"`
+	BlockMessage  string                        `json:"block_message,omitempty"`
+	CelEnabled    bool                          `json:"cel_enabled"`
+	CelExpression string                        `json:"cel_expression,omitempty"`
+	Enabled       bool                          `json:"enabled"`
+	CreatedAt     time.Time                     `json:"created_at,omitempty"`
+	UpdatedAt     time.Time                     `json:"updated_at,omitempty"`
+	Stats         applicationAssignmentStatsDTO `json:"assignment_stats"`
 }
 
 type applicationScopeDTO struct {
@@ -59,27 +61,33 @@ type applicationDetailResponse struct {
 type applicationAssignmentStatsDTO struct {
 	AllowScopes int `json:"allow_scopes"`
 	BlockScopes int `json:"block_scopes"`
+	CelScopes   int `json:"cel_scopes"`
 	TotalScopes int `json:"total_scopes"`
 	AllowUsers  int `json:"allow_users"`
 	BlockUsers  int `json:"block_users"`
+	CelUsers    int `json:"cel_users"`
 	TotalUsers  int `json:"total_users"`
 }
 
 type createApplicationRequest struct {
-	Name         string `json:"name"`
-	RuleType     string `json:"rule_type"`
-	Identifier   string `json:"identifier"`
-	Description  string `json:"description"`
-	BlockMessage string `json:"block_message"`
+	Name          string `json:"name"`
+	RuleType      string `json:"rule_type"`
+	Identifier    string `json:"identifier"`
+	Description   string `json:"description"`
+	BlockMessage  string `json:"block_message"`
+	CelEnabled    bool   `json:"cel_enabled"`
+	CelExpression string `json:"cel_expression"`
 }
 
 type updateApplicationRequest struct {
-	Name         *string `json:"name"`
-	RuleType     *string `json:"rule_type"`
-	Identifier   *string `json:"identifier"`
-	Description  *string `json:"description"`
-	BlockMessage *string `json:"block_message"`
-	Enabled      *bool   `json:"enabled"`
+	Name          *string `json:"name"`
+	RuleType      *string `json:"rule_type"`
+	Identifier    *string `json:"identifier"`
+	Description   *string `json:"description"`
+	BlockMessage  *string `json:"block_message"`
+	CelEnabled    *bool   `json:"cel_enabled"`
+	CelExpression *string `json:"cel_expression"`
+	Enabled       *bool   `json:"enabled"`
 }
 
 type createScopeRequest struct {
@@ -193,8 +201,10 @@ func (h Handler) createApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metaBytes, err := h.Store.MarshalRuleMetadata(map[string]any{
-		"description":   validated.Description,
-		"block_message": validated.BlockMessage,
+		"description":    validated.Description,
+		"block_message":  validated.BlockMessage,
+		"cel_enabled":    validated.CelEnabled,
+		"cel_expression": validated.CelExpression,
 	})
 	if err != nil {
 		h.Logger.Error("marshal rule metadata", "err", err)
@@ -252,11 +262,13 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 	meta, _ := rules.ParseMetadata(current.Metadata)
 	payload := applicationValidationInput{
-		Name:         current.Name,
-		RuleType:     current.Type,
-		Identifier:   current.Target,
-		Description:  meta.Description,
-		BlockMessage: meta.BlockMessage,
+		Name:          current.Name,
+		RuleType:      current.Type,
+		Identifier:    current.Target,
+		Description:   meta.Description,
+		BlockMessage:  meta.BlockMessage,
+		CelEnabled:    meta.CelEnabled,
+		CelExpression: meta.CelExpression,
 	}
 	if body.Name != nil {
 		payload.Name = *body.Name
@@ -272,6 +284,12 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.BlockMessage != nil {
 		payload.BlockMessage = *body.BlockMessage
+	}
+	if body.CelEnabled != nil {
+		payload.CelEnabled = *body.CelEnabled
+	}
+	if body.CelExpression != nil {
+		payload.CelExpression = *body.CelExpression
 	}
 	validated, fieldErrs, existing, err := h.validateApplicationInput(r.Context(), payload, &current.ID)
 	if err != nil {
@@ -289,8 +307,16 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, http.StatusUnprocessableEntity, code, message, fieldErrs, existing)
 		return
 	}
+	if meta.CelEnabled && !validated.CelEnabled {
+		respondValidationError(w, http.StatusUnprocessableEntity, errCodeValidationFailed, "Application validation failed", fieldErrors{
+			"cel_enabled": "CEL mode cannot be disabled once enabled",
+		}, nil)
+		return
+	}
 	meta.Description = validated.Description
 	meta.BlockMessage = validated.BlockMessage
+	meta.CelEnabled = validated.CelEnabled
+	meta.CelExpression = validated.CelExpression
 	metaBytes, err := h.Store.MarshalRuleMetadata(meta)
 	if err != nil {
 		h.Logger.Error("marshal metadata", "err", err)
@@ -419,7 +445,7 @@ func (h Handler) createApplicationScope(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	validated, fieldErrs, duplicate, err := h.validateScopeInput(r.Context(), appID, body)
+	validated, fieldErrs, duplicate, err := h.validateScopeInput(r.Context(), rule, body)
 	if err != nil {
 		h.Logger.Error("validate scope", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to create scope")
@@ -591,15 +617,17 @@ func mapApplication(rule sqlc.Rule) applicationDTO {
 		updatedAt = rule.UpdatedAt.Time
 	}
 	return applicationDTO{
-		ID:           rule.ID,
-		Name:         rule.Name,
-		RuleType:     strings.ToUpper(rule.Type),
-		Identifier:   rule.Target,
-		Description:  meta.Description,
-		BlockMessage: meta.BlockMessage,
-		Enabled:      rule.Enabled,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
+		ID:            rule.ID,
+		Name:          rule.Name,
+		RuleType:      strings.ToUpper(rule.Type),
+		Identifier:    rule.Target,
+		Description:   meta.Description,
+		BlockMessage:  meta.BlockMessage,
+		CelEnabled:    meta.CelEnabled,
+		CelExpression: meta.CelExpression,
+		Enabled:       rule.Enabled,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
 	}
 }
 
@@ -607,9 +635,11 @@ func mapAssignmentStats(row sqlc.ListApplicationAssignmentStatsRow) applicationA
 	return applicationAssignmentStatsDTO{
 		AllowScopes: int(row.AllowScopes),
 		BlockScopes: int(row.BlockScopes),
+		CelScopes:   int(row.CelScopes),
 		TotalScopes: int(row.TotalScopes),
 		AllowUsers:  int(row.AllowUsers),
 		BlockUsers:  int(row.BlockUsers),
+		CelUsers:    int(row.CelUsers),
 		TotalUsers:  int(row.TotalUsers),
 	}
 }
@@ -618,6 +648,7 @@ func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAs
 	stats := applicationAssignmentStatsDTO{}
 	allowUsers := make(map[uuid.UUID]struct{})
 	blockUsers := make(map[uuid.UUID]struct{})
+	celUsers := make(map[uuid.UUID]struct{})
 	totalUsers := make(map[uuid.UUID]struct{})
 
 	for _, scope := range scopes {
@@ -626,6 +657,8 @@ func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAs
 			stats.AllowScopes++
 		case "block":
 			stats.BlockScopes++
+		case "cel":
+			stats.CelScopes++
 		}
 		stats.TotalScopes++
 
@@ -636,12 +669,15 @@ func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAs
 				allowUsers[id] = struct{}{}
 			case "block":
 				blockUsers[id] = struct{}{}
+			case "cel":
+				celUsers[id] = struct{}{}
 			}
 		}
 	}
 
 	stats.AllowUsers = len(allowUsers)
 	stats.BlockUsers = len(blockUsers)
+	stats.CelUsers = len(celUsers)
 	stats.TotalUsers = len(totalUsers)
 	return stats
 }

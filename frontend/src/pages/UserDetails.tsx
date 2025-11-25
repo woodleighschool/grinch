@@ -121,7 +121,8 @@ function PoliciesList({ policies, onSelectPolicy }: PoliciesListProps) {
     <Stack spacing={1.5}>
       {policies.map((policy) => {
         const action = policy.action;
-        const isAllow = action.toLowerCase() === "allow";
+        const actionLower = action.toLowerCase();
+        const actionColor = actionLower === "allow" ? "success" : actionLower === "block" ? "error" : "info";
         const canNavigate = Boolean(policy.application_id && onSelectPolicy);
 
         return (
@@ -161,7 +162,7 @@ function PoliciesList({ policies, onSelectPolicy }: PoliciesListProps) {
                       />
                       <Chip
                         size="small"
-                        color={isAllow ? "success" : "error"}
+                        color={actionColor}
                         label={action.toUpperCase()}
                       />
                       {policy.via_group && (

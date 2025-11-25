@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS rule_scopes (
   rule_id     UUID NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
   target_type TEXT NOT NULL CHECK (target_type IN ('group', 'user')),
   target_id   UUID NOT NULL,
-  action      TEXT NOT NULL CHECK (action IN ('allow', 'block')),
+  action      TEXT NOT NULL CHECK (action IN ('allow', 'block', 'cel')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS rule_assignments (
   rule_id     UUID NOT NULL REFERENCES rules(id)       ON DELETE CASCADE,
   scope_id    UUID NOT NULL REFERENCES rule_scopes(id) ON DELETE CASCADE,
   target_type TEXT NOT NULL CHECK (target_type IN ('group', 'user')),
-  action      TEXT NOT NULL CHECK (action IN ('allow', 'block')),
+  action      TEXT NOT NULL CHECK (action IN ('allow', 'block', 'cel')),
   user_id     UUID REFERENCES users(id)   ON DELETE CASCADE,
   group_id    UUID REFERENCES groups(id)  ON DELETE CASCADE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

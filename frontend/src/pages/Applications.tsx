@@ -128,9 +128,8 @@ export default function Applications() {
             rows={apps}
             columns={columns}
             loading={isLoading}
-            disableRowSelectionOnClick={true}
+            disableRowSelectionOnClick
             onRowClick={handleRowClick}
-            sx={{ "& .MuiDataGrid-row": { cursor: "pointer" } }}
             showToolbar
             slots={{
               noRowsOverlay: () => (
@@ -199,7 +198,7 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
     {
       field: "rule_type",
       headerName: "Type",
-      width: 120,
+      flex: 1,
     },
     {
       field: "identifier",
@@ -208,35 +207,13 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
     },
     {
       field: "assignment_stats",
-      headerName: "Assignments",
-      width: 250,
+      headerName: "Total Scope",
+      flex: 1,
       renderCell: (params) => {
         const stats = params.row.assignment_stats;
+        const totalUsers = stats?.total_users ?? 0;
 
-        return (
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            height="100%"
-          >
-            <Chip
-              size="small"
-              color="success"
-              label={`Allow ${String(stats?.allow_scopes ?? 0)}`}
-            />
-            <Chip
-              size="small"
-              color="error"
-              label={`Block ${String(stats?.block_scopes ?? 0)}`}
-            />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={`Total ${String(stats?.total_users ?? 0)}`}
-            />
-          </Stack>
-        );
+        return totalUsers;
       },
     },
     {

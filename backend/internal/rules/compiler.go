@@ -37,28 +37,30 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 		scope := RuleScope(row.Scope)
 		if scope == RuleScopeGlobal {
 			syncRules = append(syncRules, SyncRule{
-				ID:        row.ID,
-				Name:      row.Name,
-				Type:      RuleType(row.Type),
-				Target:    row.Target,
-				Scope:     RuleScopeGlobal,
-				Action:    RuleActionAllow,
-				CustomMsg: meta.BlockMessage,
-				CreatedAt: createdAt,
+				ID:            row.ID,
+				Name:          row.Name,
+				Type:          RuleType(row.Type),
+				Target:        row.Target,
+				Scope:         RuleScopeGlobal,
+				Action:        RuleActionAllow,
+				CustomMsg:     meta.BlockMessage,
+				CelExpression: meta.CelExpression,
+				CreatedAt:     createdAt,
 			})
 			continue
 		}
 		matched := filterAssignments(machine, assignments[row.ID])
 		for _, assignment := range matched {
 			syncRules = append(syncRules, SyncRule{
-				ID:        assignment.ScopeID,
-				Name:      row.Name,
-				Type:      RuleType(row.Type),
-				Target:    row.Target,
-				Scope:     scopeFromTargetType(assignment.TargetType),
-				Action:    RuleAction(assignment.Action),
-				CustomMsg: meta.BlockMessage,
-				CreatedAt: createdAt,
+				ID:            assignment.ScopeID,
+				Name:          row.Name,
+				Type:          RuleType(row.Type),
+				Target:        row.Target,
+				Scope:         scopeFromTargetType(assignment.TargetType),
+				Action:        RuleAction(assignment.Action),
+				CustomMsg:     meta.BlockMessage,
+				CelExpression: meta.CelExpression,
+				CreatedAt:     createdAt,
 			})
 		}
 	}
@@ -68,14 +70,15 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 		// Santa ignores empty rule lists during sync, so we must provide at least one rule.
 		// TODO: This rule is not removed when rules are re-added
 		syncRules = append(syncRules, SyncRule{
-			ID:        uuid.Nil,
-			Name:      "NOOP",
-			Type:      RuleTypeBinary,
-			Target:    "0000000000000000000000000000000000000000000000000000000000000000",
-			Scope:     RuleScopeGlobal,
-			Action:    RuleActionAllow,
-			CustomMsg: "NOOP",
-			CreatedAt: time.Time{},
+			ID:            uuid.Nil,
+			Name:          "NOOP",
+			Type:          RuleTypeBinary,
+			Target:        "0000000000000000000000000000000000000000000000000000000000000000",
+			Scope:         RuleScopeGlobal,
+			Action:        RuleActionAllow,
+			CustomMsg:     "NOOP",
+			CelExpression: "",
+			CreatedAt:     time.Time{},
 		})
 	}
 
@@ -182,6 +185,8 @@ func normaliseAction(value string) RuleAction {
 	switch RuleAction(value) {
 	case RuleActionBlock:
 		return RuleActionBlock
+	case RuleActionCel:
+		return RuleActionCel
 	default:
 		return RuleActionAllow
 	}
@@ -205,6 +210,7 @@ func ComputeCursor(rules []SyncRule) string {
 		sum.Write([]byte(r.Scope))
 		sum.Write([]byte(r.Action))
 		sum.Write([]byte(r.CustomMsg))
+		sum.Write([]byte(r.CelExpression))
 		sum.Write([]byte(r.CreatedAt.UTC().Format(time.RFC3339Nano)))
 	}
 	return hex.EncodeToString(sum.Sum(nil))

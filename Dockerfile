@@ -1,5 +1,5 @@
 # Build the frontend
-FROM node:24-alpine AS frontend
+FROM node:25-alpine AS frontend
 WORKDIR /workspace/frontend
 COPY frontend/package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund

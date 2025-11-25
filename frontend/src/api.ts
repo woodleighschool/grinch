@@ -51,6 +51,8 @@ export interface Application {
   identifier: string;
   description?: string;
   block_message?: string;
+  cel_enabled: boolean;
+  cel_expression?: string;
   enabled: boolean;
   assignment_stats?: ApplicationAssignmentStats;
 }
@@ -58,9 +60,11 @@ export interface Application {
 export interface ApplicationAssignmentStats {
   allow_scopes: number;
   block_scopes: number;
+  cel_scopes: number;
   total_scopes: number;
   allow_users: number;
   block_users: number;
+  cel_users: number;
   total_users: number;
 }
 
@@ -76,7 +80,7 @@ export interface ApplicationScope {
   application_id: string;
   target_type: "group" | "user";
   target_id: string;
-  action: "allow" | "block";
+  action: "allow" | "block" | "cel";
   created_at: string;
   target_display_name?: string;
   target_description?: string;
@@ -211,6 +215,8 @@ export interface ApplicationPayload {
   identifier: string;
   description?: string;
   block_message?: string;
+  cel_enabled?: boolean;
+  cel_expression?: string;
 }
 
 export type ApplicationValidationPayload = ApplicationPayload;
@@ -225,7 +231,7 @@ export interface ApplicationUpdatePayload extends Partial<ApplicationPayload> {
 export interface ScopePayload {
   target_type: "group" | "user";
   target_id: string;
-  action: "allow" | "block";
+  action: "allow" | "block" | "cel";
 }
 
 export type ScopeValidationRequest = ScopePayload;
