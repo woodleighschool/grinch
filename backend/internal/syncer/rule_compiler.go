@@ -12,6 +12,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// NewRuleCompilerJob periodically recomputes rule assignments for every rule.
 func NewRuleCompilerJob(store *store.Store, compiler *rules.Compiler, logger *slog.Logger) Job {
 	return func(ctx context.Context) error {
 		if store == nil || compiler == nil {

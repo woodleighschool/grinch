@@ -19,6 +19,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// applicationDTO is returned for listings + detail views.
 type applicationDTO struct {
 	ID            uuid.UUID                     `json:"id"`
 	Name          string                        `json:"name"`
@@ -34,6 +35,7 @@ type applicationDTO struct {
 	Stats         applicationAssignmentStatsDTO `json:"assignment_stats"`
 }
 
+// applicationScopeDTO captures the raw rule scope row.
 type applicationScopeDTO struct {
 	ID            uuid.UUID `json:"id"`
 	ApplicationID uuid.UUID `json:"application_id"`
@@ -43,6 +45,7 @@ type applicationScopeDTO struct {
 	CreatedAt     time.Time `json:"created_at,omitempty"`
 }
 
+// applicationScopeRelationshipDTO augments scopes with display data.
 type applicationScopeRelationshipDTO struct {
 	applicationScopeDTO
 	TargetDisplayName    string      `json:"target_display_name,omitempty"`
@@ -53,11 +56,13 @@ type applicationScopeRelationshipDTO struct {
 	EffectiveMembers     []userDTO   `json:"effective_members,omitempty"`
 }
 
+// applicationDetailResponse powers the application detail screen.
 type applicationDetailResponse struct {
 	Application applicationDTO                    `json:"application"`
 	Scopes      []applicationScopeRelationshipDTO `json:"scopes"`
 }
 
+// applicationAssignmentStatsDTO summarises scope + user counts.
 type applicationAssignmentStatsDTO struct {
 	AllowScopes    int `json:"allow_scopes"`
 	BlockScopes    int `json:"block_scopes"`
@@ -71,6 +76,7 @@ type applicationAssignmentStatsDTO struct {
 	SyncedMachines int `json:"synced_machines"`
 }
 
+// createApplicationRequest matches the body for POST /applications.
 type createApplicationRequest struct {
 	Name          string `json:"name"`
 	RuleType      string `json:"rule_type"`
@@ -81,6 +87,7 @@ type createApplicationRequest struct {
 	CelExpression string `json:"cel_expression"`
 }
 
+// updateApplicationRequest contains patchable fields on an application.
 type updateApplicationRequest struct {
 	Name          *string `json:"name"`
 	RuleType      *string `json:"rule_type"`
@@ -92,12 +99,14 @@ type updateApplicationRequest struct {
 	Enabled       *bool   `json:"enabled"`
 }
 
+// createScopeRequest describes the payload to add a rule scope.
 type createScopeRequest struct {
 	TargetType string `json:"target_type"`
 	TargetID   string `json:"target_id"`
 	Action     string `json:"action"`
 }
 
+// applicationsRoutes exposes CRUD + validation endpoints for Santa rules.
 func (h Handler) applicationsRoutes(r chi.Router) {
 	r.Get("/", h.listApplications)
 	r.Get("/check", h.checkApplication)
@@ -117,6 +126,7 @@ func (h Handler) applicationsRoutes(r chi.Router) {
 	})
 }
 
+// listApplications is the primary data source for the applications grid.
 func (h Handler) listApplications(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	filter := store.RuleFilter{
@@ -159,6 +169,7 @@ func (h Handler) listApplications(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// checkApplication is used by the Santa browser extension to inspect binaries.
 func (h Handler) checkApplication(w http.ResponseWriter, r *http.Request) {
 	identifier := strings.TrimSpace(r.URL.Query().Get("identifier"))
 	if identifier == "" {
@@ -178,6 +189,7 @@ func (h Handler) checkApplication(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, mapApplication(rule))
 }
 
+// createApplication validates and persists a new application.
 func (h Handler) createApplication(w http.ResponseWriter, r *http.Request) {
 	var body createApplicationRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -241,6 +253,7 @@ func (h Handler) createApplication(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, mapApplication(rule))
 }
 
+// updateApplication partially updates an existing rule definition.
 func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 	id, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -349,6 +362,7 @@ func (h Handler) updateApplication(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, mapApplication(updated))
 }
 
+// deleteApplication removes the rule and triggers a clean sync.
 func (h Handler) deleteApplication(w http.ResponseWriter, r *http.Request) {
 	id, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -364,6 +378,7 @@ func (h Handler) deleteApplication(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// applicationDetails returns an application plus resolved scopes.
 func (h Handler) applicationDetails(w http.ResponseWriter, r *http.Request) {
 	appID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -403,6 +418,7 @@ func (h Handler) applicationDetails(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// listApplicationScopes lists scopes for a single application.
 func (h Handler) listApplicationScopes(w http.ResponseWriter, r *http.Request) {
 	appID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -425,6 +441,7 @@ func (h Handler) listApplicationScopes(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resolved)
 }
 
+// createApplicationScope validates + inserts a new scope entry.
 func (h Handler) createApplicationScope(w http.ResponseWriter, r *http.Request) {
 	appID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -486,6 +503,7 @@ func (h Handler) createApplicationScope(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusCreated, mapScope(scope))
 }
 
+// deleteApplicationScope removes an assignment and requests a targeted clean sync.
 func (h Handler) deleteApplicationScope(w http.ResponseWriter, r *http.Request) {
 	appID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -520,6 +538,7 @@ func (h Handler) deleteApplicationScope(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// resolveApplicationScopes caches group + user lookups to enrich scopes.
 func (h Handler) resolveApplicationScopes(ctx context.Context, scopes []sqlc.RuleScope, includeMembers bool) ([]applicationScopeRelationshipDTO, error) {
 	resp := make([]applicationScopeRelationshipDTO, 0, len(scopes))
 	userCache := make(map[uuid.UUID]sqlc.User)
@@ -585,6 +604,7 @@ func (h Handler) resolveApplicationScopes(ctx context.Context, scopes []sqlc.Rul
 	return resp, nil
 }
 
+// getCachedUser memoizes user lookups while resolving scopes.
 func (h Handler) getCachedUser(ctx context.Context, cache map[uuid.UUID]sqlc.User, userID uuid.UUID) (sqlc.User, error) {
 	if user, ok := cache[userID]; ok {
 		return user, nil
@@ -597,6 +617,7 @@ func (h Handler) getCachedUser(ctx context.Context, cache map[uuid.UUID]sqlc.Use
 	return user, nil
 }
 
+// getCachedGroup memoizes group lookups while resolving scopes.
 func (h Handler) getCachedGroup(ctx context.Context, cache map[uuid.UUID]sqlc.Group, groupID uuid.UUID) (sqlc.Group, error) {
 	if group, ok := cache[groupID]; ok {
 		return group, nil
@@ -609,6 +630,7 @@ func (h Handler) getCachedGroup(ctx context.Context, cache map[uuid.UUID]sqlc.Gr
 	return group, nil
 }
 
+// mapApplication merges a rule row with metadata for API responses.
 func mapApplication(rule sqlc.Rule) applicationDTO {
 	meta, _ := rules.ParseMetadata(rule.Metadata)
 	var createdAt, updatedAt time.Time
@@ -633,6 +655,7 @@ func mapApplication(rule sqlc.Rule) applicationDTO {
 	}
 }
 
+// mapAssignmentStats translates the SQL aggregate row into the DTO.
 func mapAssignmentStats(row sqlc.ListApplicationAssignmentStatsRow) applicationAssignmentStatsDTO {
 	return applicationAssignmentStatsDTO{
 		AllowScopes:    int(row.AllowScopes),
@@ -648,6 +671,7 @@ func mapAssignmentStats(row sqlc.ListApplicationAssignmentStatsRow) applicationA
 	}
 }
 
+// summariseScopeStats recomputes counts for a resolved scope list.
 func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAssignmentStatsDTO {
 	stats := applicationAssignmentStatsDTO{}
 	allowUsers := make(map[uuid.UUID]struct{})
@@ -688,6 +712,7 @@ func summariseScopeStats(scopes []applicationScopeRelationshipDTO) applicationAs
 	return stats
 }
 
+// mapScope wraps sqlc.RuleScope in the API DTO.
 func mapScope(scope sqlc.RuleScope) applicationScopeDTO {
 	var created time.Time
 	if scope.CreatedAt.Valid {
@@ -703,12 +728,14 @@ func mapScope(scope sqlc.RuleScope) applicationScopeDTO {
 	}
 }
 
+// requestCleanSyncAll asks every agent to re-sync on the next heartbeat.
 func (h Handler) requestCleanSyncAll(ctx context.Context) {
 	if err := h.Store.RequestCleanSyncAllMachines(ctx); err != nil {
 		h.Logger.Warn("request global clean sync", "err", err)
 	}
 }
 
+// requestCleanSyncForScope requests a scoped clean sync for affected devices.
 func (h Handler) requestCleanSyncForScope(ctx context.Context, scope sqlc.RuleScope) {
 	var err error
 	switch scope.TargetType {

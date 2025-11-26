@@ -7,6 +7,7 @@ import (
 	msgraphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 )
 
+// DirectoryGroup represents the subset of Entra ID fields we care about.
 type DirectoryGroup struct {
 	ObjectID    string
 	DisplayName string
@@ -14,6 +15,7 @@ type DirectoryGroup struct {
 	Members     []string
 }
 
+// FetchGroups enumerates Entra ID security groups plus their members.
 func (c *Client) FetchGroups(ctx context.Context) ([]DirectoryGroup, error) {
 	if !c.enabled {
 		return nil, ErrNotConfigured
@@ -61,6 +63,7 @@ func (c *Client) FetchGroups(ctx context.Context) ([]DirectoryGroup, error) {
 	return groups, nil
 }
 
+// fetchGroupMembers walks the paginated graph API to collect member IDs.
 func (c *Client) fetchGroupMembers(ctx context.Context, groupID string) ([]string, error) {
 	if groupID == "" {
 		return nil, nil

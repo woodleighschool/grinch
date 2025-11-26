@@ -22,6 +22,7 @@ const (
 	defaultRedirect = "/admin"
 )
 
+// Handler owns the OIDC + local admin login endpoints.
 type Handler struct {
 	provider             *auth.OIDCProvider
 	sessions             *auth.SessionManager
@@ -32,12 +33,14 @@ type Handler struct {
 	initialAdminPassword string
 }
 
+// oidcState is stored in an HttpOnly cookie to defend against CSRF.
 type oidcState struct {
 	State    string `json:"state"`
 	Nonce    string `json:"nonce"`
 	Redirect string `json:"redirect"`
 }
 
+// RegisterRoutes attaches the auth endpoints (login, callback, logout).
 func RegisterRoutes(r chi.Router, cfg config.Config, provider *auth.OIDCProvider, sessions *auth.SessionManager, logger *slog.Logger) {
 	if sessions == nil {
 		if logger != nil {
@@ -69,6 +72,7 @@ func RegisterRoutes(r chi.Router, cfg config.Config, provider *auth.OIDCProvider
 	r.Post("/logout", h.logout)
 }
 
+// login orchestrates both OAuth and optional local login flows.
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	method := r.URL.Query().Get("method")
 
@@ -104,6 +108,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
+// callback completes the OIDC code flow and sets the Grinch session cookie.
 func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	stored, err := h.readStateCookie(r)
 	if err != nil {
@@ -160,11 +165,13 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, stored.Redirect, http.StatusFound)
 }
 
+// logout clears the session cookie without calling back to the IdP.
 func (h *Handler) logout(w http.ResponseWriter, _ *http.Request) {
 	h.sessions.Clear(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// me introspects the current session without revealing extra claims.
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	session, err := h.sessions.Read(r)
 	if err != nil {
@@ -184,6 +191,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// providers tells the UI what login options exist.
 func (h *Handler) providers(w http.ResponseWriter, r *http.Request) {
 	providers := map[string]bool{
 		"oauth": h.provider != nil,
@@ -197,6 +205,7 @@ func (h *Handler) providers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// localLogin is a bootstrap-only login path guarded by a static password.
 func (h *Handler) localLogin(w http.ResponseWriter, r *http.Request) {
 	if h.initialAdminPassword == "" {
 		http.Error(w, "Local login disabled", http.StatusNotFound)

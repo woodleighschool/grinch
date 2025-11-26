@@ -55,6 +55,7 @@ var applicationIdentifierValidators = map[string]identifierValidator{
 
 type fieldErrors map[string]string
 
+// applicationValidationResult is returned to callers for display.
 type applicationValidationResult struct {
 	Name          string `json:"name"`
 	RuleType      string `json:"rule_type"`
@@ -65,6 +66,7 @@ type applicationValidationResult struct {
 	CelExpression string `json:"cel_expression,omitempty"`
 }
 
+// applicationValidationInput contains raw fields before trimming/validation.
 type applicationValidationInput struct {
 	Name          string
 	RuleType      string
@@ -75,6 +77,7 @@ type applicationValidationInput struct {
 	CelExpression string
 }
 
+// scopeValidationResult is returned when validating new scopes.
 type scopeValidationResult struct {
 	ApplicationID uuid.UUID `json:"application_id"`
 	TargetType    string    `json:"target_type"`
@@ -88,6 +91,7 @@ var (
 	celEnvErr  error
 )
 
+// celValidationEnv lazily initialises the CEL parser.
 func celValidationEnv() (*cel.Env, error) {
 	celEnvOnce.Do(func() {
 		celEnv, celEnvErr = cel.NewEnv()
@@ -95,6 +99,7 @@ func celValidationEnv() (*cel.Env, error) {
 	return celEnv, celEnvErr
 }
 
+// validateCELExpression ensures expression parses before persisting.
 func validateCELExpression(expr string) error {
 	trimmed := strings.TrimSpace(expr)
 	if trimmed == "" {
@@ -110,6 +115,7 @@ func validateCELExpression(expr string) error {
 	return nil
 }
 
+// apiErrorResponse standardises validation errors sent back to the UI.
 type apiErrorResponse struct {
 	Error               string            `json:"error"`
 	Message             string            `json:"message"`
@@ -117,11 +123,13 @@ type apiErrorResponse struct {
 	ExistingApplication *applicationDTO   `json:"existing_application,omitempty"`
 }
 
+// validationSuccessResponse wraps successful validation responses.
 type validationSuccessResponse[T any] struct {
 	Valid      bool `json:"valid"`
 	Normalised T    `json:"normalised"`
 }
 
+// respondValidationError emits a structured validation error payload.
 func respondValidationError(w http.ResponseWriter, status int, code, message string, fields fieldErrors, existing *applicationDTO) {
 	resp := apiErrorResponse{
 		Error:   code,
@@ -136,6 +144,7 @@ func respondValidationError(w http.ResponseWriter, status int, code, message str
 	respondJSON(w, status, resp)
 }
 
+// respondValidationSuccess mirrors the happy-path result for validation endpoints.
 func respondValidationSuccess[T any](w http.ResponseWriter, result T) {
 	respondJSON(w, http.StatusOK, validationSuccessResponse[T]{
 		Valid:      true,
@@ -143,6 +152,7 @@ func respondValidationSuccess[T any](w http.ResponseWriter, result T) {
 	})
 }
 
+// validateApplication runs server-side validation without persisting.
 func (h Handler) validateApplication(w http.ResponseWriter, r *http.Request) {
 	var body createApplicationRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -168,6 +178,7 @@ func (h Handler) validateApplication(w http.ResponseWriter, r *http.Request) {
 	respondValidationSuccess(w, result)
 }
 
+// validateScopeForApplication ensures the target/action combination is valid.
 func (h Handler) validateScopeForApplication(w http.ResponseWriter, r *http.Request) {
 	appID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -182,6 +193,7 @@ func (h Handler) validateScopeForApplication(w http.ResponseWriter, r *http.Requ
 	h.runScopeValidation(r.Context(), w, appID, body)
 }
 
+// runScopeValidation executes the shared validation logic after loading the rule.
 func (h Handler) runScopeValidation(ctx context.Context, w http.ResponseWriter, appID uuid.UUID, body createScopeRequest) {
 	rule, err := h.Store.GetRule(ctx, appID)
 	if err != nil {
@@ -214,6 +226,7 @@ func (h Handler) runScopeValidation(ctx context.Context, w http.ResponseWriter, 
 	respondValidationSuccess(w, result)
 }
 
+// validateApplicationInput normalises + validates create/update payloads.
 func (h Handler) validateApplicationInput(ctx context.Context, input applicationValidationInput, excludeID *uuid.UUID) (applicationValidationResult, fieldErrors, *applicationDTO, error) {
 	errs := fieldErrors{}
 	result := applicationValidationResult{}
@@ -281,6 +294,7 @@ func (h Handler) validateApplicationInput(ctx context.Context, input application
 	}, &dto, nil
 }
 
+// validateScopeInput checks uniqueness and CEL compatibility for a target/action pair.
 func (h Handler) validateScopeInput(ctx context.Context, rule sqlc.Rule, body createScopeRequest) (scopeValidationResult, fieldErrors, bool, error) {
 	errs := fieldErrors{}
 	result := scopeValidationResult{ApplicationID: rule.ID}

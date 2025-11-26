@@ -7,6 +7,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// Config captures all runtime configuration derived from environment variables.
 type Config struct {
 	AdminListenAddr      string        `env:"ADMIN_LISTEN_ADDR" envDefault:":8080"`
 	SantaListenAddr      string        `env:"SANTA_LISTEN_ADDR" envDefault:":8081"`
@@ -34,6 +35,7 @@ type Config struct {
 	FrontendDistDir      string        `env:"FRONTEND_DIST_DIR"`
 }
 
+// Load reads environment variables into a Config.
 func Load() (Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
@@ -42,6 +44,7 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
+// DatabaseURL returns the DSN used to connect to Postgres.
 func (c Config) DatabaseURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName, c.DatabaseSSLMode)

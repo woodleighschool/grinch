@@ -21,11 +21,13 @@ import (
 )
 
 var (
+	// buildVersion, gitCommit, and buildDate are injected at build-time.
 	buildVersion = "dev"
 	gitCommit    = "unknown"
 	buildDate    = "unknown"
 )
 
+// main wires up all backend dependencies and blocks until both admin and santa servers exit.
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -159,6 +161,7 @@ func main() {
 	}
 }
 
+// newLogger configures a JSON slog logger honoring the requested log level.
 func newLogger(level string) *slog.Logger {
 	lvl := new(slog.LevelVar)
 	switch strings.ToLower(level) {
@@ -175,6 +178,7 @@ func newLogger(level string) *slog.Logger {
 	return slog.New(handler)
 }
 
+// newHTTPServer returns an HTTP server configured with consistent timeouts.
 func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:         addr,
@@ -185,6 +189,7 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
+// startServer launches the HTTP server on a goroutine and reports terminal errors.
 func startServer(logger *slog.Logger, name string, server *http.Server) <-chan error {
 	errCh := make(chan error, 1)
 	go func() {
@@ -199,6 +204,7 @@ func startServer(logger *slog.Logger, name string, server *http.Server) <-chan e
 	return errCh
 }
 
+// shutdownServer attempts a graceful stop and logs the result.
 func shutdownServer(ctx context.Context, logger *slog.Logger, name string, server *http.Server) error {
 	if server == nil {
 		return nil

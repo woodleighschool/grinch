@@ -15,6 +15,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// groupDTO mirrors the fields exposed by the admin UI.
 type groupDTO struct {
 	ID          uuid.UUID   `json:"id"`
 	DisplayName string      `json:"displayName"`
@@ -22,6 +23,7 @@ type groupDTO struct {
 	Members     []uuid.UUID `json:"members"`
 }
 
+// groupsRoutes registers membership + group management endpoints.
 func (h Handler) groupsRoutes(r chi.Router) {
 	r.Get("/", h.listGroups)
 	r.Post("/", h.upsertGroup)
@@ -30,6 +32,7 @@ func (h Handler) groupsRoutes(r chi.Router) {
 	r.Get("/{id}/effective-members", h.groupEffectiveMembers)
 }
 
+// listGroups returns directory groups with optional search filtering.
 func (h Handler) listGroups(w http.ResponseWriter, r *http.Request) {
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 	groups, err := h.Store.ListGroups(r.Context(), search)
@@ -49,6 +52,7 @@ func (h Handler) listGroups(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// upsertGroup creates or updates a group record and synchronises membership.
 func (h Handler) upsertGroup(w http.ResponseWriter, r *http.Request) {
 	var body groupDTO
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -84,6 +88,7 @@ func (h Handler) upsertGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// deleteGroup removes a directory group entirely.
 func (h Handler) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idParam)
@@ -99,6 +104,7 @@ func (h Handler) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusNoContent, nil)
 }
 
+// sqlNullString converts optional text fields into pgtype.Text.
 func sqlNullString(value string) pgtype.Text {
 	if value == "" {
 		return pgtype.Text{}
@@ -106,6 +112,7 @@ func sqlNullString(value string) pgtype.Text {
 	return pgtype.Text{String: value, Valid: true}
 }
 
+// groupEffectiveMembers resolves a group's membership including derived data.
 func (h Handler) groupEffectiveMembers(w http.ResponseWriter, r *http.Request) {
 	groupID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -148,6 +155,7 @@ func (h Handler) groupEffectiveMembers(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// groupEffectiveMembersResponse contains both member IDs and their richer records.
 type groupEffectiveMembersResponse struct {
 	Group     groupDTO    `json:"group"`
 	Members   []userDTO   `json:"members"`

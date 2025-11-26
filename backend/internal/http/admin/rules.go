@@ -12,6 +12,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// ruleDTO represents a raw Santa rule, mainly for debugging endpoints.
 type ruleDTO struct {
 	ID       uuid.UUID      `json:"id"`
 	Name     string         `json:"name"`
@@ -22,6 +23,7 @@ type ruleDTO struct {
 	Metadata map[string]any `json:"metadata"`
 }
 
+// rulesRoutes exposes legacy debugging endpoints for raw rules.
 func (h Handler) rulesRoutes(r chi.Router) {
 	r.Get("/", h.listRules)
 	r.Post("/", h.createRule)
@@ -29,6 +31,7 @@ func (h Handler) rulesRoutes(r chi.Router) {
 	r.Delete("/{id}", h.deleteRule)
 }
 
+// listRules streams every rule, primarily for troubleshooting.
 func (h Handler) listRules(w http.ResponseWriter, r *http.Request) {
 	rules, err := h.Store.ListRules(r.Context())
 	if err != nil {
@@ -43,6 +46,7 @@ func (h Handler) listRules(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// createRule stores a debugging rule and recompiles assignments out-of-band.
 func (h Handler) createRule(w http.ResponseWriter, r *http.Request) {
 	var body ruleDTO
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -75,6 +79,7 @@ func (h Handler) createRule(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, mapRule(rule))
 }
 
+// updateRule mutates an existing rule; primarily used in development.
 func (h Handler) updateRule(w http.ResponseWriter, r *http.Request) {
 	var body ruleDTO
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -109,6 +114,7 @@ func (h Handler) updateRule(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, mapRule(rule))
 }
 
+// deleteRule removes a rule; legacy endpoint retained for compatibility.
 func (h Handler) deleteRule(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -123,6 +129,7 @@ func (h Handler) deleteRule(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// recompileRuleAssignments rebuilds compiled assignments for a single rule.
 func (h Handler) recompileRuleAssignments(ctx context.Context, rule sqlc.Rule) {
 	meta, err := rules.ParseMetadata(rule.Metadata)
 	if err != nil {
@@ -149,6 +156,7 @@ func (h Handler) recompileRuleAssignments(ctx context.Context, rule sqlc.Rule) {
 	}
 }
 
+// recompileGroupRules refreshes compiled assignments for every rule targeting the group.
 func (h Handler) recompileGroupRules(ctx context.Context, groupID uuid.UUID) {
 	ruleIDs, err := h.Store.ListRulesByGroupTarget(ctx, groupID)
 	if err != nil {
@@ -165,6 +173,7 @@ func (h Handler) recompileGroupRules(ctx context.Context, groupID uuid.UUID) {
 	}
 }
 
+// mapRule flattens the sqlc rule row for the legacy API.
 func mapRule(r sqlc.Rule) ruleDTO {
 	return ruleDTO{
 		ID:       r.ID,

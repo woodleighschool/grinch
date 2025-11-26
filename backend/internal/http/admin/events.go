@@ -20,11 +20,13 @@ type eventDTO struct {
 	UserID    string    `json:"userId"`
 }
 
+// eventsRoutes exposes recent logs + summary stats.
 func (h Handler) eventsRoutes(r chi.Router) {
 	r.Get("/", h.listEvents)
 	r.Get("/stats", h.eventStats)
 }
 
+// listEvents streams recent events for troubleshooting.
 func (h Handler) listEvents(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 100)
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
@@ -41,12 +43,14 @@ func (h Handler) listEvents(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// eventStatDTO aggregates events per time bucket/kind.
 type eventStatDTO struct {
 	Bucket time.Time `json:"bucket"`
 	Kind   string    `json:"kind"`
 	Total  int64     `json:"total"`
 }
 
+// eventStats powers the trend charts in the admin UI.
 func (h Handler) eventStats(w http.ResponseWriter, r *http.Request) {
 	days := parseInt(r.URL.Query().Get("days"), 14)
 	stats, err := h.Store.SummariseEvents(r.Context(), int32(days))

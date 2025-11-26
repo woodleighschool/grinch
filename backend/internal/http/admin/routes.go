@@ -10,6 +10,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
+// Handler centralises admin HTTP handlers and shared dependencies.
 type Handler struct {
 	Store    *store.Store
 	Logger   *slog.Logger
@@ -17,6 +18,7 @@ type Handler struct {
 	Compiler *rules.Compiler
 }
 
+// RegisterRoutes attaches all admin endpoints under /v1.
 func RegisterRoutes(r chi.Router, cfg config.Config, store *store.Store, logger *slog.Logger, compiler *rules.Compiler) {
 	h := Handler{Store: store, Logger: logger, Config: cfg, Compiler: compiler}
 	r.Route("/v1", func(r chi.Router) {

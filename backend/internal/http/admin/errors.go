@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// isUniqueConstraintError inspects the pg error for constraint violations.
 func isUniqueConstraintError(err error, constraint string) bool {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {

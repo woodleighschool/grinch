@@ -13,6 +13,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// RuleFilter narrows the rule listing in the admin API.
 type RuleFilter struct {
 	Search     string
 	RuleType   string
@@ -68,6 +69,7 @@ func (s *Store) DeleteGroup(ctx context.Context, id uuid.UUID) error {
 	return s.queries.DeleteGroup(ctx, id)
 }
 
+// ReplaceGroupMembers swaps the entire membership set inside a transaction.
 func (s *Store) ReplaceGroupMembers(ctx context.Context, groupID uuid.UUID, userIDs []uuid.UUID) error {
 	return s.WithTx(ctx, func(tx pgx.Tx) error {
 		queries := sqlc.New(tx)
@@ -126,6 +128,7 @@ func (s *Store) UpdateMachinePostflightState(ctx context.Context, params sqlc.Up
 	return s.queries.UpdateMachinePostflightState(ctx, params)
 }
 
+// TouchMachine updates the machine heartbeat + cursors whenever the agent calls home.
 func (s *Store) TouchMachine(ctx context.Context, machineID uuid.UUID, clientVersion string, syncCursor, ruleCursor string) (sqlc.Machine, error) {
 	return s.queries.UpdateMachineSyncState(ctx, sqlc.UpdateMachineSyncStateParams{
 		ID:         machineID,
@@ -159,6 +162,7 @@ func (s *Store) ListRules(ctx context.Context) ([]sqlc.Rule, error) {
 	return s.queries.ListRules(ctx)
 }
 
+// FilterRules applies search + status filters for the applications page.
 func (s *Store) FilterRules(ctx context.Context, filter RuleFilter) ([]sqlc.Rule, error) {
 	var enabled pgtype.Bool
 	if filter.Enabled != nil {
@@ -204,6 +208,7 @@ func (s *Store) DeleteRuleScope(ctx context.Context, scopeID uuid.UUID) error {
 	return s.queries.DeleteRuleScope(ctx, scopeID)
 }
 
+// ReplaceRuleAssignments atomically refreshes all compiled assignments for a rule.
 func (s *Store) ReplaceRuleAssignments(ctx context.Context, ruleID uuid.UUID, assignments []sqlc.InsertRuleAssignmentParams) error {
 	return s.WithTx(ctx, func(tx pgx.Tx) error {
 		queries := sqlc.New(tx)
@@ -259,6 +264,7 @@ func (s *Store) ListBlocksByUser(ctx context.Context, userID pgtype.UUID) ([]sql
 	return s.queries.ListBlocksByUser(ctx, userID)
 }
 
+// SummariseEvents returns aggregate counts used for dashboards.
 func (s *Store) SummariseEvents(ctx context.Context, days int32) ([]sqlc.SummariseEventsRow, error) {
 	if days <= 0 {
 		days = 14
@@ -266,6 +272,7 @@ func (s *Store) SummariseEvents(ctx context.Context, days int32) ([]sqlc.Summari
 	return s.queries.SummariseEvents(ctx, days)
 }
 
+// MarshalRuleMetadata encodes optional metadata while tolerating nil values.
 func (s *Store) MarshalRuleMetadata(meta any) ([]byte, error) {
 	if meta == nil {
 		return nil, nil

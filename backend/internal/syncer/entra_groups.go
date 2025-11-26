@@ -13,6 +13,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// NewGroupJob synchronises Entra ID groups and their memberships.
 func NewGroupJob(store *store.Store, graphClient *graph.Client, logger *slog.Logger) Job {
 	return func(ctx context.Context) error {
 		if graphClient == nil || !graphClient.Enabled() {

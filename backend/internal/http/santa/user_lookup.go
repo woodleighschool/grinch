@@ -12,6 +12,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
+// resolveUserID attempts to match Santa's reported username to a directory user.
 func resolveUserID(ctx context.Context, store *store.Store, logger *slog.Logger, reported string) *uuid.UUID {
 	reported = strings.TrimSpace(reported)
 	if reported == "" {

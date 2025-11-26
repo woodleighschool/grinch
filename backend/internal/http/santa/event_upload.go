@@ -20,11 +20,13 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// eventUploadHandler ingests Santa events + file metadata.
 type eventUploadHandler struct {
 	store  *store.Store
 	logger *slog.Logger
 }
 
+// Handle ingests an EventUploadRequest and persists compacted event rows.
 func (h *eventUploadHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	machineIdentifier := strings.TrimSpace(chi.URLParam(r, "machineID"))
 	if machineIdentifier == "" {

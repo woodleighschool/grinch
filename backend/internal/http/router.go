@@ -20,6 +20,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
+// AdminDeps contains dependencies for the internal admin API + UI.
 type AdminDeps struct {
 	Store         *store.Store
 	Logger        *slog.Logger
@@ -29,6 +30,7 @@ type AdminDeps struct {
 	BuildInfo     BuildInfo
 }
 
+// SantaDeps contains dependencies for the Santa sync API.
 type SantaDeps struct {
 	Store     *store.Store
 	Logger    *slog.Logger
@@ -36,12 +38,14 @@ type SantaDeps struct {
 	BuildInfo BuildInfo
 }
 
+// BuildInfo is mirrored back to HTTP clients for display.
 type BuildInfo struct {
 	Version   string `json:"version"`
 	GitCommit string `json:"git_commit"`
 	BuildDate string `json:"build_date"`
 }
 
+// NewAdminRouter wires the admin API, auth routes, and optional static UI.
 func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
 	r := baseRouter()
 
@@ -68,6 +72,7 @@ func NewAdminRouter(cfg config.Config, deps AdminDeps) http.Handler {
 	return handler
 }
 
+// NewSantaRouter exposes the limited Santa sync endpoints.
 func NewSantaRouter(deps SantaDeps) http.Handler {
 	r := baseRouter()
 
@@ -82,6 +87,7 @@ func NewSantaRouter(deps SantaDeps) http.Handler {
 	return r
 }
 
+// baseRouter applies the common middleware stack used by both routers.
 func baseRouter() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -91,6 +97,7 @@ func baseRouter() *chi.Mux {
 	return r
 }
 
+// mountStatic serves the compiled frontend unless an API/Santa path was requested.
 func mountStatic(distDir string, apiHandler http.Handler) http.Handler {
 	fileServer := http.FileServer(http.Dir(distDir))
 

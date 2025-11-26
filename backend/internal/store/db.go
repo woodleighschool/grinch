@@ -17,8 +17,10 @@ import (
 //go:embed migrate/*.sql
 var migrations embed.FS
 
+// ErrNilPool indicates the Store was used after being closed.
 var ErrNilPool = errors.New("store: nil pool")
 
+// Options tweak the Postgres pool behaviour.
 type Options struct {
 	URL             string
 	MaxConnections  int32
@@ -26,11 +28,13 @@ type Options struct {
 	MaxConnLifetime time.Duration
 }
 
+// Store wraps sqlc queries and connection pool helpers.
 type Store struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
+// Open initialises the pgx connection pool and sqlc helpers.
 func Open(ctx context.Context, opts Options) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(opts.URL)
 	if err != nil {
@@ -52,6 +56,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	return &Store{pool: pool, queries: sqlc.New(pool)}, nil
 }
 
+// Close shuts down the underlying pool.
 func (s *Store) Close() {
 	if s == nil || s.pool == nil {
 		return
@@ -59,6 +64,7 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
+// Ping verifies connectivity to Postgres.
 func (s *Store) Ping(ctx context.Context) error {
 	if s.pool == nil {
 		return ErrNilPool
@@ -66,6 +72,7 @@ func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
+// WithTx runs fn inside a transaction and commits on success.
 func (s *Store) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -88,10 +95,12 @@ func (s *Store) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
 	return nil
 }
 
+// Queries exposes the raw sqlc handle for callers that need fine control.
 func (s *Store) Queries() *sqlc.Queries {
 	return s.queries
 }
 
+// Migrate applies embedded SQL migration files in alphabetical order.
 func (s *Store) Migrate(ctx context.Context) error {
 	entries, err := migrations.ReadDir("migrate")
 	if err != nil {

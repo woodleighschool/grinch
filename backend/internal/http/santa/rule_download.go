@@ -15,6 +15,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store"
 )
 
+// ruleDownloadHandler streams compiled rules to a Santa agent.
 type ruleDownloadHandler struct {
 	store    *store.Store
 	logger   *slog.Logger

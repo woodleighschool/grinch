@@ -16,11 +16,13 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// postflightHandler processes the final sync step after rules / events.
 type postflightHandler struct {
 	store  *store.Store
 	logger *slog.Logger
 }
 
+// Handle finalises a sync session and clears the clean-sync flag.
 func (h *postflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	machineIdentifier := strings.TrimSpace(chi.URLParam(r, "machineID"))
 	if machineIdentifier == "" {

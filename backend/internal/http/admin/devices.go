@@ -15,6 +15,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// deviceDTO contains the subset of machine fields exposed to the UI.
 type deviceDTO struct {
 	ID                   string          `json:"id"`
 	MachineIdentifier    string          `json:"machineIdentifier"`
@@ -34,6 +35,7 @@ type deviceDTO struct {
 	SyncCursor           string          `json:"syncCursor"`
 }
 
+// deviceDetailsResponse bundles device, user, and policy info.
 type deviceDetailsResponse struct {
 	Device       deviceDTO    `json:"device"`
 	PrimaryUser  userDTO      `json:"primary_user"`
@@ -41,11 +43,13 @@ type deviceDetailsResponse struct {
 	Policies     []userPolicy `json:"policies"`
 }
 
+// devicesRoutes registers the device listing + detail endpoints.
 func (h Handler) devicesRoutes(r chi.Router) {
 	r.Get("/", h.listDevices)
 	r.Get("/{id}", h.deviceDetails)
 }
 
+// listDevices returns paginated device rows for the admin UI.
 func (h Handler) listDevices(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 50)
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
@@ -63,6 +67,7 @@ func (h Handler) listDevices(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// deviceDetails fetches the machine plus related user + event data.
 func (h Handler) deviceDetails(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	machineID, err := uuid.Parse(idParam)

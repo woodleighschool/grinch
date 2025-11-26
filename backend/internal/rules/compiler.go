@@ -13,12 +13,15 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// Compiler turns rule rows + assignments into Santa wire representations.
 type Compiler struct{}
 
+// NewCompiler creates a ready-to-use compiler.
 func NewCompiler() *Compiler {
 	return &Compiler{}
 }
 
+// BuildPayload assembles the SyncPayload for a machine using precomputed assignments.
 func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assignmentRows []sqlc.RuleAssignment) SyncPayload {
 	assignments := map[uuid.UUID][]sqlc.RuleAssignment{}
 	for _, a := range assignmentRows {
@@ -85,6 +88,7 @@ func (c *Compiler) BuildPayload(machine sqlc.Machine, ruleRows []sqlc.Rule, assi
 	return SyncPayload{Cursor: ComputeCursor(syncRules), Rules: syncRules}
 }
 
+// CompileAssignments expands scopes + metadata into the per-user assignments Santa expects.
 func (c *Compiler) CompileAssignments(rule sqlc.Rule, scopes []sqlc.RuleScope, meta RuleMetadata, groupMembers map[uuid.UUID][]uuid.UUID) []sqlc.InsertRuleAssignmentParams {
 	normalised := append([]sqlc.RuleScope(nil), scopes...)
 	if len(meta.Users) > 0 || len(meta.Groups) > 0 {
@@ -133,6 +137,7 @@ func (c *Compiler) CompileAssignments(rule sqlc.Rule, scopes []sqlc.RuleScope, m
 	return assignments
 }
 
+// filterAssignments narrows assignments to those relevant to the machine's primary user.
 func filterAssignments(machine sqlc.Machine, assignments []sqlc.RuleAssignment) []sqlc.RuleAssignment {
 	if !machine.UserID.Valid {
 		return nil
@@ -147,6 +152,7 @@ func filterAssignments(machine sqlc.Machine, assignments []sqlc.RuleAssignment) 
 	return matched
 }
 
+// scopeFromTargetType normalises DB scope semantics to the API enum.
 func scopeFromTargetType(targetType string) RuleScope {
 	switch targetType {
 	case "group":
@@ -158,6 +164,7 @@ func scopeFromTargetType(targetType string) RuleScope {
 	}
 }
 
+// legacyScopes keeps legacy metadata-based target lists compatible with scopes.
 func legacyScopes(ruleID uuid.UUID, meta RuleMetadata) []sqlc.RuleScope {
 	var scopes []sqlc.RuleScope
 	for _, userID := range meta.Users {
@@ -181,6 +188,7 @@ func legacyScopes(ruleID uuid.UUID, meta RuleMetadata) []sqlc.RuleScope {
 	return scopes
 }
 
+// normaliseAction ensures empty/unknown actions default to allow.
 func normaliseAction(value string) RuleAction {
 	switch RuleAction(value) {
 	case RuleActionBlock:
@@ -192,14 +200,17 @@ func normaliseAction(value string) RuleAction {
 	}
 }
 
+// matchesUUID compares a UUID to a nullable pgtype.UUID.
 func matchesUUID(id uuid.UUID, candidate pgtype.UUID) bool {
 	return candidate.Valid && id == candidate.Bytes
 }
 
+// uuidToPgtype wraps a UUID in the pgtype helper struct.
 func uuidToPgtype(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
 }
 
+// ComputeCursor hashes the rule list to create a stable sync cursor.
 func ComputeCursor(rules []SyncRule) string {
 	sum := sha256.New()
 	for _, r := range rules {
@@ -216,6 +227,7 @@ func ComputeCursor(rules []SyncRule) string {
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
+// normaliseSyncRules sorts the rule list for deterministic cursors.
 func normaliseSyncRules(rules []SyncRule) []SyncRule {
 	out := append([]SyncRule(nil), rules...)
 	sort.Slice(out, func(i, j int) bool {
@@ -230,6 +242,7 @@ func normaliseSyncRules(rules []SyncRule) []SyncRule {
 	return out
 }
 
+// SerialiseMetadata converts raw JSON metadata into a map for API responses.
 func SerialiseMetadata(meta []byte) map[string]any {
 	if len(meta) == 0 {
 		return nil
@@ -239,6 +252,7 @@ func SerialiseMetadata(meta []byte) map[string]any {
 	return out
 }
 
+// CollectGroupIDs enumerates all group IDs that appear across metadata + scopes.
 func CollectGroupIDs(meta RuleMetadata, scopes []sqlc.RuleScope) []uuid.UUID {
 	seen := map[uuid.UUID]struct{}{}
 	var ids []uuid.UUID

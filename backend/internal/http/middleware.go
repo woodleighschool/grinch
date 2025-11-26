@@ -12,6 +12,7 @@ type contextKey string
 
 const sessionContextKey contextKey = "session"
 
+// AdminAuth enforces a valid session cookie and injects it into the request context.
 func AdminAuth(sessions *auth.SessionManager, logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +32,7 @@ func AdminAuth(sessions *auth.SessionManager, logger *slog.Logger) func(http.Han
 	}
 }
 
+// SessionFromContext extracts the authenticated session from the request context.
 func SessionFromContext(ctx context.Context) (auth.Session, bool) {
 	val := ctx.Value(sessionContextKey)
 	if val == nil {

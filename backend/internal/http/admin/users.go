@@ -15,6 +15,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// userDTO is the public representation of a directory user.
 type userDTO struct {
 	ID          uuid.UUID `json:"id"`
 	UPN         string    `json:"upn"`
@@ -23,6 +24,7 @@ type userDTO struct {
 	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
 }
 
+// userDetailResponse bundles the related objects for the detail drawer.
 type userDetailResponse struct {
 	User         userDTO      `json:"user"`
 	Groups       []groupDTO   `json:"groups"`
@@ -31,6 +33,7 @@ type userDetailResponse struct {
 	Policies     []userPolicy `json:"policies"`
 }
 
+// userPolicy describes one effective assignment for a user.
 type userPolicy struct {
 	ScopeID         string `json:"scope_id"`
 	ApplicationID   string `json:"application_id"`
@@ -45,6 +48,7 @@ type userPolicy struct {
 	CreatedAt       string `json:"created_at"`
 }
 
+// usersRoutes registers the CRUD + policy endpoints.
 func (h Handler) usersRoutes(r chi.Router) {
 	r.Get("/", h.listUsers)
 	r.Post("/", h.upsertUser)
@@ -53,6 +57,7 @@ func (h Handler) usersRoutes(r chi.Router) {
 	r.Get("/{id}/effective-policies", h.userEffectivePolicies)
 }
 
+// listUsers surfaces fuzzy search results for the admin UI.
 func (h Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
@@ -69,6 +74,7 @@ func (h Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
+// upsertUser creates or updates a user from the admin UI.
 func (h Handler) upsertUser(w http.ResponseWriter, r *http.Request) {
 	var body userDTO
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -91,6 +97,7 @@ func (h Handler) upsertUser(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, mapUserDTO(user))
 }
 
+// userDetails aggregates the most recent view of a user.
 func (h Handler) userDetails(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(idParam)
@@ -233,6 +240,7 @@ func mapUserPolicies(rows []sqlc.ListUserAssignmentsRow, user sqlc.User) []userP
 	return resp
 }
 
+// userEffectivePolicies is a lightweight endpoint used for popovers.
 func (h Handler) userEffectivePolicies(w http.ResponseWriter, r *http.Request) {
 	userID, err := parseUUIDParam(r, "id")
 	if err != nil {

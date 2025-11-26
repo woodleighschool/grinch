@@ -16,6 +16,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// NewUserJob syncs Entra ID users into our local store.
 func NewUserJob(store *store.Store, graphClient *graph.Client, logger *slog.Logger) Job {
 	return func(ctx context.Context) error {
 		if graphClient == nil || !graphClient.Enabled() {
@@ -61,6 +62,7 @@ func NewUserJob(store *store.Store, graphClient *graph.Client, logger *slog.Logg
 	}
 }
 
+// shouldSkipUser filters inactive and guest users that shouldn't sync.
 func shouldSkipUser(u graph.DirectoryUser) bool {
 	if !u.Active {
 		return true
@@ -68,6 +70,7 @@ func shouldSkipUser(u graph.DirectoryUser) bool {
 	return strings.Contains(strings.ToUpper(u.UPN), "#EXT#")
 }
 
+// parseDirectoryUserID returns a UUID when the Graph object ID is valid.
 func parseDirectoryUserID(objectID string) (uuid.UUID, bool) {
 	if objectID == "" {
 		return uuid.Nil, false
@@ -79,6 +82,7 @@ func parseDirectoryUserID(objectID string) (uuid.UUID, bool) {
 	return id, true
 }
 
+// deleteDirectoryUser removes the row using either object ID or UPN.
 func deleteDirectoryUser(ctx context.Context, store *store.Store, userID uuid.UUID, hasObjectID bool, upn string) error {
 	if hasObjectID {
 		return store.DeleteUser(ctx, userID)

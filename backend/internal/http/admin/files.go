@@ -23,10 +23,12 @@ type fileDTO struct {
 	LastSeen     time.Time       `json:"lastSeen"`
 }
 
+// filesRoutes exposes file lookups for the admin UI.
 func (h Handler) filesRoutes(r chi.Router) {
 	r.Get("/", h.listFiles)
 }
 
+// listFiles returns paginated file metadata + event counts.
 func (h Handler) listFiles(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 100)
 	offset := parseInt(r.URL.Query().Get("offset"), 0)
@@ -39,6 +41,7 @@ func (h Handler) listFiles(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, mapFiles(files))
 }
 
+// mapFiles converts sql rows to DTOs while cloning JSON blobs.
 func mapFiles(files []sqlc.ListFilesRow) []fileDTO {
 	resp := make([]fileDTO, 0, len(files))
 	for _, f := range files {
@@ -47,6 +50,7 @@ func mapFiles(files []sqlc.ListFilesRow) []fileDTO {
 	return resp
 }
 
+// mapFile converts a sqlc row into the API DTO.
 func mapFile(f sqlc.ListFilesRow) fileDTO {
 	var signingChain json.RawMessage
 	if len(f.SigningChain) > 0 {
@@ -69,6 +73,7 @@ func mapFile(f sqlc.ListFilesRow) fileDTO {
 	}
 }
 
+// cloneJSONMessage ensures we don't retain references to sqlc buffers.
 func cloneJSONMessage(data []byte) json.RawMessage {
 	if len(data) == 0 {
 		return nil

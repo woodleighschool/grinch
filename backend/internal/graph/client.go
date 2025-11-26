@@ -9,13 +9,16 @@ import (
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 )
 
+// ErrNotConfigured indicates Azure Graph credentials were not provided.
 var ErrNotConfigured = errors.New("graph: client not configured")
 
+// Client wraps the Microsoft Graph SDK and tracks if it should be used.
 type Client struct {
 	graph   *msgraphsdk.GraphServiceClient
 	enabled bool
 }
 
+// NewClient authenticates with Entra ID and returns a Graph client.
 func NewClient(ctx context.Context, tenantID, clientID, clientSecret string) (*Client, error) {
 	if tenantID == "" || clientID == "" || clientSecret == "" {
 		return &Client{enabled: false}, nil
@@ -31,6 +34,7 @@ func NewClient(ctx context.Context, tenantID, clientID, clientSecret string) (*C
 	return &Client{graph: graphClient, enabled: true}, nil
 }
 
+// Enabled reports whether the client has been configured with credentials.
 func (c *Client) Enabled() bool {
 	return c.enabled
 }

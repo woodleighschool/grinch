@@ -21,11 +21,13 @@ const (
 	defaultEventBatchSize   = 100
 )
 
+// preflightHandler implements the /preflight endpoint Santa agents call before syncing.
 type preflightHandler struct {
 	store  *store.Store
 	logger *slog.Logger
 }
 
+// Handle ingests the metadata Santa sends before rule/event syncs.
 func (h *preflightHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	machineIdentifier := strings.TrimSpace(chi.URLParam(r, "machineID"))
 	if machineIdentifier == "" {

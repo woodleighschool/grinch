@@ -8,8 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// RuleType describes the Santa rule primitive (binary, signing ID, etc).
 type RuleType string
 
+// RuleScope indicates which target the rule applies to.
 type RuleScope string
 
 const (
@@ -24,6 +26,7 @@ const (
 	RuleScopeUser   RuleScope = "user"
 )
 
+// RuleAction instructs Santa whether to allow, block, or evaluate CEL.
 type RuleAction string
 
 const (
@@ -32,6 +35,7 @@ const (
 	RuleActionCel   RuleAction = "cel"
 )
 
+// RuleMetadata encodes the optional, user-facing properties on a rule.
 type RuleMetadata struct {
 	Description   string      `json:"description"`
 	BlockMessage  string      `json:"block_message"`
@@ -41,6 +45,7 @@ type RuleMetadata struct {
 	Groups        []uuid.UUID `json:"groups"`
 }
 
+// SyncRule is the canonical representation sent to Santa agents.
 type SyncRule struct {
 	ID            uuid.UUID  `json:"id"`
 	Name          string     `json:"name"`
@@ -53,11 +58,13 @@ type SyncRule struct {
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
+// SyncPayload contains the rules and cursor Santa expects.
 type SyncPayload struct {
 	Cursor string     `json:"cursor"`
 	Rules  []SyncRule `json:"rules"`
 }
 
+// ParseMetadata unpacks optional JSON metadata stored for a rule.
 func ParseMetadata(raw []byte) (RuleMetadata, error) {
 	if len(raw) == 0 {
 		return RuleMetadata{}, nil
@@ -83,6 +90,7 @@ func ParseMetadata(raw []byte) (RuleMetadata, error) {
 	}, nil
 }
 
+// parseUUIDs filters out invalid identifiers without failing parsing.
 func parseUUIDs(values []string) []uuid.UUID {
 	out := make([]uuid.UUID, 0, len(values))
 	for _, val := range values {

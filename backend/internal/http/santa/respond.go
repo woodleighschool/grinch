@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// wireFormat tracks whether a Santa request/response should use JSON or protobuf.
 type wireFormat int
 
 const (
@@ -31,6 +32,7 @@ func respondJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+// respondProto automatically negotiates JSON vs protobuf for Santa handlers.
 func respondProto(w http.ResponseWriter, r *http.Request, status int, payload proto.Message) {
 	format := responseWireFormat(r)
 	contentType := contentTypeForFormat(format)
@@ -64,6 +66,7 @@ func respondError(w http.ResponseWriter, status int, msg string) {
 	respondJSON(w, status, map[string]string{"error": msg})
 }
 
+// unmarshalProtoJSON hides protojson options from callers.
 func unmarshalProtoJSON(data []byte, msg proto.Message) error {
 	if len(data) == 0 {
 		return nil
@@ -75,6 +78,7 @@ func marshalProtoJSON(msg proto.Message) ([]byte, error) {
 	return protoJSONMarshal.Marshal(msg)
 }
 
+// decodeWireMessage centralises format negotiation for requests.
 func decodeWireMessage(format wireFormat, data []byte, msg proto.Message) error {
 	if len(data) == 0 {
 		return nil
@@ -87,6 +91,7 @@ func decodeWireMessage(format wireFormat, data []byte, msg proto.Message) error 
 	}
 }
 
+// requestWireFormat infers the body encoding based on Content-Type headers.
 func requestWireFormat(r *http.Request) wireFormat {
 	if format := wireFormatFromContentType(r.Header.Get("Content-Type")); format != wireFormatUnknown {
 		return format
@@ -94,6 +99,7 @@ func requestWireFormat(r *http.Request) wireFormat {
 	return wireFormatJSON
 }
 
+// responseWireFormat defaults to the request format unless Accept overrides it.
 func responseWireFormat(r *http.Request) wireFormat {
 	if format := wireFormatFromAccept(r.Header.Get("Accept")); format != wireFormatUnknown {
 		return format

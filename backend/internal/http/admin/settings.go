@@ -10,14 +10,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// settingsRoutes exposes helper endpoints for config files.
 func (h Handler) settingsRoutes(r chi.Router) {
 	r.Get("/santa-config", h.getSantaConfig)
 }
 
+// santaConfigResponse wraps the generated XML snippet.
 type santaConfigResponse struct {
 	XML string `json:"xml"`
 }
 
+// getSantaConfig renders the XML plist snippet the MDM profile expects.
 func (h Handler) getSantaConfig(w http.ResponseWriter, r *http.Request) {
 	base := strings.TrimRight(h.Config.SiteBaseURL, "/")
 	if base == "" {

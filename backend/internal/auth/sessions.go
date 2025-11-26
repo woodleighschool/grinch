@@ -12,10 +12,12 @@ import (
 	"time"
 )
 
+// ErrInvalidSession indicates the cookie could not be decoded or verified.
 var ErrInvalidSession = errors.New("auth: invalid session")
 
 const defaultSessionTTL = 8 * time.Hour
 
+// Session models the signed cookie we hand to the admin UI.
 type Session struct {
 	Subject   string         `json:"sub"`
 	IssuedAt  time.Time      `json:"iat"`
@@ -23,6 +25,7 @@ type Session struct {
 	Claims    map[string]any `json:"claims,omitempty"`
 }
 
+// SessionManager issues, validates, and clears the signed session cookie.
 type SessionManager struct {
 	name   string
 	secret []byte
@@ -30,6 +33,7 @@ type SessionManager struct {
 	secure bool
 }
 
+// NewSessionManager constructs a manager using the supplied cookie parameters.
 func NewSessionManager(cookieName, secret string, secure bool) (*SessionManager, error) {
 	if len(secret) < 32 {
 		return nil, fmt.Errorf("session secret must be at least 32 bytes")
@@ -42,6 +46,7 @@ func NewSessionManager(cookieName, secret string, secure bool) (*SessionManager,
 	}, nil
 }
 
+// Issue serialises and signs the session into an HTTP cookie.
 func (m *SessionManager) Issue(w http.ResponseWriter, session Session) error {
 	if session.Subject == "" {
 		return fmt.Errorf("session subject required")
@@ -72,6 +77,7 @@ func (m *SessionManager) Issue(w http.ResponseWriter, session Session) error {
 	return nil
 }
 
+// Clear removes the session cookie on the client.
 func (m *SessionManager) Clear(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.name,
@@ -84,6 +90,7 @@ func (m *SessionManager) Clear(w http.ResponseWriter) {
 	})
 }
 
+// Read extracts, verifies, and decodes the session from the request.
 func (m *SessionManager) Read(r *http.Request) (Session, error) {
 	cookie, err := r.Cookie(m.name)
 	if err != nil {
@@ -103,6 +110,7 @@ func (m *SessionManager) Read(r *http.Request) (Session, error) {
 	return sess, nil
 }
 
+// sign HMAC-signs the payload and returns token payload.signature.
 func (m *SessionManager) sign(payload []byte) (string, error) {
 	signer := hmac.New(sha256.New, m.secret)
 	if _, err := signer.Write(payload); err != nil {
@@ -112,6 +120,7 @@ func (m *SessionManager) sign(payload []byte) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(payload) + "." + base64.RawURLEncoding.EncodeToString(sig), nil
 }
 
+// verify checks the HMAC signature on the token and returns the payload bytes.
 func (m *SessionManager) verify(token string) ([]byte, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 2 {

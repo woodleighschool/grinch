@@ -7,6 +7,7 @@ import (
 	msgraphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
+// DirectoryUser represents the directory identity synced into Grinch.
 type DirectoryUser struct {
 	ObjectID    string
 	UPN         string
@@ -14,6 +15,7 @@ type DirectoryUser struct {
 	Active      bool
 }
 
+// FetchUsers pages through Microsoft Graph and normalises the user records.
 func (c *Client) FetchUsers(ctx context.Context) ([]DirectoryUser, error) {
 	if !c.enabled {
 		return nil, ErrNotConfigured
