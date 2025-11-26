@@ -1,5 +1,6 @@
 export const applicationRuleTypes = ["BINARY", "CERTIFICATE", "SIGNINGID", "TEAMID", "CDHASH"] as const;
 export type ApplicationRuleType = (typeof applicationRuleTypes)[number];
+export const defaultApplicationRuleType: ApplicationRuleType = applicationRuleTypes[0];
 
 export type ApplicationRuleTypeMetadata = {
   label: string;

@@ -6,7 +6,7 @@ import { Virtuoso } from "react-virtuoso";
 
 import type { Application, ApplicationScope, DirectoryGroup, DirectoryUser } from "../api";
 import { ApiValidationError, createScope, deleteApplication, deleteScope, validateScope } from "../api";
-import { useApplicationDetail, useGroups, useUsers } from "../hooks/useQueries";
+import { useApplicationDetail, useGroups, useUpdateApplication, useUsers } from "../hooks/useQueries";
 
 import {
   Alert,
@@ -37,6 +37,8 @@ import {
 } from "@mui/material";
 
 import DeleteIcon from "@mui/icons-material/Delete";
+import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import GroupIcon from "@mui/icons-material/Groups";
 import PersonIcon from "@mui/icons-material/Person";
 import SearchIcon from "@mui/icons-material/Search";
@@ -52,6 +54,7 @@ export interface SelectedTarget {
 }
 
 type ShowToast = (toast: ToastOptions) => void;
+const EMPTY_SCOPES: ApplicationScope[] = [];
 
 interface ScopeAssignmentRowProps {
   scope: ApplicationScope;
@@ -63,6 +66,10 @@ function formatIdentifier(value: unknown) {
   if (typeof value === "string") return value;
   if (typeof value === "number") return value.toString();
   return "unknown";
+}
+
+function sortByDisplayName<T extends { displayName: string }>(a: T, b: T) {
+  return a.displayName.localeCompare(b.displayName);
 }
 
 function ScopeAssignmentRow({ scope, onDelete, disabled }: ScopeAssignmentRowProps) {
@@ -636,12 +643,14 @@ export default function ApplicationDetails() {
   const confirm = useConfirm();
 
   const [deletingApp, setDeletingApp] = useState(false);
+  const [togglingApp, setTogglingApp] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { showToast } = useToast();
 
   const { data: groups = [] } = useGroups();
   const { data: users = [] } = useUsers();
+  const updateApplication = useUpdateApplication();
   const {
     data: applicationDetail,
     isLoading,
@@ -652,17 +661,43 @@ export default function ApplicationDetails() {
   });
 
   const app = applicationDetail?.application ?? null;
-  const scopes = applicationDetail?.scopes ?? [];
+  const scopes = applicationDetail?.scopes ?? EMPTY_SCOPES;
 
-  const allowScopes = scopes.filter((scope) => scope.action === "allow");
-  const blockScopes = scopes.filter((scope) => scope.action === "block");
-  const celScopes = scopes.filter((scope) => scope.action === "cel");
+  const { allowScopes, blockScopes, celScopes, assignedGroupIds, assignedUserIds } = useMemo(() => {
+    const allow: ApplicationScope[] = [];
+    const block: ApplicationScope[] = [];
+    const cel: ApplicationScope[] = [];
+    const groupIds = new Set<string>();
+    const userIds = new Set<string>();
 
-  const assignedGroupIds = new Set(scopes.filter((scope) => scope.target_type === "group").map((scope) => scope.target_id));
-  const assignedUserIds = new Set(scopes.filter((scope) => scope.target_type === "user").map((scope) => scope.target_id));
+    scopes.forEach((scope) => {
+      switch (scope.action) {
+        case "allow":
+          allow.push(scope);
+          break;
+        case "block":
+          block.push(scope);
+          break;
+        default:
+          cel.push(scope);
+      }
 
-  const availableGroups = groups.filter((group) => !assignedGroupIds.has(group.id));
-  const availableUsers = users.filter((user) => !assignedUserIds.has(user.id));
+      if (scope.target_type === "group") {
+        groupIds.add(scope.target_id);
+      } else {
+        userIds.add(scope.target_id);
+      }
+    });
+
+    return { allowScopes: allow, blockScopes: block, celScopes: cel, assignedGroupIds: groupIds, assignedUserIds: userIds };
+  }, [scopes]);
+
+  const availableGroups = useMemo(() => {
+    return groups.filter((group) => !assignedGroupIds.has(group.id)).sort(sortByDisplayName);
+  }, [groups, assignedGroupIds]);
+  const availableUsers = useMemo(() => {
+    return users.filter((user) => !assignedUserIds.has(user.id)).sort(sortByDisplayName);
+  }, [users, assignedUserIds]);
 
   const assignment = useAssignmentManager({
     app,
@@ -704,6 +739,32 @@ export default function ApplicationDetails() {
     }
   }, [app, appId, navigate, showToast]);
 
+  const handleToggleStatus = useCallback(async () => {
+    const targetAppId = app?.id ?? appId;
+    if (!targetAppId || !app) return;
+
+    setTogglingApp(true);
+    try {
+      await updateApplication.mutateAsync({
+        appId: targetAppId,
+        payload: { enabled: !app.enabled },
+      });
+      void refetch();
+      showToast({
+        message: app.enabled ? "Application paused." : "Application resumed.",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Toggle application status failed", error);
+      showToast({
+        message: "Failed to update application status.",
+        severity: "error",
+      });
+    } finally {
+      setTogglingApp(false);
+    }
+  }, [app, appId, refetch, showToast, updateApplication]);
+
   const action = useMemo<ReactNode | undefined>(() => {
     if (!app) return undefined;
 
@@ -712,6 +773,16 @@ export default function ApplicationDetails() {
         direction="row"
         spacing={1}
       >
+        <Button
+          variant="outlined"
+          startIcon={app.enabled ? <PauseCircleOutlineIcon /> : <PlayCircleOutlineIcon />}
+          onClick={() => {
+            void handleToggleStatus();
+          }}
+          disabled={togglingApp}
+        >
+          {app.enabled ? "Pause" : "Resume"}
+        </Button>
         <Button
           variant="contained"
           onClick={() => {
@@ -741,7 +812,7 @@ export default function ApplicationDetails() {
         </Button>
       </Stack>
     );
-  }, [app, deletingApp, confirm, handleDeleteApplication]);
+  }, [app, deletingApp, togglingApp, confirm, handleDeleteApplication, handleToggleStatus]);
 
   const pageTitle = app?.name ?? "Application Details";
   const subtitleParts = [app?.rule_type, app?.identifier].filter(Boolean) as string[];

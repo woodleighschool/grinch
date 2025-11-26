@@ -1,19 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  Card,
-  CardContent,
-  Chip,
-  Grid,
-  LinearProgress,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Grid, LinearProgress, Stack, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { formatDateTime } from "../utils/dates";
@@ -29,50 +16,49 @@ interface DeviceSummaryProps {
 function DeviceSummary({ device }: DeviceSummaryProps) {
   const rawSantaVersion = device.lastPreflightPayload?.santa_version;
   const santaVersion = typeof rawSantaVersion === "string" || typeof rawSantaVersion === "number" ? String(rawSantaVersion) : undefined;
+  const identityLabel = device.hostname || device.serial || "Unnamed device";
 
   return (
-    <Stack spacing={1.5}>
+    <Stack spacing={2}>
       <Stack spacing={0.25}>
         <Typography
-          variant="h5"
+          variant="h6"
           fontWeight={600}
         >
-          {device.hostname || "Unnamed device"}
+          {identityLabel}
         </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-        >
-          Serial:{" "}
-          <Typography
-            component="span"
-            variant="body2"
-            fontFamily="monospace"
-          >
-            {device.serial || "—"}
-          </Typography>
-        </Typography>
-        {device.id && (
+        {device.serial && (
           <Typography
             variant="body2"
             color="text.secondary"
           >
-            Machine ID:{" "}
-            <Typography
-              component="span"
-              variant="body2"
-              fontFamily="monospace"
-            >
-              {device.id}
-            </Typography>
+            Serial {device.serial}
           </Typography>
         )}
       </Stack>
+
+      {device.id && (
+        <Stack spacing={0.25}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+          >
+            Machine ID
+          </Typography>
+          <Typography
+            variant="body2"
+            fontFamily="monospace"
+          >
+            {device.id}
+          </Typography>
+        </Stack>
+      )}
 
       <Stack
         direction="row"
         spacing={1}
         flexWrap="wrap"
+        useFlexGap
       >
         {device.clientMode && (
           <Chip
@@ -122,7 +108,13 @@ export default function DeviceDetails() {
 
   const { showToast } = useToast();
   const { data, isLoading, error } = useDeviceDetails(deviceId ?? "");
-  const device = data?.device;
+  const deviceDetail = data?.device ?? null;
+  const primaryUser = data?.primary_user ?? null;
+  const recentBlocks = data?.recent_blocks ?? [];
+  const handleSelectUser = useCallback(() => {
+    if (!primaryUser) return;
+    void navigate(`/users/${primaryUser.id}`);
+  }, [navigate, primaryUser]);
 
   useEffect(() => {
     if (!error) return;
@@ -134,9 +126,10 @@ export default function DeviceDetails() {
     });
   }, [error, showToast]);
 
-  const pageTitle = device?.hostname ?? "Device Details";
-  const pageSubtitle = device?.serial;
-  const breadcrumbs = [{ label: "Devices", to: "/devices" }, { label: pageTitle }];
+  const identityParts = deviceDetail ? [deviceDetail.hostname, deviceDetail.serial].filter(Boolean) : [];
+  const pageTitle = "Device Details";
+  const pageSubtitle = identityParts.length ? identityParts.join(" • ") : undefined;
+  const breadcrumbs = [{ label: "Devices", to: "/devices" }, { label: deviceDetail?.hostname ?? deviceDetail?.serial ?? "Details" }];
 
   let content: ReactNode = null;
 
@@ -144,7 +137,9 @@ export default function DeviceDetails() {
     content = <Alert severity="error">Missing device identifier.</Alert>;
   } else if (isLoading) {
     content = <LinearProgress />;
-  } else if (!data) {
+  } else if (error) {
+    content = <Alert severity="error">{error instanceof Error ? error.message : "Failed to load device details."}</Alert>;
+  } else if (!deviceDetail) {
     content = (
       <EmptyState
         title="Device not found"
@@ -152,21 +147,13 @@ export default function DeviceDetails() {
       />
     );
   } else {
-    const { primary_user, recent_blocks: events = [] } = data;
-    const deviceDetail = data.device;
-
-    const handleSelectUser = () => {
-      if (!primary_user) return;
-      void navigate(`/users/${primary_user.id}`);
-    };
-
     content = (
       <Stack spacing={3}>
         <Grid
           container
           spacing={3}
         >
-          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+          <Grid size={{ xs: 12, md: 7 }}>
             <SectionCard
               title="Device overview"
               subheader="Reported by Santa from the latest preflight."
@@ -174,34 +161,37 @@ export default function DeviceDetails() {
               <DeviceSummary device={deviceDetail} />
             </SectionCard>
           </Grid>
-          {primary_user && (
-            <Grid size={{ xs: 12, md: 7, lg: 4 }}>
+          {primaryUser && (
+            <Grid size={{ xs: 12, md: 5 }}>
               <SectionCard
                 title="Primary user"
                 subheader="Determined from latest telemetry, not the logged-in user."
               >
-                <UserSummary
-                  component="div"
-                  user={primary_user}
-                  onClick={handleSelectUser}
-                  sx={{
-                    "cursor": "pointer",
-                    "&:hover": { bgcolor: "action.hover" },
-                    "borderRadius": 1,
-                    "p": 1,
-                  }}
-                />
+                <Stack spacing={1.5}>
+                  <UserSummary
+                    component="div"
+                    user={primaryUser}
+                    showMetadata={false}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={handleSelectUser}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    View full profile
+                  </Button>
+                </Stack>
               </SectionCard>
             </Grid>
           )}
 
-          <Grid size={{ xs: 12, md: 12, lg: 4 }}>
+          <Grid size={{ xs: 12 }}>
             <SectionCard
               title="Recent blocks"
               subheader="Latest Santa telemetry targeting this device."
             >
               <RecentBlocksList
-                events={events}
+                events={recentBlocks}
                 emptyMessage="No recent Santa blocks recorded for this device."
               />
             </SectionCard>
@@ -229,17 +219,20 @@ export default function DeviceDetails() {
                     <Typography fontWeight={600}>View JSON payload</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <TextField
-                          fullWidth
-                          multiline
-                          minRows={8}
-                          value={JSON.stringify(deviceDetail.lastPreflightPayload, null, 2)}
-                          slotProps={{ input: { readOnly: true } }}
-                        />
-                      </CardContent>
-                    </Card>
+                    <Box
+                      component="pre"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: (theme) => `1px solid ${theme.palette.divider}`,
+                        bgcolor: "background.paper",
+                        overflowX: "auto",
+                        fontFamily: "Consolas, Menlo, monospace",
+                        fontSize: 13,
+                      }}
+                    >
+                      {JSON.stringify(deviceDetail.lastPreflightPayload, null, 2)}
+                    </Box>
                   </AccordionDetails>
                 </Accordion>
               </SectionCard>

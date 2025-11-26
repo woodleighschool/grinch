@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, type NavigateFunction } from "react-router-dom";
-import { Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Chip, Typography, Stack, TextField } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Chip, Typography, Stack } from "@mui/material";
 import { DataGrid, GridActionsCellItem, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
 import ArticleIcon from "@mui/icons-material/Article";
 import DevicesIcon from "@mui/icons-material/Devices";
@@ -12,6 +12,7 @@ import { useBlockedEvents } from "../hooks/useQueries";
 import { useToast } from "../hooks/useToast";
 import { formatDateTime } from "../utils/dates";
 
+// Types
 type EventRow = {
   id: string;
   occurredAt: string | undefined;
@@ -24,6 +25,7 @@ type EventRow = {
   kind: string;
 };
 
+// Helpers
 function createEventColumns(navigate: NavigateFunction, showPayload: (payload: Record<string, unknown>) => void): GridColDef<EventRow>[] {
   return [
     {
@@ -131,12 +133,16 @@ function createEventColumns(navigate: NavigateFunction, showPayload: (payload: R
   ];
 }
 
+// Page component
 export default function Events() {
   const navigate = useNavigate();
   const { events, loading, error } = useBlockedEvents();
   const { showToast } = useToast();
+
+  // Local state
   const [eventPayload, setEventPayload] = useState<string | null>(null);
 
+  // Effects
   useEffect(() => {
     if (!error) return;
 
@@ -147,25 +153,37 @@ export default function Events() {
     });
   }, [error, showToast]);
 
-  const columns = createEventColumns(navigate, (payload) => {
+  // Handlers
+  const handleShowPayload = useCallback((payload: Record<string, unknown>) => {
     setEventPayload(JSON.stringify(payload, null, 2));
-  });
+  }, []);
+
   const handleClosePayloadDialog = () => {
     setEventPayload(null);
   };
 
-  const rows: EventRow[] = events.map((event) => ({
-    id: event.id,
-    occurredAt: event.occurredAt,
-    file_path: typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind,
-    payload: event.payload ?? {},
-    hostname: event.hostname,
-    machineId: event.machineId,
-    user: event.email,
-    userId: event.userId,
-    kind: typeof event.payload?.decision === "string" ? event.payload.decision : event.kind,
-  }));
+  const eventErrorMessage = error ?? null;
 
+  // Derived data
+  const columns = useMemo(() => createEventColumns(navigate, handleShowPayload), [navigate, handleShowPayload]);
+
+  const rows: EventRow[] = useMemo(
+    () =>
+      events.map((event) => ({
+        id: event.id,
+        occurredAt: event.occurredAt,
+        file_path: typeof event.payload?.file_name === "string" ? event.payload.file_name : event.kind,
+        payload: event.payload ?? {},
+        hostname: event.hostname,
+        machineId: event.machineId,
+        user: event.email,
+        userId: event.userId,
+        kind: typeof event.payload?.decision === "string" ? event.payload.decision : event.kind,
+      })),
+    [events],
+  );
+
+  // Render
   return (
     <>
       <Stack spacing={3}>
@@ -173,6 +191,8 @@ export default function Events() {
           title="Events"
           subtitle="Audit log of all Santa agent activity."
         />
+
+        {eventErrorMessage && <Alert severity="error">{eventErrorMessage}</Alert>}
 
         <Paper sx={{ height: 640, width: "100%" }}>
           <DataGrid
@@ -199,6 +219,7 @@ export default function Events() {
         </Paper>
       </Stack>
 
+      {/* Event payload dialog */}
       <Dialog
         open={Boolean(eventPayload)}
         onClose={handleClosePayloadDialog}
@@ -207,21 +228,24 @@ export default function Events() {
       >
         <DialogTitle>Event Payload</DialogTitle>
         <DialogContent dividers>
-          <Card variant="outlined">
-            <CardContent sx={{ overflowX: "auto" }}>
-              {eventPayload ? (
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={10}
-                  value={eventPayload}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              ) : (
-                <Typography color="text.secondary">No payload data available.</Typography>
-              )}
-            </CardContent>
-          </Card>
+          {eventPayload ? (
+            <Box
+              component="pre"
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: (theme) => `1px solid ${theme.palette.divider}`,
+                bgcolor: "background.paper",
+                overflowX: "auto",
+                fontFamily: "Consolas, Menlo, monospace",
+                fontSize: 13,
+              }}
+            >
+              {eventPayload}
+            </Box>
+          ) : (
+            <Typography color="text.secondary">No payload data available.</Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClosePayloadDialog}>Close</Button>

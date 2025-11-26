@@ -1,11 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { Box, Button, Card, CardContent, Container, Divider, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Divider,
+  FormControl,
+  FormHelperText,
+  InputLabel,
+  OutlinedInput,
+  Stack,
+  Typography,
+} from "@mui/material";
 
 import { getAuthProviders } from "../api";
 import { Logo } from "../components";
 import { useToast } from "../hooks/useToast";
 
+// Props & types
 interface LoginProps {
   onLogin: () => void;
 }
@@ -15,10 +30,14 @@ interface LoginFormData {
   password: string;
 }
 
+// Page component
 export default function Login({ onLogin }: LoginProps) {
+  // Local state
   const [oauthEnabled, setOauthEnabled] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // Form state
   const {
     register,
     handleSubmit,
@@ -26,19 +45,23 @@ export default function Login({ onLogin }: LoginProps) {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>();
 
+  // Effects
   useEffect(() => {
     const loadProviders = async () => {
       try {
         const providers = await getAuthProviders();
         setOauthEnabled(providers.oauth);
+        setProviderError(null);
       } catch (error) {
         console.error("Failed to fetch auth providers", error);
+        setProviderError("Unable to determine OAuth availability. Use local credentials or reload to try again.");
       }
     };
 
     void loadProviders();
   }, []);
 
+  // Handlers
   const handleLocalLogin = useCallback(
     async (data: LoginFormData) => {
       try {
@@ -76,6 +99,7 @@ export default function Login({ onLogin }: LoginProps) {
     [onLogin, setError, showToast],
   );
 
+  // Render
   return (
     <Box
       sx={{
@@ -88,6 +112,7 @@ export default function Login({ onLogin }: LoginProps) {
         <Card elevation={2}>
           <CardContent>
             <Stack spacing={3}>
+              {/* Brand header */}
               <Stack
                 direction="row"
                 spacing={1.25}
@@ -112,6 +137,7 @@ export default function Login({ onLogin }: LoginProps) {
                 Manage Santa rules and monitor blocked executions.
               </Typography>
 
+              {/* OAuth login */}
               <Stack spacing={2}>
                 <Button
                   component="a"
@@ -132,33 +158,47 @@ export default function Login({ onLogin }: LoginProps) {
                     OAuth sign-in is disabled. Use your local administrator credentials instead.
                   </Typography>
                 )}
+                {providerError && <Alert severity="warning">{providerError}</Alert>}
               </Stack>
 
               <Divider />
 
+              {/* Local login form */}
               <Stack
                 component="form"
                 spacing={2}
                 onSubmit={(e) => void handleSubmit(handleLocalLogin)(e)}
               >
-                <TextField
-                  label="Username"
+                <FormControl
                   fullWidth
                   required
-                  {...register("username")}
                   error={Boolean(errors.username)}
-                  helperText={errors.username?.message}
-                />
+                >
+                  <InputLabel htmlFor="login-username">Username</InputLabel>
+                  <OutlinedInput
+                    id="login-username"
+                    label="Username"
+                    autoComplete="username"
+                    {...register("username")}
+                  />
+                  <FormHelperText>{errors.username?.message}</FormHelperText>
+                </FormControl>
 
-                <TextField
-                  label="Password"
-                  type="password"
+                <FormControl
                   fullWidth
                   required
-                  {...register("password")}
                   error={Boolean(errors.password)}
-                  helperText={errors.password?.message}
-                />
+                >
+                  <InputLabel htmlFor="login-password">Password</InputLabel>
+                  <OutlinedInput
+                    id="login-password"
+                    label="Password"
+                    type="password"
+                    autoComplete="current-password"
+                    {...register("password")}
+                  />
+                  <FormHelperText>{errors.password?.message}</FormHelperText>
+                </FormControl>
 
                 <Button
                   type="submit"

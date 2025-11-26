@@ -1,12 +1,12 @@
 import { useEffect, useMemo, Suspense, lazy, useCallback, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { useCurrentUser, useStatus } from "./hooks/useQueries";
-
 import { Box, Container, LinearProgress } from "@mui/material";
 
+import { useCurrentUser, useStatus } from "./hooks/useQueries";
 import { Navbar, Footer, CreditsDialog } from "./components";
 import { useToast } from "./hooks/useToast";
 
+// Route-level lazy-loaded pages
 const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Applications = lazy(() => import("./pages/Applications"));
@@ -18,6 +18,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const ApplicationDetails = lazy(() => import("./pages/ApplicationDetails"));
 const UserDetails = lazy(() => import("./pages/UserDetails"));
 
+// Suspense fallback UI for lazy-loaded content
 const SuspenseFallback = () => (
   <Box p={2}>
     <LinearProgress />
@@ -25,12 +26,16 @@ const SuspenseFallback = () => (
 );
 
 export default function App() {
+  // Data hooks
   const { data: user, error } = useCurrentUser();
   const { data: status } = useStatus();
   const location = useLocation();
   const { showToast } = useToast();
 
+  // Local UI state
   const [creditsOpen, setCreditsOpen] = useState(false);
+
+  // Side effects
   useEffect(() => {
     if (!error) return;
 
@@ -41,6 +46,7 @@ export default function App() {
     });
   }, [error, showToast]);
 
+  // Derived values
   const activeTab = useMemo(() => {
     const path = location.pathname;
 
@@ -53,6 +59,11 @@ export default function App() {
     return false;
   }, [location.pathname]);
 
+  const userDisplay = user?.display_name ?? "Administrator";
+  const userInitial = (userDisplay[0] ?? "U").toUpperCase();
+  const versionLabel = status?.version.version;
+
+  // Handlers
   const handleLogout = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/logout", {
@@ -74,30 +85,28 @@ export default function App() {
     }
   }, [showToast]);
 
-  const handleOpenCredits = useCallback(() => {
+  const handleOpenCredits = () => {
     setCreditsOpen(true);
-  }, []);
+  };
 
-  const handleCloseCredits = useCallback(() => {
+  const handleCloseCredits = () => {
     setCreditsOpen(false);
-  }, []);
+  };
 
-  const userDisplay = user?.display_name ?? "Administrator";
-  const userInitial = (userDisplay[0] ?? "U").toUpperCase();
-  const versionLabel = status?.version.version;
+  const handleLoginSuccess = () => {
+    window.location.reload();
+  };
 
+  // Auth gate (login screen)
   if (!user) {
     return (
       <Suspense fallback={<SuspenseFallback />}>
-        <Login
-          onLogin={() => {
-            window.location.reload();
-          }}
-        />
+        <Login onLogin={handleLoginSuccess} />
       </Suspense>
     );
   }
 
+  // Main application layout
   return (
     <Box
       sx={{
@@ -106,6 +115,7 @@ export default function App() {
         flexDirection: "column",
       }}
     >
+      {/* Global navigation */}
       <Navbar
         activeTab={activeTab}
         userDisplay={userDisplay}
@@ -113,6 +123,7 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Main content container */}
       <Container
         component="main"
         maxWidth="xl"
@@ -126,6 +137,7 @@ export default function App() {
       >
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Suspense fallback={<SuspenseFallback />}>
+            {/* Application routes */}
             <Routes>
               <Route
                 path="/"
@@ -168,6 +180,7 @@ export default function App() {
         </Box>
       </Container>
 
+      {/* Footer and credits dialog */}
       <Footer
         versionLabel={versionLabel}
         onOpenCredits={handleOpenCredits}

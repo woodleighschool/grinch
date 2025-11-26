@@ -10,6 +10,7 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { createAppTheme } from "./styles/theme";
 
+// React Query client configuration
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -19,10 +20,12 @@ const queryClient = new QueryClient({
   },
 });
 
+// Global error handler for ErrorBoundary
 const handleError = (error: Error, info: ErrorInfo) => {
   console.error("App error", { error, info });
 };
 
+// Root component with global providers
 export function Root() {
   const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
   const mode: PaletteMode = prefersDark ? "dark" : "light";
@@ -46,6 +49,7 @@ export function Root() {
   );
 }
 
+// Application bootstrap
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary onError={handleError}>

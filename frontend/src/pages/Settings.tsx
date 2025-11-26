@@ -7,10 +7,12 @@ import { PageHeader } from "../components";
 import { useSantaConfig } from "../hooks/useQueries";
 import { useToast } from "../hooks/useToast";
 
+// Props & types
 interface SantaConfigPanelProps {
   config?: SantaConfig | null | undefined;
 }
 
+// Subcomponents
 function SantaConfigPanel({ config }: SantaConfigPanelProps) {
   if (!config) {
     return <Alert severity="warning">Unable to load configuration XML. Verify the backend is reachable and try again.</Alert>;
@@ -102,10 +104,12 @@ function SantaConfigPanel({ config }: SantaConfigPanelProps) {
   );
 }
 
+// Page component
 export default function Settings() {
   const { data: config, isLoading, error } = useSantaConfig();
   const { showToast } = useToast();
 
+  // Effects
   useEffect(() => {
     if (!error) return;
 
@@ -115,6 +119,7 @@ export default function Settings() {
     });
   }, [error, showToast]);
 
+  // Render
   return (
     <Stack spacing={3}>
       <PageHeader

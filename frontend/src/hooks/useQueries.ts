@@ -99,15 +99,14 @@ export function useApplicationScopes(appId: string) {
 }
 
 export function useApplicationDetail(appId?: string, options?: { includeMembers?: boolean }) {
+  const includeMembers = options?.includeMembers;
   return useQuery({
-    queryKey: appId
-      ? queryKeys.applicationDetail(appId, options?.includeMembers)
-      : ["applicationDetail", "unknown", options?.includeMembers ? "withMembers" : "basic"],
+    queryKey: queryKeys.applicationDetail(appId ?? "unknown", includeMembers),
     queryFn: () => {
       if (!appId) throw new Error("Missing application identifier.");
       return getApplicationDetail(appId, options);
     },
-    enabled: !!appId,
+    enabled: Boolean(appId),
   });
 }
 

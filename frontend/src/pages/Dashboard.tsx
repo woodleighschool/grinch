@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { group } from "d3-array";
-import { Card, CardContent, CardHeader, LinearProgress, Stack, Typography, useTheme } from "@mui/material";
+import { Alert, Card, CardContent, CardHeader, LinearProgress, Stack, Typography, useTheme } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 
@@ -9,6 +9,7 @@ import { EmptyState, PageHeader } from "../components";
 import { useEventStats } from "../hooks/useQueries";
 import { useToast } from "../hooks/useToast";
 
+// Types
 type ChartDay = {
   day: string;
   label: string;
@@ -23,6 +24,18 @@ interface EventVolumeChartProps {
   colorForKind: (kind: string) => string;
 }
 
+// Priority for stacking / legend ordering
+const KIND_PRIORITY: Record<string, number> = {
+  BLOCKLIST: 0,
+  BLOCK_BINARY: 0,
+  BLOCK_CERTIFICATE: 1,
+  SILENT_BLOCKLIST: 2,
+  ALLOWLIST: 3,
+  ALLOW_BINARY: 3,
+  ALLOW_CERTIFICATE: 3,
+};
+
+// Subcomponents
 function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVolumeChartProps) {
   if (dataset.length === 0 || kinds.length === 0) {
     return (
@@ -77,11 +90,14 @@ function EventVolumeChart({ dataset, kinds, totalEvents, colorForKind }: EventVo
   );
 }
 
+// Page component
 export default function Dashboard() {
   const theme = useTheme();
   const { stats, loading: statsLoading, error: statsError } = useEventStats(14);
   const { showToast } = useToast();
+  const statsErrorMessage = statsError ?? null;
 
+  // Effects
   useEffect(() => {
     if (statsError == null) return;
 
@@ -93,6 +109,7 @@ export default function Dashboard() {
     });
   }, [statsError, showToast]);
 
+  // Derived data
   const chartData = useMemo(() => {
     if (stats.length === 0) {
       return {
@@ -116,6 +133,7 @@ export default function Dashboard() {
 
       const firstEntry = entryArray[0];
       if (!firstEntry) return;
+
       const parsed = parseISO(firstEntry.bucket);
       const label = isValid(parsed) ? format(parsed, "MMM d") : firstEntry.bucket;
       const counts: Record<string, number> = {};
@@ -139,35 +157,29 @@ export default function Dashboard() {
 
     dataset.sort((a, b) => a.day.localeCompare(b.day));
 
-    const priority: Record<string, number> = {
-      BLOCKLIST: 0,
-      BLOCK_BINARY: 0,
-      BLOCK_CERTIFICATE: 1,
-      SILENT_BLOCKLIST: 2,
-      ALLOWLIST: 3,
-      ALLOW_BINARY: 3,
-      ALLOW_CERTIFICATE: 3,
-    };
-
-    const kinds = Array.from(kindSet).sort((a, b) => (priority[a] ?? 99) - (priority[b] ?? 99) || a.localeCompare(b));
+    const kinds = Array.from(kindSet).sort((a, b) => (KIND_PRIORITY[a] ?? 99) - (KIND_PRIORITY[b] ?? 99) || a.localeCompare(b));
 
     const totalEvents = dataset.reduce((sum, day) => sum + day.total, 0);
 
     return { dataset, kinds, totalEvents };
   }, [stats]);
 
-  const colorForKind = (kind: string) => {
-    if (kind.includes("BLOCK")) {
-      return kind.includes("SILENT") ? theme.palette.warning.main : theme.palette.error.main;
-    }
+  const colorForKind = useCallback(
+    (kind: string) => {
+      if (kind.includes("BLOCK")) {
+        return kind.includes("SILENT") ? theme.palette.warning.main : theme.palette.error.main;
+      }
 
-    if (kind.includes("ALLOW")) {
-      return kind.includes("UNKNOWN") ? theme.palette.warning.main : theme.palette.success.main;
-    }
+      if (kind.includes("ALLOW")) {
+        return kind.includes("UNKNOWN") ? theme.palette.warning.main : theme.palette.success.main;
+      }
 
-    return theme.palette.info.main;
-  };
+      return theme.palette.info.main;
+    },
+    [theme],
+  );
 
+  // Render
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -180,9 +192,18 @@ export default function Dashboard() {
           title="Policy Outcomes"
           subheader="Stacked daily totals from the last 14 days."
         />
+
         {statsLoading && <LinearProgress />}
 
         <CardContent>
+          {statsErrorMessage && (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+            >
+              {statsErrorMessage}
+            </Alert>
+          )}
           {!statsLoading && (
             <EventVolumeChart
               dataset={chartData.dataset}

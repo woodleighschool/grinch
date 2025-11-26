@@ -5,9 +5,12 @@ import { formatDateTime } from "../utils/dates";
 
 export interface UserSummaryProps extends StackProps {
   user: DirectoryUser;
+  showMetadata?: boolean;
 }
 
-export function UserSummary({ user, ...stackProps }: UserSummaryProps) {
+export function UserSummary({ user, showMetadata = true, ...stackProps }: UserSummaryProps) {
+  const hasMetadata = Boolean(showMetadata && (user.createdAt || user.updatedAt));
+
   return (
     <Stack
       spacing={1.5}
@@ -26,28 +29,30 @@ export function UserSummary({ user, ...stackProps }: UserSummaryProps) {
         {user.upn}
       </Typography>
 
-      <Divider />
+      {hasMetadata && <Divider />}
 
-      <Stack
-        direction="row"
-        spacing={1}
-        flexWrap="wrap"
-      >
-        {user.createdAt && (
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Created ${formatDateTime(user.createdAt)}`}
-          />
-        )}
-        {user.updatedAt && (
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Updated ${formatDateTime(user.updatedAt)}`}
-          />
-        )}
-      </Stack>
+      {hasMetadata && (
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+        >
+          {user.createdAt && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Created ${formatDateTime(user.createdAt)}`}
+            />
+          )}
+          {user.updatedAt && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Updated ${formatDateTime(user.updatedAt)}`}
+            />
+          )}
+        </Stack>
+      )}
     </Stack>
   );
 }

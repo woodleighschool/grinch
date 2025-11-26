@@ -33,6 +33,7 @@ import { useCreateApplication, useUpdateApplication } from "../hooks/useQueries"
 import {
   applicationRuleTypeMetadata,
   applicationRuleTypes,
+  defaultApplicationRuleType,
   primaryRuleTypeEntries,
   signingChainReference,
   type ApplicationRuleType,
@@ -55,7 +56,7 @@ type ApplicationDialogMode = "create" | "edit";
 
 const defaultValues: ApplicationFormValues = {
   name: "",
-  rule_type: "BINARY",
+  rule_type: defaultApplicationRuleType,
   identifier: "",
   description: "",
   block_message: "",
@@ -73,6 +74,7 @@ interface ApplicationDialogProps {
 }
 
 export function ApplicationDialog({ open, mode = "create", application, onClose, onSuccess, onError }: ApplicationDialogProps) {
+  const editing = mode === "edit";
   const createApplication = useCreateApplication();
   const updateApplication = useUpdateApplication();
 
@@ -98,7 +100,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
   useEffect(() => {
     if (!open) return;
 
-    if (mode === "edit" && application) {
+    if (editing && application) {
       reset({
         name: application.name,
         rule_type: application.rule_type as ApplicationFormValues["rule_type"],
@@ -113,12 +115,12 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
     }
 
     clearErrors();
-  }, [open, mode, application, reset, clearErrors]);
+  }, [open, editing, application, reset, clearErrors]);
 
   const watchedRuleType = watch("rule_type");
   const watchedCelEnabled = watch("cel_enabled");
 
-  const celLocked = mode === "edit" && Boolean(application?.cel_enabled);
+  const celLocked = editing && Boolean(application?.cel_enabled);
 
   useEffect(() => {
     if (celLocked) return;
@@ -128,9 +130,9 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
   }, [watchedCelEnabled, celLocked, setValue]);
 
   const identifierPlaceholder = applicationRuleTypeMetadata[watchedRuleType].placeholder;
-  const dialogTitle = mode === "edit" ? "Edit Application Rule" : "Create Application Rule";
-  const submitLabel = mode === "edit" ? "Save Changes" : "Create";
-  const submittingLabel = mode === "edit" ? "Saving..." : "Creating...";
+  const dialogTitle = editing ? "Edit Application Rule" : "Create Application Rule";
+  const submitLabel = editing ? "Save Changes" : "Create";
+  const submittingLabel = editing ? "Saving..." : "Creating...";
 
   const buildPayload = (values: ApplicationFormValues) => {
     const payload: {
@@ -163,7 +165,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
     try {
       const payload = buildPayload(formData);
 
-      if (mode === "edit") {
+      if (editing) {
         if (!application?.id) {
           throw new Error("Missing application identifier.");
         }
@@ -197,7 +199,7 @@ export function ApplicationDialog({ open, mode = "create", application, onClose,
       }
 
       console.error("Application dialog failed", err);
-      onError(mode === "edit" ? "Failed to update application rule." : "Failed to create application rule.");
+      onError(editing ? "Failed to update application rule." : "Failed to create application rule.");
     }
   };
 

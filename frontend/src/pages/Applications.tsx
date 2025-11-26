@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { useConfirm } from "material-ui-confirm";
 import { DataGrid, GridActionsCellItem, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ShieldIcon from "@mui/icons-material/Shield";
+import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 
 import type { Application } from "../api";
-import { useApplications, useDeleteApplication } from "../hooks/useQueries";
+import { useApplications, useDeleteApplication, useUpdateApplication } from "../hooks/useQueries";
 import { ApplicationDialog, EmptyState, PageHeader } from "../components";
 import { useToast } from "../hooks/useToast";
 
+// Types
 type DialogMode = "create" | "edit";
 
 interface DialogConfig {
@@ -20,156 +23,50 @@ interface DialogConfig {
   application?: Application | null;
 }
 
-export default function Applications() {
-  const navigate = useNavigate();
-
-  const { data: apps = [], error: appsError, isLoading } = useApplications();
-
-  const deleteApplication = useDeleteApplication();
-
-  const [dialogConfig, setDialogConfig] = useState<DialogConfig | null>(null);
-  const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
-  const confirm = useConfirm();
-
-  const { showToast } = useToast();
-  const dialogMode: DialogMode = dialogConfig?.mode ?? "create";
-
-  const openCreateDialog = () => {
-    setDialogConfig({ mode: "create", application: null });
-  };
-
-  const openEditDialog = (application: Application) => {
-    setDialogConfig({ mode: "edit", application });
-  };
-
-  const closeDialog = () => {
-    setDialogConfig(null);
-  };
-
-  useEffect(() => {
-    if (!appsError) return;
-
-    console.error("Applications query failed", appsError);
-    showToast({
-      message: appsError instanceof Error ? appsError.message : "Failed to load applications.",
-      severity: "error",
-    });
-  }, [appsError, showToast]);
-
-  const handleDeleteApplication = async (appId: string) => {
-    setDeletingAppId(appId);
-
-    try {
-      await deleteApplication.mutateAsync(appId);
-      showToast({
-        message: "Application rule deleted.",
-        severity: "success",
-      });
-    } catch (error) {
-      console.error("Delete application failed", error);
-      showToast({
-        message: "Failed to delete application rule.",
-        severity: "error",
-      });
-    } finally {
-      setDeletingAppId(null);
-    }
-  };
-
-  const handleRowClick = (params: GridRowParams<Application>) => {
-    void navigate(`/applications/${String(params.id)}`);
-  };
-
-  const handleConfirmDelete = (appId: string, appName: string) => {
-    confirm({
-      title: "Delete Application Rule",
-      description: `Are you sure you want to delete “${appName}”? This action cannot be undone.`,
-      cancellationText: "Cancel",
-      confirmationText: "Delete",
-      confirmationButtonProps: { color: "error", variant: "contained" },
-    })
-      .then(() => void handleDeleteApplication(appId))
-      .catch(() => {});
-  };
-
-  const columns = createApplicationColumns({
-    onEdit: openEditDialog,
-    onRequestDelete: handleConfirmDelete,
-    deletingAppId,
-  });
-
-  const handleDialogSuccess = () => {
-    const message = dialogMode === "edit" ? "Application rule updated." : "Application rule created.";
-
-    showToast({ message, severity: "success" });
-  };
-
-  const action = (
-    <Button
-      variant="contained"
-      startIcon={<AddIcon />}
-      onClick={openCreateDialog}
-    >
-      Add Application
-    </Button>
-  );
-
-  return (
-    <>
-      <Stack spacing={3}>
-        <PageHeader
-          title="Applications"
-          subtitle="Define rules using reference-compatible identifiers."
-          action={action}
-        />
-
-        <Paper sx={{ height: 640, width: "100%" }}>
-          <DataGrid
-            rows={apps}
-            columns={columns}
-            loading={isLoading}
-            disableRowSelectionOnClick
-            onRowClick={handleRowClick}
-            showToolbar
-            slots={{
-              noRowsOverlay: () => (
-                <EmptyState
-                  title="No application rules yet"
-                  description="Create your first application rule to get started."
-                  icon={<ShieldIcon fontSize="inherit" />}
-                />
-              ),
-            }}
-            initialState={{
-              sorting: {
-                sortModel: [{ field: "name", sort: "asc" }],
-              },
-            }}
-          />
-        </Paper>
-      </Stack>
-
-      <ApplicationDialog
-        open={Boolean(dialogConfig)}
-        mode={dialogMode}
-        application={dialogConfig?.application ?? null}
-        onClose={closeDialog}
-        onSuccess={handleDialogSuccess}
-        onError={(message) => {
-          showToast({ message, severity: "error" });
-        }}
-      />
-    </>
-  );
-}
-
 interface ApplicationColumnOptions {
   onEdit: (application: Application) => void;
   onRequestDelete: (appId: string, appName: string) => void;
+  onToggleStatus: (application: Application) => void;
   deletingAppId: string | null;
+  togglingAppId: string | null;
 }
 
-function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: ApplicationColumnOptions): GridColDef<Application>[] {
+function LinearProgressWithLabel({ value }: { value: number }) {
+  const rounded = Math.round(value).toString().concat("%");
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        width: "100%",
+        gap: 1,
+      }}
+    >
+      <Box sx={{ flexGrow: 1 }}>
+        <LinearProgress
+          variant="determinate"
+          value={value}
+        />
+      </Box>
+      <Typography
+        variant="body2"
+        sx={{ minWidth: 40, color: "text.secondary" }}
+      >
+        {rounded}
+      </Typography>
+    </Box>
+  );
+}
+
+// Column factory
+function createApplicationColumns({
+  onEdit,
+  onRequestDelete,
+  onToggleStatus,
+  deletingAppId,
+  togglingAppId,
+}: ApplicationColumnOptions): GridColDef<Application>[] {
   return [
     {
       field: "name",
@@ -223,25 +120,16 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
 
         return (
           <Stack
-            spacing={0.5}
+            spacing={0.75}
             width="100%"
           >
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
+            <LinearProgressWithLabel value={deploymentPercent} />
+            <Typography
+              variant="body2"
+              fontWeight="medium"
             >
-              <Typography variant="body2">
-                {totalMachines} machine{totalMachines === 1 ? "" : "s"}
-              </Typography>
-              <Typography variant="body2">{syncedMachines} synced</Typography>
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={deploymentPercent}
-              sx={{ height: 6, borderRadius: 999 }}
-            />
-            <Typography variant="caption">{deploymentPercent.toFixed(0)}% deployed</Typography>
+              {syncedMachines.toLocaleString()} of {totalMachines.toLocaleString()} synced
+            </Typography>
           </Stack>
         );
       },
@@ -251,6 +139,16 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
       type: "actions",
       width: 150,
       getActions: (params) => [
+        <GridActionsCellItem
+          key="toggle"
+          icon={params.row.enabled ? <PauseCircleOutlineIcon /> : <PlayCircleOutlineIcon />}
+          label={params.row.enabled ? "Pause Rule" : "Resume Rule"}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleStatus(params.row);
+          }}
+          disabled={togglingAppId === String(params.id)}
+        />,
         <GridActionsCellItem
           key="edit"
           icon={<EditIcon />}
@@ -274,4 +172,210 @@ function createApplicationColumns({ onEdit, onRequestDelete, deletingAppId }: Ap
       ],
     },
   ];
+}
+
+// Page component
+export default function Applications() {
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+  const { showToast } = useToast();
+
+  const { data: apps = [], error: appsError, isLoading } = useApplications();
+  const deleteApplication = useDeleteApplication();
+  const updateApplication = useUpdateApplication();
+
+  // Local state
+  const [dialogConfig, setDialogConfig] = useState<DialogConfig | null>(null);
+  const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
+  const [togglingAppId, setTogglingAppId] = useState<string | null>(null);
+
+  const dialogMode: DialogMode = dialogConfig?.mode ?? "create";
+
+  // Effects
+  useEffect(() => {
+    if (!appsError) return;
+
+    console.error("Applications query failed", appsError);
+    showToast({
+      message: appsError instanceof Error ? appsError.message : "Failed to load applications.",
+      severity: "error",
+    });
+  }, [appsError, showToast]);
+
+  const applicationErrorMessage = useMemo(() => {
+    if (!appsError) return null;
+    return appsError instanceof Error ? appsError.message : "Failed to load applications.";
+  }, [appsError]);
+
+  // Handlers
+  const openCreateDialog = useCallback(() => {
+    setDialogConfig({ mode: "create", application: null });
+  }, []);
+
+  const openEditDialog = useCallback((application: Application) => {
+    setDialogConfig({ mode: "edit", application });
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setDialogConfig(null);
+  }, []);
+
+  const handleDeleteApplication = useCallback(
+    async (appId: string) => {
+      setDeletingAppId(appId);
+
+      try {
+        await deleteApplication.mutateAsync(appId);
+        showToast({
+          message: "Application rule deleted.",
+          severity: "success",
+        });
+      } catch (error) {
+        console.error("Delete application failed", error);
+        showToast({
+          message: "Failed to delete application rule.",
+          severity: "error",
+        });
+      } finally {
+        setDeletingAppId(null);
+      }
+    },
+    [deleteApplication, showToast],
+  );
+
+  const handleToggleApplication = useCallback(
+    (application: Application) => {
+      setTogglingAppId(application.id);
+      void updateApplication
+        .mutateAsync({
+          appId: application.id,
+          payload: { enabled: !application.enabled },
+        })
+        .then(() => {
+          showToast({
+            message: application.enabled ? "Application paused." : "Application resumed.",
+            severity: "success",
+          });
+        })
+        .catch((error: unknown) => {
+          console.error("Toggle application failed", error);
+          showToast({
+            message: "Failed to update application status.",
+            severity: "error",
+          });
+        })
+        .finally(() => {
+          setTogglingAppId(null);
+        });
+    },
+    [showToast, updateApplication],
+  );
+
+  const handleRowClick = useCallback(
+    (params: GridRowParams<Application>) => {
+      void navigate(`/applications/${String(params.id)}`);
+    },
+    [navigate],
+  );
+
+  const handleConfirmDelete = useCallback(
+    (appId: string, appName: string) => {
+      confirm({
+        title: "Delete Application Rule",
+        description: `Are you sure you want to delete “${appName}”? This action cannot be undone.`,
+        cancellationText: "Cancel",
+        confirmationText: "Delete",
+        confirmationButtonProps: { color: "error", variant: "contained" },
+      })
+        .then(() => void handleDeleteApplication(appId))
+        .catch(() => {
+          // user cancelled; no-op
+        });
+    },
+    [confirm, handleDeleteApplication],
+  );
+
+  const handleDialogSuccess = useCallback(() => {
+    const message = dialogMode === "edit" ? "Application rule updated." : "Application rule created.";
+
+    showToast({ message, severity: "success" });
+  }, [dialogMode, showToast]);
+
+  const handleDialogError = useCallback(
+    (message: string) => {
+      showToast({ message, severity: "error" });
+    },
+    [showToast],
+  );
+
+  // Derived data
+  const columns = useMemo(
+    () =>
+      createApplicationColumns({
+        onEdit: openEditDialog,
+        onRequestDelete: handleConfirmDelete,
+        onToggleStatus: handleToggleApplication,
+        deletingAppId,
+        togglingAppId,
+      }),
+    [openEditDialog, handleConfirmDelete, handleToggleApplication, deletingAppId, togglingAppId],
+  );
+
+  const action = (
+    <Button
+      variant="contained"
+      startIcon={<AddIcon />}
+      onClick={openCreateDialog}
+    >
+      Add Application
+    </Button>
+  );
+
+  // Render
+  return (
+    <>
+      <Stack spacing={3}>
+        <PageHeader
+          title="Applications"
+          subtitle="Define rules using reference-compatible identifiers."
+          action={action}
+        />
+
+        {applicationErrorMessage && <Alert severity="error">{applicationErrorMessage}</Alert>}
+
+        <Paper sx={{ height: 640, width: "100%" }}>
+          <DataGrid
+            rows={apps}
+            columns={columns}
+            loading={isLoading}
+            disableRowSelectionOnClick
+            onRowClick={handleRowClick}
+            slots={{
+              noRowsOverlay: () => (
+                <EmptyState
+                  title="No application rules yet"
+                  description="Create your first application rule to get started."
+                  icon={<ShieldIcon fontSize="inherit" />}
+                />
+              ),
+            }}
+            initialState={{
+              sorting: {
+                sortModel: [{ field: "name", sort: "asc" }],
+              },
+            }}
+          />
+        </Paper>
+      </Stack>
+
+      <ApplicationDialog
+        open={Boolean(dialogConfig)}
+        mode={dialogMode}
+        application={dialogConfig?.application ?? null}
+        onClose={closeDialog}
+        onSuccess={handleDialogSuccess}
+        onError={handleDialogError}
+      />
+    </>
+  );
 }

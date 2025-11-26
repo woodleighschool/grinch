@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Paper, Stack } from "@mui/material";
+import { Alert, Paper, Stack } from "@mui/material";
 import { DataGrid, type GridColDef, type GridRowParams } from "@mui/x-data-grid";
 import DevicesOtherIcon from "@mui/icons-material/DevicesOther";
 
@@ -9,6 +9,7 @@ import { useDevices } from "../hooks/useQueries";
 import { useToast } from "../hooks/useToast";
 import { formatDateTime } from "../utils/dates";
 
+// Types
 type DeviceRow = {
   id: string;
   hostname: string;
@@ -18,6 +19,7 @@ type DeviceRow = {
   lastSeen: string | undefined;
 };
 
+// Data grid configuration
 const deviceColumns: GridColDef<DeviceRow>[] = [
   {
     field: "hostname",
@@ -47,11 +49,14 @@ const deviceColumns: GridColDef<DeviceRow>[] = [
   },
 ];
 
+// Page component
 export default function Devices() {
+  // Hooks
   const navigate = useNavigate();
   const { data: devices = [], isLoading, error } = useDevices({});
   const { showToast } = useToast();
 
+  // Effects
   useEffect(() => {
     if (!error) return;
 
@@ -61,21 +66,42 @@ export default function Devices() {
     });
   }, [error, showToast]);
 
-  const rows: DeviceRow[] = devices.map((device) => ({
-    id: device.id,
-    hostname: device.hostname,
-    serial: device.serial,
-    primaryUser: device.primaryUser,
-    clientMode: device.clientMode,
-    lastSeen: device.lastSeen,
-  }));
+  // Handlers
+  const handleRowClick = useCallback(
+    (params: GridRowParams<DeviceRow>) => {
+      void navigate(`/devices/${String(params.id)}`);
+    },
+    [navigate],
+  );
 
+  const devicesErrorMessage = useMemo(() => {
+    if (!error) return null;
+    return error instanceof Error ? error.message : "Failed to load devices";
+  }, [error]);
+
+  // Derived data
+  const rows: DeviceRow[] = useMemo(
+    () =>
+      devices.map((device) => ({
+        id: device.id,
+        hostname: device.hostname,
+        serial: device.serial,
+        primaryUser: device.primaryUser,
+        clientMode: device.clientMode,
+        lastSeen: device.lastSeen,
+      })),
+    [devices],
+  );
+
+  // Render
   return (
     <Stack spacing={3}>
       <PageHeader
         title="Devices"
         subtitle="Monitor Santa agents across your fleet."
       />
+
+      {devicesErrorMessage && <Alert severity="error">{devicesErrorMessage}</Alert>}
 
       <Paper sx={{ height: 640, width: "100%" }}>
         <DataGrid
@@ -84,9 +110,7 @@ export default function Devices() {
           showToolbar
           loading={isLoading}
           disableRowSelectionOnClick
-          onRowClick={(params: GridRowParams<DeviceRow>) => {
-            void navigate(`/devices/${String(params.id)}`);
-          }}
+          onRowClick={handleRowClick}
           initialState={{
             sorting: {
               sortModel: [{ field: "hostname", sort: "asc" }],
