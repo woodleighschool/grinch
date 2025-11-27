@@ -11,6 +11,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// fileDTO mirrors the file table payload returned to the UI.
 type fileDTO struct {
 	SHA256       string          `json:"sha256"`
 	Name         string          `json:"name"`
@@ -30,9 +31,9 @@ func (h Handler) filesRoutes(r chi.Router) {
 
 // listFiles returns paginated file metadata + event counts.
 func (h Handler) listFiles(w http.ResponseWriter, r *http.Request) {
-	limit := parseInt(r.URL.Query().Get("limit"), 100)
-	offset := parseInt(r.URL.Query().Get("offset"), 0)
-	files, err := h.Store.ListFiles(r.Context(), int32(limit), int32(offset))
+	limit := parseInt32(r.URL.Query().Get("limit"), 100)
+	offset := parseInt32(r.URL.Query().Get("offset"), 0)
+	files, err := h.Store.ListFiles(r.Context(), limit, offset)
 	if err != nil {
 		h.Logger.Error("list files", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to list files")

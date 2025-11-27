@@ -51,10 +51,10 @@ func (h Handler) devicesRoutes(r chi.Router) {
 
 // listDevices returns paginated device rows for the admin UI.
 func (h Handler) listDevices(w http.ResponseWriter, r *http.Request) {
-	limit := parseInt(r.URL.Query().Get("limit"), 50)
-	offset := parseInt(r.URL.Query().Get("offset"), 0)
+	limit := parseInt32(r.URL.Query().Get("limit"), 50)
+	offset := parseInt32(r.URL.Query().Get("offset"), 0)
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
-	machines, err := h.Store.ListMachines(r.Context(), int32(limit), int32(offset), search)
+	machines, err := h.Store.ListMachines(r.Context(), limit, offset, search)
 	if err != nil {
 		h.Logger.Error("list devices", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to list devices")
@@ -143,12 +143,17 @@ func mapDevice(m sqlc.Machine) deviceDTO {
 	if m.LastPostflightAt.Valid {
 		lastPostflight = m.LastPostflightAt.Time
 	}
+	var userID uuid.UUID
+	if m.UserID.Valid {
+		userID = uuid.UUID(m.UserID.Bytes)
+	}
 	return deviceDTO{
 		ID:                   m.ID.String(),
 		MachineIdentifier:    m.MachineIdentifier,
 		Serial:               m.Serial,
 		Hostname:             m.Hostname,
 		PrimaryUser:          m.PrimaryUser.String,
+		UserID:               userID,
 		ClientMode:           strings.ToUpper(m.ClientMode),
 		CleanSyncRequested:   m.CleanSyncRequested,
 		LastSeen:             lastSeen,

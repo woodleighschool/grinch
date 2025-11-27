@@ -72,7 +72,7 @@ func (h Handler) upsertGroup(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	if len(body.Members) > 0 {
+	if body.Members != nil {
 		if err := h.Store.ReplaceGroupMembers(r.Context(), body.ID, body.Members); err != nil {
 			h.Logger.Error("sync members", "err", err)
 			respondError(w, http.StatusInternalServerError, "members update failed")

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -107,8 +108,9 @@ func mountStatic(distDir string, apiHandler http.Handler) http.Handler {
 			return
 		}
 
-		path := filepath.Join(distDir, r.URL.Path)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+		reqPath := path.Clean("/" + r.URL.Path)
+		fullPath := filepath.Join(distDir, strings.TrimPrefix(reqPath, "/"))
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			r.URL.Path = "/"
 		}
 

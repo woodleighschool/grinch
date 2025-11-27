@@ -8,13 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// parseInt best-effort parses query params while providing defaults.
-func parseInt(value string, fallback int) int {
+// parseInt32 best-effort parses query params while providing defaults.
+func parseInt32(value string, fallback int32) int32 {
 	if value == "" {
 		return fallback
 	}
-	if n, err := strconv.Atoi(value); err == nil {
-		return n
+	if n, err := strconv.ParseInt(value, 10, 32); err == nil {
+		return int32(n)
 	}
 	return fallback
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/sqlc"
 )
 
+// eventDTO is a generic event payload returned to the UI.
 type eventDTO struct {
 	ID        int64     `json:"id"`
 	Occurred  time.Time `json:"occurredAt"`
@@ -28,9 +29,9 @@ func (h Handler) eventsRoutes(r chi.Router) {
 
 // listEvents streams recent events for troubleshooting.
 func (h Handler) listEvents(w http.ResponseWriter, r *http.Request) {
-	limit := parseInt(r.URL.Query().Get("limit"), 100)
-	offset := parseInt(r.URL.Query().Get("offset"), 0)
-	events, err := h.Store.ListEvents(r.Context(), int32(limit), int32(offset))
+	limit := parseInt32(r.URL.Query().Get("limit"), 100)
+	offset := parseInt32(r.URL.Query().Get("offset"), 0)
+	events, err := h.Store.ListEvents(r.Context(), limit, offset)
 	if err != nil {
 		h.Logger.Error("list events", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to list events")
@@ -52,8 +53,8 @@ type eventStatDTO struct {
 
 // eventStats powers the trend charts in the admin UI.
 func (h Handler) eventStats(w http.ResponseWriter, r *http.Request) {
-	days := parseInt(r.URL.Query().Get("days"), 14)
-	stats, err := h.Store.SummariseEvents(r.Context(), int32(days))
+	days := parseInt32(r.URL.Query().Get("days"), 14)
+	stats, err := h.Store.SummariseEvents(r.Context(), days)
 	if err != nil {
 		h.Logger.Error("summarise events", "err", err)
 		respondError(w, http.StatusInternalServerError, "failed to summarise events")
