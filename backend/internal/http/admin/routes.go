@@ -26,7 +26,6 @@ func RegisterRoutes(r chi.Router, cfg config.Config, store *store.Store, logger 
 		r.Route("/devices", h.devicesRoutes)
 		r.Route("/users", h.usersRoutes)
 		r.Route("/groups", h.groupsRoutes)
-		r.Route("/rules", h.rulesRoutes)
 		r.Route("/events", h.eventsRoutes)
 		r.Route("/files", h.filesRoutes)
 		r.Route("/settings", h.settingsRoutes)

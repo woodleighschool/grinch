@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -48,13 +47,11 @@ type userPolicy struct {
 	CreatedAt       string `json:"created_at"`
 }
 
-// usersRoutes registers the CRUD + policy endpoints.
+// usersRoutes registers directory + policy endpoints.
 func (h Handler) usersRoutes(r chi.Router) {
 	r.Get("/", h.listUsers)
-	r.Post("/", h.upsertUser)
 	r.Get("/{id}", h.userDetails)
 	r.Get("/{id}/policies", h.userEffectivePolicies)
-	r.Get("/{id}/effective-policies", h.userEffectivePolicies)
 }
 
 // listUsers surfaces fuzzy search results for the admin UI.
@@ -72,29 +69,6 @@ func (h Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, mapUserDTO(u))
 	}
 	respondJSON(w, http.StatusOK, resp)
-}
-
-// upsertUser creates or updates a user from the admin UI.
-func (h Handler) upsertUser(w http.ResponseWriter, r *http.Request) {
-	var body userDTO
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid body")
-		return
-	}
-	if body.ID == uuid.Nil {
-		body.ID = uuid.New()
-	}
-	user, err := h.Store.UpsertUser(r.Context(), sqlc.UpsertUserParams{
-		ID:          body.ID,
-		Upn:         body.UPN,
-		DisplayName: body.DisplayName,
-	})
-	if err != nil {
-		h.Logger.Error("upsert user", "err", err)
-		respondError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	respondJSON(w, http.StatusOK, mapUserDTO(user))
 }
 
 // userDetails aggregates the most recent view of a user.
