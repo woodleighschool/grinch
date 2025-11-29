@@ -53,7 +53,7 @@ const deviceColumns: GridColDef<DeviceRow>[] = [
 export default function Devices() {
   // Hooks
   const navigate = useNavigate();
-  const { data: devices = [], isLoading, error } = useDevices({});
+  const { data: devices = [], isLoading, error } = useDevices();
   const { showToast } = useToast();
 
   // Effects

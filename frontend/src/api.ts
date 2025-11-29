@@ -70,13 +70,6 @@ export interface ApplicationAssignmentStats {
   synced_machines: number;
 }
 
-export interface ApplicationFilters {
-  search?: string;
-  rule_type?: string;
-  identifier?: string;
-  enabled?: boolean;
-}
-
 export interface ApplicationScope {
   id: string;
   application_id: string;
@@ -103,10 +96,6 @@ export interface DirectoryGroup {
   description?: string;
 }
 
-export interface GroupQueryParams {
-  search?: string;
-}
-
 export interface GroupEffectiveMembersResponse {
   group: DirectoryGroup;
   members: DirectoryUser[];
@@ -120,10 +109,6 @@ export interface DirectoryUser {
   displayName: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-export interface UserQueryParams {
-  search?: string;
 }
 
 export interface UserEffectivePoliciesResponse {
@@ -169,12 +154,6 @@ export interface DeviceDetailResponse {
   primary_user?: DirectoryUser | null;
   recent_blocks: EventRecord[];
   policies: UserPolicy[];
-}
-
-export interface DeviceQueryParams {
-  search?: string;
-  limit?: number;
-  offset?: number;
 }
 
 export interface UserPolicy {
@@ -326,16 +305,8 @@ export async function getAuthProviders(): Promise<AuthProviders> {
 
 // Applications
 
-export async function listApplications(filters: ApplicationFilters = {}): Promise<Application[]> {
-  const params = new URLSearchParams();
-
-  if (filters.search?.trim()) params.set("search", filters.search.trim());
-  if (filters.rule_type?.trim()) params.set("rule_type", filters.rule_type.trim());
-  if (filters.identifier?.trim()) params.set("identifier", filters.identifier.trim());
-  if (filters.enabled !== undefined) params.set("enabled", String(filters.enabled));
-
-  const query = params.toString();
-  return apiRequest<Application[]>(`/applications${query ? `?${query}` : ""}`);
+export async function listApplications(): Promise<Application[]> {
+  return apiRequest<Application[]>("/applications");
 }
 
 export async function validateApplication(payload: ApplicationValidationPayload): Promise<ValidationSuccess<ApplicationValidationPayload>> {
@@ -422,10 +393,8 @@ export async function deleteScope(appId: string, scopeId: string): Promise<void>
 
 // Groups
 
-export async function listGroups(params: GroupQueryParams = {}): Promise<DirectoryGroup[]> {
-  const search = params.search?.trim();
-  const url = search ? `/groups?search=${encodeURIComponent(search)}` : "/groups";
-  return apiRequest<DirectoryGroup[]>(url);
+export async function listGroups(): Promise<DirectoryGroup[]> {
+  return apiRequest<DirectoryGroup[]>("/groups");
 }
 
 export async function getGroupEffectiveMembers(groupId: string): Promise<GroupEffectiveMembersResponse> {
@@ -434,10 +403,8 @@ export async function getGroupEffectiveMembers(groupId: string): Promise<GroupEf
 
 // Users
 
-export async function listUsers(params: UserQueryParams = {}): Promise<DirectoryUser[]> {
-  const search = params.search?.trim();
-  const url = search ? `/users?search=${encodeURIComponent(search)}` : "/users";
-  return apiRequest<DirectoryUser[]>(url);
+export async function listUsers(): Promise<DirectoryUser[]> {
+  return apiRequest<DirectoryUser[]>("/users");
 }
 
 export async function getUserEffectivePolicies(userId: string): Promise<UserEffectivePoliciesResponse> {
@@ -450,15 +417,8 @@ export async function getUserDetails(userId: string): Promise<UserDetailResponse
 
 // Devices
 
-export async function listDevices(params: DeviceQueryParams = {}): Promise<Device[]> {
-  const query = new URLSearchParams();
-
-  if (typeof params.limit === "number") query.set("limit", String(params.limit));
-  if (typeof params.offset === "number") query.set("offset", String(params.offset));
-  if (params.search?.trim()) query.set("search", params.search.trim());
-
-  const qs = query.toString();
-  return apiRequest<Device[]>(`/devices${qs ? `?${qs}` : ""}`);
+export async function listDevices(): Promise<Device[]> {
+  return apiRequest<Device[]>("/devices");
 }
 
 export async function getDeviceDetails(deviceId: string): Promise<DeviceDetailResponse> {

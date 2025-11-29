@@ -24,7 +24,7 @@ const columns: GridColDef<UserRow>[] = [
 export default function Users() {
   // Hooks
   const navigate = useNavigate();
-  const { data: users = [], isLoading, error } = useUsers({});
+  const { data: users = [], isLoading, error } = useUsers();
   const { showToast } = useToast();
 
   // Effects

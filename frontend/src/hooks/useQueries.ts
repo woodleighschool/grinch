@@ -20,13 +20,9 @@ import {
   getStatus,
   type ApiUser,
   type Application,
-  type ApplicationFilters,
   type DirectoryUser,
   type DirectoryGroup,
-  type UserQueryParams,
   type Device,
-  type DeviceQueryParams,
-  type GroupQueryParams,
   type EventRecord,
   type EventStat,
   type AppStatusResponse,
@@ -36,28 +32,15 @@ import {
 
 // Query Keys
 export const queryKeys = {
-  users: (filters?: UserQueryParams) => ["users", filters?.search ?? ""] as const,
+  users: ["users"] as const,
   user: (id: string) => ["user", id] as const,
-  applications: (filters?: ApplicationFilters) =>
-    [
-      "applications",
-      filters?.search ?? "",
-      filters?.rule_type ?? "",
-      filters?.identifier ?? "",
-      filters?.enabled === undefined ? "all" : String(filters.enabled),
-    ] as const,
+  applications: ["applications"] as const,
   application: (id: string) => ["application", id] as const,
   applicationScopes: (appId: string) => ["application", appId, "scopes"] as const,
   applicationDetail: (id: string, includeMembers?: boolean) => ["applicationDetail", id, includeMembers ? "withMembers" : "basic"] as const,
-  devices: (filters?: DeviceQueryParams) =>
-    [
-      "devices",
-      filters?.search ?? "",
-      typeof filters?.limit === "number" ? filters.limit : "default",
-      typeof filters?.offset === "number" ? filters.offset : 0,
-    ] as const,
+  devices: ["devices"] as const,
   device: (id: string) => ["device", id] as const,
-  groups: (filters?: GroupQueryParams) => ["groups", filters?.search ?? ""] as const,
+  groups: ["groups"] as const,
   santaConfig: ["santaConfig"] as const,
   currentUser: ["currentUser"] as const,
   events: (params?: { limit?: number; offset?: number }) => ["events", params?.limit ?? 50, params?.offset ?? 0] as const,
@@ -82,10 +65,10 @@ export function useStatus() {
 }
 
 // Applications Hooks
-export function useApplications(filters: ApplicationFilters = {}) {
+export function useApplications() {
   return useQuery<Application[]>({
-    queryKey: queryKeys.applications(filters),
-    queryFn: () => listApplications(filters),
+    queryKey: queryKeys.applications,
+    queryFn: () => listApplications(),
     placeholderData: keepPreviousData,
   });
 }
@@ -184,10 +167,10 @@ export function useDeleteScope() {
 }
 
 // Users Hooks
-export function useUsers(filters: UserQueryParams = {}) {
+export function useUsers() {
   return useQuery<DirectoryUser[]>({
-    queryKey: queryKeys.users(filters),
-    queryFn: () => listUsers(filters),
+    queryKey: queryKeys.users,
+    queryFn: () => listUsers(),
     placeholderData: keepPreviousData,
   });
 }
@@ -201,10 +184,10 @@ export function useUserDetails(userId: string) {
 }
 
 // Devices Hook
-export function useDevices(filters: DeviceQueryParams = {}) {
+export function useDevices() {
   return useQuery<Device[]>({
-    queryKey: queryKeys.devices(filters),
-    queryFn: () => listDevices(filters),
+    queryKey: queryKeys.devices,
+    queryFn: () => listDevices(),
     placeholderData: keepPreviousData,
   });
 }
@@ -218,10 +201,10 @@ export function useDeviceDetails(deviceId: string) {
 }
 
 // Groups Hook
-export function useGroups(filters: GroupQueryParams = {}) {
+export function useGroups() {
   return useQuery<DirectoryGroup[]>({
-    queryKey: queryKeys.groups(filters),
-    queryFn: () => listGroups(filters),
+    queryKey: queryKeys.groups,
+    queryFn: () => listGroups(),
     placeholderData: keepPreviousData,
   });
 }
