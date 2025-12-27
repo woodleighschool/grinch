@@ -3,18 +3,18 @@ module github.com/woodleighschool/grinch
 go 1.25.3
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.10-20251120153917-33db942e2edb.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20251222234036-85229a4bd2f9.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/cel-go v0.26.1
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.7.6
-	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
+	github.com/jackc/pgx/v5 v5.8.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.92.0
 	github.com/robfig/cron/v3 v3.0.1
-	golang.org/x/oauth2 v0.33.0
-	google.golang.org/protobuf v1.36.10
+	golang.org/x/oauth2 v0.34.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
