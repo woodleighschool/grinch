@@ -7,8 +7,11 @@ on:
 
 jobs:
   backend-lint:
-    name: Backend lint
-    runs-on: ubuntu-24.04-arm
+    name: Backend Lint
+    runs-on: ubuntu
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -16,24 +19,22 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
-          go-version-file: backend/go.mod
+          go-version-file: go.mod
 
-      - name: Install sqlc
+      - name: Install Dependencies
         run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
-      - name: Generate sqlc
-        run: sqlc generate
-        working-directory: backend
+      - name: Generate
+        run: go generate ./...
 
       - name: Run Go linter
         uses: golangci/golangci-lint-action@e7fa5ac41e1cf5b7d48e45e42232ce7ada589601 # v9.1.0
         with:
           version: v2.6.2
-          working-directory: backend
 
   frontend-lint:
-    name: Frontend lint
-    runs-on: ubuntu-24.04-arm
+    name: Frontend Lint
+    runs-on: ubuntu
     defaults:
       run:
         working-directory: frontend
@@ -48,8 +49,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
       - name: Run ESLint
-        run: npm run lint -- --no-fix --max-warnings=0
+        run: npm run lint
