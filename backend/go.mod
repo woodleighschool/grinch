@@ -10,7 +10,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/httplog/v3 v3.3.0
 	github.com/go-pkgz/auth/v2 v2.1.1
-	github.com/go-pkgz/rest v1.20.6
+	github.com/go-pkgz/rest v1.21.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/google/cel-go v0.26.1
 	github.com/google/uuid v1.6.0
@@ -79,8 +79,8 @@ require (
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 )
