@@ -2,7 +2,7 @@
 FROM node:25-alpine AS frontend
 WORKDIR /workspace/frontend
 COPY frontend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY frontend .
 ENV NODE_ENV=production
 RUN npm run build
@@ -19,8 +19,8 @@ COPY backend/go.mod go.mod
 COPY backend/go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
-RUN --mount=type=cache,target=/go/pkg/mod go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+RUN go mod download
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 # Copy the go source and sqlc config
 COPY backend/cmd/ cmd/
@@ -32,8 +32,7 @@ COPY backend/internal/ internal/
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN go generate ./...
-RUN --mount=type=cache,target=/root/.cache/go-build \
-	CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
 	go build -trimpath -buildvcs=true \
 		-ldflags="${LDFLAGS} -w -s" \
 		-o grinch cmd/grinch/main.go

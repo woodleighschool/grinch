@@ -133,11 +133,12 @@ npm run dev
 
 Vite proxies `/api` and `/auth` to `localhost:8080`.
 
-## ⚠️ Limitations (for now)
+## ⚠️ Limitations
 
--   No auth on `/sync` yet.
+-   No auth on `/sync` (yet).
 -   Only Entra ID sync is implemented.
 -   No RBAC; anyone who can log in is an admin.
+-   CANNOT be horizontally scaled (yet)
 
 ## 🤝 Contributing / PRs
 

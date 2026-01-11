@@ -1,4 +1,5 @@
 ---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Lint
 
 on:
@@ -8,7 +9,9 @@ on:
 jobs:
   backend-lint:
     name: Backend Lint
-    runs-on: ubuntu
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: frontend
@@ -34,7 +37,9 @@ jobs:
 
   frontend-lint:
     name: Frontend Lint
-    runs-on: ubuntu
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: frontend
