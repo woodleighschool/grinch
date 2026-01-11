@@ -1,3 +1,4 @@
+import { DECISION_CHOICES, SIGNING_STATUS_CHOICES } from "@/api/constants";
 import type { ReactElement } from "react";
 import {
   ArrayField,
@@ -12,7 +13,6 @@ import {
   TextArrayField,
   TextField,
 } from "react-admin";
-import { DECISION_CHOICES, SIGNING_STATUS_CHOICES } from "@/api/constants";
 
 export const EventShow = (): ReactElement => (
   <Show>

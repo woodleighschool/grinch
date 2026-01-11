@@ -1,8 +1,8 @@
+import { listAuthProviders, type AuthProviders } from "@/api/auth";
+import MicrosoftIcon from "@mui/icons-material/Microsoft";
+import { Stack, Typography } from "@mui/material";
 import { useEffect, useState, type EffectCallback, type ReactElement } from "react";
 import { Button, Login, LoginForm } from "react-admin";
-import { Stack, Typography } from "@mui/material";
-import MicrosoftIcon from "@mui/icons-material/Microsoft";
-import { listAuthProviders, type AuthProviders } from "@/api/auth";
 
 export const LoginPage = (): ReactElement => {
   const [providers, setProviders] = useState<AuthProviders | undefined>();

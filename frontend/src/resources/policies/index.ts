@@ -1,9 +1,9 @@
-import GavelIcon from "@mui/icons-material/Gavel";
-import type { ComponentType } from "react";
-import type { ResourceProps } from "react-admin";
 import { PolicyCreate } from "@/resources/policies/create";
 import { PolicyEdit } from "@/resources/policies/edit";
 import { PolicyList } from "@/resources/policies/list";
+import GavelIcon from "@mui/icons-material/Gavel";
+import type { ComponentType } from "react";
+import type { ResourceProps } from "react-admin";
 
 const policies: Partial<ResourceProps> & { icon?: ComponentType } = {
   icon: GavelIcon,

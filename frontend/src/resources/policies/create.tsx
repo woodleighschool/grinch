@@ -1,12 +1,12 @@
-import type { ReactElement } from "react";
-import { Create, TabbedForm } from "react-admin";
+import { CLIENT_MODE, FILE_ACCESS_ACTION } from "@/api/constants";
 import {
   PolicyDetailsFields,
   PolicyRulesInput,
   PolicySettingsFields,
   PolicyTargetsInput,
 } from "@/resources/policies/fields";
-import { CLIENT_MODE, FILE_ACCESS_ACTION } from "@/api/constants";
+import type { ReactElement } from "react";
+import { Create, TabbedForm } from "react-admin";
 
 const defaultPolicyValues = {
   enabled: true,

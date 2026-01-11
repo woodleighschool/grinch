@@ -1,6 +1,6 @@
-import EventIcon from "@mui/icons-material/Event";
 import { EventList } from "@/resources/events/list";
 import { EventShow } from "@/resources/events/show";
+import EventIcon from "@mui/icons-material/Event";
 import type { ComponentType } from "react";
 import type { ResourceProps } from "react-admin";
 

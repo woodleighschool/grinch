@@ -1,7 +1,7 @@
-import type { ReactElement } from "react";
-import { FormDataConsumer, SelectInput, TextInput, required } from "react-admin";
 import { RULE_TYPE, enumDescription } from "@/api/constants";
 import type { Rule } from "@/api/types";
+import type { ReactElement } from "react";
+import { FormDataConsumer, SelectInput, TextInput, required } from "react-admin";
 
 export const RuleFields = (): ReactElement => (
   <>

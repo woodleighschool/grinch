@@ -1,7 +1,7 @@
+import GitHubIcon from "@mui/icons-material/GitHub";
+import { Box, IconButton, Typography } from "@mui/material";
 import type { ComponentProps, ReactElement } from "react";
 import { AppBar, Layout, TitlePortal } from "react-admin";
-import { Box, IconButton, Typography } from "@mui/material";
-import GitHubIcon from "@mui/icons-material/GitHub";
 
 const repoUrl = "https://github.com/woodleighschool/grinch";
 

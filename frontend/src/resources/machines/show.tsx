@@ -1,3 +1,4 @@
+import { CLIENT_MODE_CHOICES, DECISION_CHOICES, POLICY_STATUS_CHOICES } from "@/api/constants";
 import type { ReactElement } from "react";
 import {
   BooleanField,
@@ -14,7 +15,6 @@ import {
   TextField,
   TopToolbar,
 } from "react-admin";
-import { CLIENT_MODE_CHOICES, DECISION_CHOICES, POLICY_STATUS_CHOICES } from "@/api/constants";
 
 const MachineShowActions = (): ReactElement => (
   <TopToolbar>

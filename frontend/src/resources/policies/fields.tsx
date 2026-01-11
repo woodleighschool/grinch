@@ -10,16 +10,16 @@ import {
   SelectInput,
   SimpleFormIterator,
   TextInput,
-  useChoicesContext,
   required,
+  useChoicesContext,
 } from "react-admin";
 
 import {
   CLIENT_MODE,
   FILE_ACCESS_ACTION,
+  FILE_ACCESS_ACTION_CHOICES,
   POLICY,
   RULE_TYPE,
-  FILE_ACCESS_ACTION_CHOICES,
   enumDescription,
   enumName,
 } from "@/api/constants";

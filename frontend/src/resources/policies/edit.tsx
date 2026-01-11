@@ -1,13 +1,13 @@
 import type { ReactElement } from "react";
 import { DataTable, DateField, Edit, ReferenceManyField, SelectField, TabbedForm } from "react-admin";
 
+import { POLICY_STATUS_CHOICES } from "@/api/constants";
 import {
   PolicyDetailsFields,
   PolicyRulesInput,
   PolicySettingsFields,
   PolicyTargetsInput,
 } from "@/resources/policies/fields";
-import { POLICY_STATUS_CHOICES } from "@/api/constants";
 
 export const PolicyEdit = (): ReactElement => (
   <Edit mutationMode="pessimistic" redirect="edit">

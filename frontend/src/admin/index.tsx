@@ -1,9 +1,7 @@
-import type { ReactElement } from "react";
-import { Admin, Resource, radiantDarkTheme, radiantLightTheme } from "react-admin";
-import { authProvider } from "@/providers/authProvider";
-import { dataProvider } from "@/providers/dataProvider";
 import { AdminLayout } from "@/admin/layout";
 import { LoginPage } from "@/admin/login";
+import { authProvider } from "@/providers/authProvider";
+import { dataProvider } from "@/providers/dataProvider";
 import events from "@/resources/events";
 import groups from "@/resources/groups";
 import machines from "@/resources/machines";
@@ -11,6 +9,8 @@ import memberships from "@/resources/memberships";
 import policies from "@/resources/policies";
 import rules from "@/resources/rules";
 import users from "@/resources/users";
+import type { ReactElement } from "react";
+import { Admin, Resource, radiantDarkTheme, radiantLightTheme } from "react-admin";
 
 export const AdminApp = (): ReactElement => (
   <Admin

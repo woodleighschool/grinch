@@ -1,5 +1,5 @@
-import { fetchUtils, type DataProvider } from "react-admin";
 import simpleRestProvider from "ra-data-simple-rest";
+import { fetchUtils, type DataProvider } from "react-admin";
 
 const API_URL = "/api";
 

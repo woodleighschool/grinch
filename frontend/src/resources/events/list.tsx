@@ -1,3 +1,6 @@
+import { DECISION, DECISION_CHOICES, enumDescription, enumName } from "@/api/constants";
+import type { EventRecord } from "@/api/types";
+import { Chip, Tooltip } from "@mui/material";
 import type { ReactElement } from "react";
 import {
   DataTable,
@@ -6,13 +9,9 @@ import {
   List,
   ReferenceField,
   SearchInput,
-  SelectField,
   SelectInput,
   TextField,
 } from "react-admin";
-import { Chip, Tooltip } from "@mui/material";
-import { DECISION, DECISION_CHOICES, enumDescription, enumName } from "@/api/constants";
-import type { EventRecord } from "@/api/types";
 
 const eventFilters: ReactElement[] = [
   <SearchInput key="q" source="q" alwaysOn />,

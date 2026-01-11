@@ -1,6 +1,6 @@
+import { RULE_TYPE_CHOICES } from "@/api/constants";
 import type { ReactElement } from "react";
 import { DataTable, List, SearchInput, SelectField, SelectInput } from "react-admin";
-import { RULE_TYPE_CHOICES } from "@/api/constants";
 
 const ruleFilters: ReactElement[] = [
   <SearchInput key="q" source="q" alwaysOn />,

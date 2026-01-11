@@ -1,5 +1,5 @@
-import type { AuthProvider, UserIdentity } from "react-admin";
 import { getCurrentUser, isAuthError, loginLocal, logout } from "@/api/auth";
+import type { AuthProvider, UserIdentity } from "react-admin";
 
 export const authProvider: AuthProvider = {
   login({ username, password }: { username: string; password: string }): Promise<void> {

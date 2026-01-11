@@ -1,6 +1,6 @@
+import { POLICY_STATUS_CHOICES } from "@/api/constants";
 import type { ReactElement } from "react";
 import { DataTable, DateField, List, ReferenceField, SearchInput, SelectField, TextField } from "react-admin";
-import { POLICY_STATUS_CHOICES } from "@/api/constants";
 
 const machineFilters: ReactElement[] = [<SearchInput key="q" source="q" alwaysOn />];
 
