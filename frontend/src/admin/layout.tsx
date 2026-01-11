@@ -1,0 +1,27 @@
+import type { ComponentProps, ReactElement } from "react";
+import { AppBar, Layout, TitlePortal } from "react-admin";
+import { Box, IconButton, Typography } from "@mui/material";
+import GitHubIcon from "@mui/icons-material/GitHub";
+
+const repoUrl = "https://github.com/woodleighschool/grinch";
+
+const AppToolbar = (): ReactElement => (
+  <Box sx={{ display: "flex", alignItems: "center", width: "100%", gap: 2 }}>
+    <Typography variant="h6">Grinch</Typography>
+    <TitlePortal />
+    <Box sx={{ flex: 1 }} />
+    <IconButton color="inherit" component="a" href={repoUrl} target="_blank" rel="noreferrer">
+      <GitHubIcon />
+    </IconButton>
+  </Box>
+);
+
+const AdminAppBar = (): ReactElement => <AppBar toolbar={<AppToolbar />} />;
+
+type LayoutProperties = ComponentProps<typeof Layout>;
+
+export const AdminLayout = (properties: LayoutProperties): ReactElement => (
+  <Layout {...properties} appBar={AdminAppBar}>
+    {properties.children}
+  </Layout>
+);

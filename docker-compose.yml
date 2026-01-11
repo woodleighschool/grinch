@@ -14,13 +14,12 @@ services:
     build: .
     ports:
       - "8080:8080"
-      - "8081:8081"
     environment:
-      DATABASE_HOST: db
-      DATABASE_PORT: 5432
-      DATABASE_NAME: grinch
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: grinch
     depends_on:
       - db
     env_file:

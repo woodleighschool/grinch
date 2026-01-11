@@ -1,74 +1,78 @@
-/* eslint-env node */
+// eslint.config.js
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import js from "@eslint/js";
-import eslintPluginReact from "eslint-plugin-react";
-import eslintPluginReactHooks from "eslint-plugin-react-hooks";
-import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
-import eslintConfigPrettier from "eslint-config-prettier/flat";
+import { defineConfig } from "eslint/config";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 
-/** @type {import("eslint").Linter.Config[]} */
-const config = [
-  {
-    ignores: ["dist", "node_modules", "eslint.config.js", "vite.config.*", "scripts/**"],
-    linterOptions: {
-      reportUnusedDisableDirectives: "error",
-    },
-  },
+import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import sonarjs from "eslint-plugin-sonarjs";
+import unicorn from "eslint-plugin-unicorn";
+import { importX, createNodeResolver } from "eslint-plugin-import-x";
+import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig(
+  { ignores: ["dist", "build", "coverage", "node_modules"] },
+
+  { files: ["**/*.{ts,tsx}"] },
 
   js.configs.recommended,
 
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
+
+  react.configs.flat.recommended,
+  react.configs.flat["jsx-runtime"],
+
+  jsxA11y.flatConfigs.strict,
+
+  importX.flatConfigs.recommended,
+  importX.flatConfigs.typescript,
+
+  sonarjs.configs.recommended,
+
+  unicorn.configs.recommended,
+
   {
-    files: ["src/**/*.{ts,tsx,js,jsx}"],
     languageOptions: {
-      ecmaVersion: 2024,
+      ecmaVersion: "latest",
       sourceType: "module",
+      globals: {
+        ...globals.browser,
+        ...globals.es2021,
+      },
       parserOptions: {
-        project: "./tsconfig.json",
-        tsconfigRootDir: import.meta.dirname,
-        ecmaFeatures: { jsx: true },
+        tsconfigRootDir: __dirname,
+        projectService: true,
       },
     },
-    settings: { react: { version: "detect" } },
+    settings: {
+      react: { version: "detect" },
+      "import-x/resolver-next": [
+        createTypeScriptImportResolver(),
+        createNodeResolver(),
+      ],
+    },
     plugins: {
-      "react": eslintPluginReact,
-      "react-hooks": eslintPluginReactHooks,
-      "react-refresh": eslintPluginReactRefresh,
+      "react-hooks": reactHooks,
     },
     rules: {
-      ...eslintPluginReact.configs.recommended.rules,
-      ...eslintPluginReact.configs["jsx-runtime"].rules,
-      ...eslintPluginReactHooks.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
 
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "no-console": "error",
+      "no-debugger": "error",
 
-      "react/jsx-key": "error",
-      "react/self-closing-comp": "warn",
-      "react/jsx-no-useless-fragment": "warn",
+      "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false, ignoreIIFE: false }],
+      "@typescript-eslint/no-misused-promises": ["error", { checksVoidReturn: true }],
+      "@typescript-eslint/explicit-function-return-type": ["error", { allowExpressions: false, allowTypedFunctionExpressions: false }],
+      "unicorn/filename-case": "off",
     },
-  },
-
-  ...tseslint.configs.strictTypeChecked.map((cfg) => ({
-    ...cfg,
-    files: ["src/**/*.{ts,tsx}"],
-    languageOptions: {
-      ...cfg.languageOptions,
-      parserOptions: {
-        ...(cfg.languageOptions?.parserOptions ?? {}),
-        project: "./tsconfig.json",
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-    rules: {
-      ...cfg.rules,
-
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/no-misused-promises": "error",
-      "@typescript-eslint/consistent-type-assertions": "warn",
-    },
-  })),
-
-  eslintConfigPrettier,
-];
-
-export default config;
+  }
+);

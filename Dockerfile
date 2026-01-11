@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Build the grinch binary
-FROM golang:1.25 AS backend
+FROM golang:1.25.5 AS backend
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS
@@ -25,7 +25,6 @@ RUN --mount=type=cache,target=/go/pkg/mod go install github.com/sqlc-dev/sqlc/cm
 # Copy the go source and sqlc config
 COPY backend/cmd/ cmd/
 COPY backend/internal/ internal/
-COPY backend/sqlc.yaml sqlc.yaml
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -37,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 	CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
 	go build -trimpath -buildvcs=true \
 		-ldflags="${LDFLAGS} -w -s" \
-		-o grinch cmd/server/main.go
+		-o grinch cmd/grinch/main.go
 
 # Use distroless as minimal base image to package the grinch binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -47,8 +46,8 @@ COPY --from=backend /workspace/grinch .
 COPY --from=frontend /workspace/frontend/dist ./frontend
 
 USER 65532:65532
-EXPOSE 8080 8081
+EXPOSE 8080
 
-ENV FRONTEND_DIST_DIR=/frontend
+ENV FRONTEND_DIR=/frontend
 
 ENTRYPOINT ["/grinch"]

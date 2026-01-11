@@ -22,7 +22,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      "/healthz": {
+      "/auth": {
         target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
@@ -48,8 +48,5 @@ export default defineConfig({
         },
       },
     },
-  },
-  define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   },
 });
