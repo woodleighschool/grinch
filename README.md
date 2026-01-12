@@ -5,6 +5,10 @@ Grinch is a small Go + React control plane for Santa. It keeps users and groups 
 We created Grinch as other sync servers are quite basic in terms of who/which machines get what.
 It works for us, it is not fancy, but it will get better over time.
 
+> [!WARNING]
+> This project may be unstable or have bugs, use with caution.
+> Also expect breaking changes between releases for now.
+
 ## ✨ Features
 
 -   Santa sync endpoints (`/sync`) for preflight, rule download, event upload, and postflight

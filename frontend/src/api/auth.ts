@@ -1,10 +1,20 @@
 import { fetchUtils } from "react-admin";
+import { getCookie, XSRF_COOKIE_NAME, XSRF_HEADER_NAME } from "./cookies";
 
-const authFetch = (url: string, options: fetchUtils.Options = {}): ReturnType<typeof fetchUtils.fetchJson> =>
-  fetchUtils.fetchJson(url, {
+const authFetch = (url: string, options: fetchUtils.Options = {}): ReturnType<typeof fetchUtils.fetchJson> => {
+  const xsrfToken = getCookie(XSRF_COOKIE_NAME);
+  const headers = new Headers(options.headers);
+
+  if (xsrfToken) {
+    headers.set(XSRF_HEADER_NAME, xsrfToken);
+  }
+
+  return fetchUtils.fetchJson(url, {
     ...options,
     credentials: "include",
+    headers,
   });
+};
 
 export interface AuthUser {
   id: string;

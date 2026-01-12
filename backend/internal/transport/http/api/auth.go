@@ -3,6 +3,7 @@ package apihttp
 import (
 	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-pkgz/auth/v2"
@@ -42,11 +43,14 @@ func NewAuthService(cfg AuthConfig) (*auth.Service, error) {
 		Issuer:         cfg.AppName,
 		URL:            cfg.BaseURL,
 		SameSiteCookie: http.SameSiteStrictMode,
-		//DisableXSRF:    true,
-		AvatarStore: avatar.NewLocalFS("/tmp"),
 		Validator: token.ValidatorFunc(func(_ string, claims token.Claims) bool {
 			return claims.User != nil
 		}),
+	}
+
+	// If /tmp is writable, use it for avatar storage.
+	if isWritableDir("/tmp") {
+		opts.AvatarStore = avatar.NewLocalFS("/tmp")
 	}
 
 	service := auth.NewService(opts)
@@ -65,6 +69,16 @@ func NewAuthService(cfg AuthConfig) (*auth.Service, error) {
 	}
 
 	return service, nil
+}
+
+func isWritableDir(path string) bool {
+	f, err := os.CreateTemp(path, ".writetest-*")
+	if err != nil {
+		return false
+	}
+	f.Close()
+	_ = os.Remove(f.Name())
+	return true
 }
 
 // AuthMiddleware returns the authentication middleware.
