@@ -8,7 +8,7 @@ export const MachineList = (): ReactElement => (
   <List sort={{ field: "hostname", order: "ASC" }} filters={machineFilters}>
     <DataTable rowClick="show" bulkActionButtons={false}>
       <DataTable.Col source="hostname" label="Hostname" />
-      <DataTable.Col source="serial_number" label="Serial" />
+      <DataTable.Col source="serial_number" label="Serial Number" />
       <DataTable.Col source="primary_user" label="Primary User" />
       <DataTable.Col source="user_id" label="User">
         <ReferenceField source="user_id" reference="users" link="show">

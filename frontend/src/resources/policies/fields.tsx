@@ -27,7 +27,7 @@ import type { Policy, PolicyAttachment, PolicyTarget, Rule } from "@/api/types";
 
 export const PolicyDetailsFields = (): ReactElement => (
   <>
-    <TextInput source="name" label="Name" validate={[required()]} helperText="Unique name for this policy." />
+    <TextInput source="name" label="Name" validate={[required()]} helperText="Unique policy name." />
     <TextInput source="description" label="Description" multiline minRows={2} />
     <BooleanInput source="enabled" label="Enabled" />
     <NumberInput
@@ -36,7 +36,7 @@ export const PolicyDetailsFields = (): ReactElement => (
       min={0}
       step={1}
       validate={[required()]}
-      helperText="Higher numbers take precedence per machine."
+      helperText="Higher numbers take precedence on each machine."
     />
   </>
 );
@@ -55,42 +55,89 @@ export const PolicySettingsFields = (): ReactElement => (
       )}
     </FormDataConsumer>
 
-    <BooleanInput source="set_enable_bundles" label="Enable Bundle Analysis" />
-    <BooleanInput source="set_enable_transitive_rules" label="Enable Transitive Rules" />
-    <BooleanInput source="set_enable_all_event_upload" label="Upload All Events" />
-    <BooleanInput source="set_disable_unknown_event_upload" label="Skip Unknown Events" />
+    <BooleanInput
+      source="set_enable_bundles"
+      label="Bundle Rules and Hashing"
+      helperText="Allow bundle rules and bundle hashing on clients."
+    />
 
-    <NumberInput source="set_batch_size" label="Batch Size" min={1} step={1} validate={[required()]} />
+    <BooleanInput
+      source="set_enable_transitive_rules"
+      label="Compiler (Transitive) Rules"
+      helperText="Treat compiler rules as transitive allow rules. When off, they act as standard allow rules."
+    />
+
+    <BooleanInput
+      source="set_enable_all_event_upload"
+      label="Upload All Execution Events"
+      helperText="Upload all execution events, not only would-be blocked ones."
+    />
+
+    <BooleanInput
+      source="set_disable_unknown_event_upload"
+      label="Disable Unknown Event Uploads"
+      helperText="Skip uploads for events that would be blocked in Lockdown while in Monitor mode."
+    />
+
+    <NumberInput
+      source="set_batch_size"
+      label="Event Upload Batch Size"
+      min={1}
+      step={1}
+      validate={[required()]}
+      helperText="Events per upload request. Default 50."
+      placeholder="50"
+    />
+
     <NumberInput
       source="set_full_sync_interval_seconds"
-      label="Full Sync Interval (seconds)"
+      label="Full Sync Interval"
       min={60}
       step={1}
       validate={[required()]}
+      helperText="Seconds between full syncs. Default 600 (10 minutes); minimum 60."
+      placeholder="600"
     />
+
     <NumberInput
       source="set_push_notification_full_sync_interval_seconds"
-      label="Push Sync Interval (seconds)"
+      label="Push Notification Full Sync Fallback Interval"
       min={60}
       step={1}
       validate={[required()]}
+      helperText="Used when push notifications are enabled. Default 14400 (6 hours)."
+      placeholder="14400"
     />
+
     <NumberInput
       source="set_push_notification_global_rule_sync_deadline_seconds"
-      label="Global Sync Deadline (seconds)"
+      label="Push Notification Rule Sync Jitter Window"
       min={0}
       step={1}
       validate={[required()]}
+      helperText="After a global rule sync notification, clients wait a random delay up to this many seconds. Default 600."
+      placeholder="600"
     />
 
-    <TextInput source="set_allowed_path_regex" label="Allowed Paths" placeholder="^/Applications/.*" />
-    <TextInput source="set_blocked_path_regex" label="Blocked Paths" placeholder="^/Volumes/.*" />
+    <TextInput
+      source="set_allowed_path_regex"
+      label="Allowed Path Regex"
+      helperText="Regular expression for allowed paths."
+      placeholder="^/Applications/.*"
+    />
+
+    <TextInput
+      source="set_blocked_path_regex"
+      label="Blocked Path Regex"
+      helperText="Regular expression for blocked paths."
+      placeholder="^/Volumes/.*"
+    />
 
     <FormDataConsumer<Partial<Policy>>>
       {({ formData }): ReactElement => (
         <SelectInput
           source="set_override_file_access_action"
-          label="File Access Override"
+          label="File Access Override Action"
           choices={FILE_ACCESS_ACTION_CHOICES}
           validate={[required()]}
           helperText={enumDescription(FILE_ACCESS_ACTION, formData.set_override_file_access_action)}
@@ -98,17 +145,23 @@ export const PolicySettingsFields = (): ReactElement => (
       )}
     </FormDataConsumer>
 
-    <BooleanInput source="set_block_usb_mount" label="Block USB Mounts" />
+    <BooleanInput
+      source="set_block_usb_mount"
+      label="Block USB and SD Mounts"
+      helperText="Block USB and SD card mounts."
+    />
+
     <SelectArrayInput
       source="set_remount_usb_mode"
-      label="USB Mount Restrictions"
+      label="USB Mount Enforced Flags"
+      helperText="When USB blocking is on, mounts with these flags are allowed; others are denied, then remounted with these flags."
       choices={[
-        { id: "rdonly", name: "Read-only (rdonly)" },
-        { id: "noexec", name: "Disallow executables (noexec)" },
-        { id: "nosuid", name: "Ignore suid bits (nosuid)" },
+        { id: "rdonly", name: "Read-Only (rdonly)" },
+        { id: "noexec", name: "Disallow Executables (noexec)" },
+        { id: "nosuid", name: "Ignore Setuid/Setgid (nosuid)" },
+        { id: "nodev", name: "Ignore Device Files (nodev)" },
         { id: "nobrowse", name: "Hide in Finder (nobrowse)" },
-        { id: "noowners", name: "Ignore ownership (noowners)" },
-        { id: "nodev", name: "Ignore devices (nodev)" },
+        { id: "noowners", name: "Ignore Ownership (noowners)" },
         { id: "async", name: "Async I/O (async)" },
         { id: "-j", name: "Journaled (-j)" },
       ]}
@@ -120,7 +173,7 @@ const RuleAssignmentHelperText = (): string => {
   const { selectedChoices = [] } = useChoicesContext<Rule>();
   const rule = selectedChoices[0];
   if (!rule) {
-    return "Select a rule to see details.";
+    return "Select a rule to view details.";
   }
   const ruleTypeName = enumName(RULE_TYPE, rule.rule_type) ?? "Unknown rule";
   return `${rule.identifier} - ${ruleTypeName}`;
@@ -143,7 +196,7 @@ export const PolicyRulesInput = (): ReactElement => (
         {({ scopedFormData }): ReactElement => (
           <SelectInput
             source="action"
-            label="Policy"
+            label="Rule Action"
             choices={POLICY.choices("ALLOW", "ALLOW_COMPILER", "BLOCK", "BLOCK_SILENTLY", "EVALUATE_EXPRESSION")}
             validate={[required()]}
             helperText={enumDescription(POLICY, scopedFormData?.action)}
@@ -175,7 +228,7 @@ export const PolicyTargetsInput = (): ReactElement => (
     <SimpleFormIterator inline reOrderButtons={false}>
       <SelectInput
         source="kind"
-        label="Type"
+        label="Target Type"
         choices={[
           { id: "all", name: "All Machines" },
           { id: "user", name: "User" },

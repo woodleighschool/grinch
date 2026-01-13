@@ -88,13 +88,13 @@ export const CLIENT_MODE = defineEnum(
     STANDALONE: 3,
   } as const,
   [
-    { id: 0, name: "Unspecified/Unknown", description: "No specific mode is indicated." },
-    { id: 1, name: "Monitor", description: "Apps that don't match a rule are still allowed to run." },
-    { id: 2, name: "Lockdown", description: "Apps that don't match a rule are blocked from running." },
+    { id: 0, name: "Unspecified", description: "No mode reported." },
+    { id: 1, name: "Monitor", description: "Allows executions with no matching rule." },
+    { id: 2, name: "Lockdown", description: "Blocks executions with no matching rule." },
     {
       id: 3,
       name: "Standalone",
-      description: "Apps that don't match a rule are blocked, but the user can approve the run by authenticating.",
+      description: "Blocks executions with no matching rule, but users can approve by authenticating.",
     },
   ] as const,
 );
@@ -114,18 +114,18 @@ export const SYNC_TYPE = defineEnum(
     CLEAN_FILE_ACCESS_RULES_ONLY: 6,
   } as const,
   [
-    { id: 0, name: "Unspecified", description: 'Treated as the default "Normal" behavior.' },
+    { id: 0, name: "Unspecified", description: "Defaults to Normal." },
     {
       id: 1,
-      name: "Normal (Progressive)",
+      name: "Normal",
       description:
-        'New rules are applied on top of existing rules; matching rules are replaced; rules marked "Remove" delete the matching rule.',
+        "Applies new rules on top of existing ones; matching rules replace; Remove deletes the matching rule.",
     },
     {
       id: 2,
       name: "Clean",
       description:
-        "Deletes previously received (non-transitive) execution rules and all file access rules before applying new ones.",
+        "Deletes previously received non-transitive execution rules and all file access rules before applying new ones.",
     },
     {
       id: 3,
@@ -141,12 +141,12 @@ export const SYNC_TYPE = defineEnum(
       id: 5,
       name: "Clean Rules Only",
       description:
-        "Deletes previously received (non-transitive) execution rules before applying new ones; file access rules are left alone.",
+        "Deletes previously received non-transitive execution rules before applying new ones; file access rules remain.",
     },
     {
       id: 6,
       name: "Clean File Access Rules Only",
-      description: "Deletes all existing file access rules before applying new ones; execution rules are left alone.",
+      description: "Deletes all existing file access rules before applying new ones; execution rules remain.",
     },
   ] as const,
 );
@@ -162,14 +162,14 @@ export const FILE_ACCESS_ACTION = defineEnum(
     DISABLED: 3,
   } as const,
   [
-    { id: 0, name: "Unspecified", description: "Does not change any file access settings on the computer." },
+    { id: 0, name: "Unspecified", description: "No change to file access settings." },
     {
       id: 1,
-      name: "No Override (Apply Policy as Written)",
-      description: "Uses the file access policy exactly as configured.",
+      name: "Apply Policy",
+      description: "Apply the file access policy as written.",
     },
-    { id: 2, name: "Audit Only", description: "Actions that would be denied are logged, but still allowed." },
-    { id: 3, name: "Disabled", description: "No file access action is taken." },
+    { id: 2, name: "Audit Only", description: "Log would-be denials, but allow them." },
+    { id: 3, name: "Disable", description: "Do not take any file access action." },
   ] as const,
 );
 export type FileAccessAction = EnumValue<typeof FILE_ACCESS_ACTION>;
@@ -199,41 +199,41 @@ export const DECISION = defineEnum(
     BUNDLE_INVENTORY_ITEM: 15,
   } as const,
   [
-    { id: 0, name: "Unknown/Unspecified", description: "No decision is indicated." },
+    { id: 0, name: "Unspecified", description: "No decision reported." },
     {
       id: 1,
-      name: "Allowed (Monitor Fallback)",
-      description: "Allowed because nothing matched while in Monitor mode.",
+      name: "Allowed - Monitor Fallback",
+      description: "Allowed because no rule matched while in Monitor mode.",
     },
-    { id: 2, name: "Allowed (Binary)", description: "Allowed by a rule for this exact binary." },
-    { id: 3, name: "Allowed (Certificate)", description: "Allowed by a matching signing certificate." },
+    { id: 2, name: "Allowed - Binary Rule", description: "Allowed by a rule for this exact binary." },
+    { id: 3, name: "Allowed - Certificate Rule", description: "Allowed by a matching signing certificate." },
     {
       id: 4,
-      name: "Allowed (Scope/Path/Script Allow)",
-      description: "Allowed by an approved path/scope or script exception.",
+      name: "Allowed - Allowed Path or Script",
+      description: "Allowed by an approved path or script exception.",
     },
-    { id: 5, name: "Allowed (Team ID)", description: "Allowed by a matching publisher team ID." },
-    { id: 6, name: "Allowed (Signing ID)", description: "Allowed by a matching signing identifier." },
-    { id: 7, name: "Allowed (CDHash)", description: "Allowed by a matching code directory hash." },
+    { id: 5, name: "Allowed - Team ID Rule", description: "Allowed by a matching Team ID rule." },
+    { id: 6, name: "Allowed - Signing ID Rule", description: "Allowed by a matching Signing ID rule." },
+    { id: 7, name: "Allowed - CDHash Rule", description: "Allowed by a matching CDHash rule." },
     {
       id: 8,
-      name: "Blocked (Lockdown Fallback)",
-      description: "Blocked because nothing matched while in Lockdown mode.",
+      name: "Blocked - Lockdown Fallback",
+      description: "Blocked because no rule matched while in Lockdown mode.",
     },
-    { id: 9, name: "Blocked (Binary)", description: "Blocked by a rule for this exact binary." },
-    { id: 10, name: "Blocked (Certificate)", description: "Blocked by a matching certificate rule." },
+    { id: 9, name: "Blocked - Binary Rule", description: "Blocked by a rule for this exact binary." },
+    { id: 10, name: "Blocked - Certificate Rule", description: "Blocked by a matching certificate rule." },
     {
       id: 11,
-      name: "Blocked (Scope/Path Protection)",
-      description: "Blocked by a protected path/scope requirement.",
+      name: "Blocked - Blocked Path or Page Zero",
+      description: "Blocked by a blocked path rule or Page Zero protection.",
     },
-    { id: 12, name: "Blocked (Team ID)", description: "Blocked by a publisher team ID rule." },
-    { id: 13, name: "Blocked (Signing ID)", description: "Blocked by a signing identifier rule." },
-    { id: 14, name: "Blocked (CDHash)", description: "Blocked by a code directory hash rule." },
+    { id: 12, name: "Blocked - Team ID Rule", description: "Blocked by a matching Team ID rule." },
+    { id: 13, name: "Blocked - Signing ID Rule", description: "Blocked by a matching Signing ID rule." },
+    { id: 14, name: "Blocked - CDHash Rule", description: "Blocked by a matching CDHash rule." },
     {
       id: 15,
-      name: "Bundle Inventory Item (Not an Execution)",
-      description: "Metadata entry for bundle contents, not an execution decision.",
+      name: "Bundle Inventory Item",
+      description: "Bundle contents metadata; not an execution decision.",
     },
   ] as const,
 );
@@ -252,12 +252,12 @@ export const SIGNING_STATUS = defineEnum(
     SIGNED_PRODUCTION: 5,
   } as const,
   [
-    { id: 0, name: "Unspecified", description: "No signing status is indicated." },
-    { id: 1, name: "Unsigned", description: "The app/binary wasn't signed." },
+    { id: 0, name: "Unspecified", description: "No signing status reported." },
+    { id: 1, name: "Unsigned", description: "The executing binary was not signed." },
     { id: 2, name: "Invalid Signature", description: "Signature validation failed or the signature was invalid." },
-    { id: 3, name: "Ad-Hoc Signed", description: "The app/binary was ad-hoc signed." },
-    { id: 4, name: "Signed (Development)", description: "Valid signature using a development certificate." },
-    { id: 5, name: "Signed (Production)", description: "Valid signature using a production certificate." },
+    { id: 3, name: "Ad Hoc Signed", description: "The executing binary was ad hoc signed." },
+    { id: 4, name: "Signed - Development", description: "Valid signature using a development certificate." },
+    { id: 5, name: "Signed - Production", description: "Valid signature using a production certificate." },
   ] as const,
 );
 export type SigningStatus = EnumValue<typeof SIGNING_STATUS>;
@@ -275,14 +275,14 @@ export const FILE_ACCESS_DECISION = defineEnum(
     ALLOWED_AUDITED: 3,
   } as const,
   [
-    { id: 0, name: "Unknown/Unspecified", description: "No decision is indicated." },
-    { id: 1, name: "Denied (Policy)", description: "The access was blocked by policy." },
+    { id: 0, name: "Unspecified", description: "No decision reported." },
+    { id: 1, name: "Denied - Policy", description: "Denied by policy." },
     {
       id: 2,
-      name: "Denied (Invalid Signature)",
-      description: "The access was blocked because the process signature was invalid.",
+      name: "Denied - Invalid Signature",
+      description: "Denied because the process signature was invalid.",
     },
-    { id: 3, name: "Allowed but Audited", description: "The access was allowed, but recorded for auditing." },
+    { id: 3, name: "Allowed - Audited", description: "Allowed, but recorded." },
   ] as const,
 );
 export type FileAccessDecision = EnumValue<typeof FILE_ACCESS_DECISION>;
@@ -296,9 +296,9 @@ export const POLICY_STATUS = defineEnum(
     UP_TO_DATE: 2,
   } as const,
   [
-    { id: 0, name: "Unassigned", description: "No policy is assigned." },
-    { id: 1, name: "Pending", description: "The policy is awaiting a client sync." },
-    { id: 2, name: "Up to date", description: "The client has applied the assigned policy." },
+    { id: 0, name: "Unassigned", description: "No policy assigned." },
+    { id: 1, name: "Pending", description: "Waiting for the client to sync." },
+    { id: 2, name: "Up to Date", description: "Client has applied the assigned policy." },
   ] as const,
 );
 export type PolicyStatus = EnumValue<typeof POLICY_STATUS>;
@@ -317,31 +317,30 @@ export const POLICY = defineEnum(
     EVALUATE_EXPRESSION: 6,
   } as const,
   [
-    { id: 0, name: "Unknown/Ignore", description: "Should not be set; ignored." },
-    { id: 1, name: "Allow", description: "This target should be allowed." },
+    { id: 0, name: "Unknown", description: "Ignored." },
+    { id: 1, name: "Allow", description: "Allow this target." },
     {
       id: 2,
-      name: "Allow (Compiler)",
+      name: "Allow - Compiler",
       description:
-        "Allowed; and if transitive allowlisting is enabled on the computer, files created by this process become locally allowed too.",
+        "Allow, and if transitive allowlisting is enabled, files created by this process are allowed locally.",
     },
-    { id: 3, name: "Block", description: "This target should be blocked." },
+    { id: 3, name: "Block", description: "Block this target." },
     {
       id: 4,
-      name: "Block (Silently)",
-      description:
-        "Block it and do not show GUI notifications (intended to be used sparingly because silent blocks are confusing).",
+      name: "Block - Silent",
+      description: "Block without showing a user notification.",
     },
     {
       id: 5,
-      name: "Remove Existing Rule",
+      name: "Remove Rule",
       description:
-        "Removes the matching existing rule so the computer falls back to lower-precedence rules or the current ClientMode behavior.",
+        "Remove the matching rule so the client falls back to lower-precedence rules or client mode.",
     },
     {
       id: 6,
       name: "Evaluate Expression",
-      description: "The rule's outcome is decided by evaluating the attached CEL expression.",
+      description: "Decide using the attached CEL expression.",
     },
   ] as const,
 );
@@ -359,20 +358,20 @@ export const RULE_TYPE = defineEnum(
     CDHASH: 5,
   } as const,
   [
-    { id: 0, name: "Unknown/Ignore", description: "Should not be set; ignored." },
-    { id: 1, name: "Binary", description: "Matches a file by its SHA-256 hash." },
-    { id: 2, name: "Certificate", description: "Matches the leaf signing certificate SHA-256." },
+    { id: 0, name: "Unknown", description: "Ignored." },
+    { id: 1, name: "Binary", description: "SHA-256 hash of the binary." },
+    { id: 2, name: "Certificate", description: "SHA-256 hash of the leaf signing certificate." },
     {
       id: 3,
       name: "Team ID",
-      description: "Matches the publisher's 10-character Apple Team ID.",
+      description: "Apple 10-character Team ID.",
     },
     {
       id: 4,
       name: "Signing ID",
-      description: "Matches the signing identifier combined with the team/platform prefix.",
+      description: "Signing identifier with team or platform prefix.",
     },
-    { id: 5, name: "CDHash", description: "Matches the code directory hash." },
+    { id: 5, name: "CDHash", description: "Code directory hash." },
   ] as const,
 );
 export type RuleType = EnumValue<typeof RULE_TYPE>;

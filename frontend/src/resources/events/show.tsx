@@ -51,7 +51,7 @@ export const EventShow = (): ReactElement => (
         <TextField source="file_bundle_id" label="Bundle ID" />
         <TextField source="file_bundle_path" label="Bundle Path" />
         <TextField source="file_bundle_version" label="Bundle Version" />
-        <TextField source="file_bundle_version_string" label="Bundle Version (string)" />
+        <TextField source="file_bundle_version_string" label="Bundle Version String" />
         <NumberField source="file_bundle_binary_count" label="Binary Count" />
       </TabbedShowLayout.Tab>
 
@@ -68,10 +68,10 @@ export const EventShow = (): ReactElement => (
         <DateField source="secure_signing_time" label="Secure Signing Time" showTime />
         <ArrayField source="signing_chain">
           <DataTable bulkActionButtons={false} rowClick={false}>
-            <DataTable.Col source="sha256" label="SHA256" />
-            <DataTable.Col source="cn" label="CN" />
-            <DataTable.Col source="org" label="Org" />
-            <DataTable.Col source="ou" label="OU" />
+            <DataTable.Col source="sha256" label="SHA-256" />
+            <DataTable.Col source="cn" label="Common Name" />
+            <DataTable.Col source="org" label="Organization" />
+            <DataTable.Col source="ou" label="Organizational Unit" />
             <DataTable.Col source="valid_from" label="Valid From">
               <DateField source="valid_from" showTime />
             </DataTable.Col>
@@ -94,7 +94,7 @@ export const EventShow = (): ReactElement => (
       </TabbedShowLayout.Tab>
 
       <TabbedShowLayout.Tab label="Sessions">
-        <TextArrayField source="logged_in_users" label="Logged-in Users" />
+        <TextArrayField source="logged_in_users" label="Logged-In Users" />
         <TextArrayField source="current_sessions" label="Current Sessions" />
       </TabbedShowLayout.Tab>
     </TabbedShowLayout>

@@ -41,10 +41,10 @@ export const LoginPage = (): ReactElement => {
       <Stack spacing={2} sx={{ px: 3, py: 3 }}>
         <Stack spacing={0.5}>
           <Typography variant="h5" fontWeight={600}>
-            Sign in
+            Sign In
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Use your Microsoft account or a local account.
+            Use a Microsoft account or a local account.
           </Typography>
         </Stack>
 
@@ -55,7 +55,7 @@ export const LoginPage = (): ReactElement => {
             variant="contained"
             size="large"
             fullWidth
-            label="Continue with Microsoft"
+            label="Continue With Microsoft"
             startIcon={<MicrosoftIcon />}
           />
         ) : undefined}

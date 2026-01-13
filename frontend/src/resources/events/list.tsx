@@ -38,7 +38,7 @@ export const EventList = (): ReactElement => (
           )}
         />
       </DataTable.Col>
-      <DataTable.Col source="file_name" label="Name" />
+      <DataTable.Col source="file_name" label="File Name" />
       <DataTable.Col source="signing_id" label="Signing ID" />
     </DataTable>
   </List>

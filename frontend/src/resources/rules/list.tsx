@@ -11,7 +11,7 @@ export const RuleList = (): ReactElement => (
   <List sort={{ field: "name", order: "ASC" }} filters={ruleFilters}>
     <DataTable rowClick="edit" bulkActionButtons={false}>
       <DataTable.Col source="name" label="Name" />
-      <DataTable.Col source="rule_type" label="Type">
+      <DataTable.Col source="rule_type" label="Rule Type">
         <SelectField source="rule_type" choices={RULE_TYPE_CHOICES} optionText="name" />
       </DataTable.Col>
       <DataTable.Col source="identifier" label="Identifier" />
