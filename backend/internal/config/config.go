@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,29 +12,30 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	Port        int    `env:"PORT" envDefault:"8080" validate:"gte=1,lte=65535"`
-	LogLevel    string `env:"LOG_LEVEL" envDefault:"info"`
-	BaseURL     string `env:"BASE_URL" envRequired:"true" validate:"required,url"`
+	Port        int    `env:"PORT"         envDefault:"8080" validate:"gte=1,lte=65535"`
+	LogLevel    string `env:"LOG_LEVEL"    envDefault:"info"`
+	BaseURL     string `env:"BASE_URL"                       validate:"required,url"    envRequired:"true"`
 	FrontendDir string `env:"FRONTEND_DIR"`
 
-	DBHost     string `env:"DB_HOST" envRequired:"true" validate:"required"`
-	DBPort     int    `env:"DB_PORT" envDefault:"5432" validate:"gte=1,lte=65535"`
-	DBUser     string `env:"DB_USER" envRequired:"true" validate:"required"`
+	DBHost     string `env:"DB_HOST"     envRequired:"true" validate:"required"`
+	DBPort     int    `env:"DB_PORT"                        validate:"gte=1,lte=65535"                             envDefault:"5432"`
+	DBUser     string `env:"DB_USER"     envRequired:"true" validate:"required"`
 	DBPassword string `env:"DB_PASSWORD" envRequired:"true" validate:"required"`
-	DBName     string `env:"DB_NAME" envRequired:"true" validate:"required"`
-	DBSSLMode  string `env:"DB_SSLMODE" envDefault:"disable" validate:"oneof=disable require verify-ca verify-full"`
+	DBName     string `env:"DB_NAME"     envRequired:"true" validate:"required"`
+	DBSSLMode  string `env:"DB_SSLMODE"                     validate:"oneof=disable require verify-ca verify-full" envDefault:"disable"`
 
-	AuthSecret        string        `env:"AUTH_SECRET" envRequired:"true" validate:"required,min=32"`
-	TokenDuration     time.Duration `env:"TOKEN_DURATION" envDefault:"1h" validate:"gt=0"`
-	CookieDuration    time.Duration `env:"COOKIE_DURATION" envDefault:"24h" validate:"gt=0"`
+	AuthSecret        string        `env:"AUTH_SECRET"             envRequired:"true" validate:"required,min=32"`
+	TokenDuration     time.Duration `env:"TOKEN_DURATION"                             validate:"gt=0"            envDefault:"1h"`
+	CookieDuration    time.Duration `env:"COOKIE_DURATION"                            validate:"gt=0"            envDefault:"24h"`
 	AdminPassword     string        `env:"ADMIN_PASSWORD"`
 	MicrosoftClientID string        `env:"MICROSOFT_CLIENT_ID"`
 	MicrosoftSecret   string        `env:"MICROSOFT_CLIENT_SECRET"`
 
-	EntraTenantID     string        `env:"ENTRA_TENANT_ID" envRequired:"true" validate:"required"`
-	EntraClientID     string        `env:"ENTRA_CLIENT_ID" envRequired:"true" validate:"required"`
-	EntraClientSecret string        `env:"ENTRA_CLIENT_SECRET" envRequired:"true" validate:"required"`
-	EntraSyncInterval time.Duration `env:"ENTRA_SYNC_INTERVAL" envDefault:"15m" validate:"gt=0"`
+	EntraTenantID           string        `env:"ENTRA_TENANT_ID"           envRequired:"true" validate:"required"`
+	EntraClientID           string        `env:"ENTRA_CLIENT_ID"           envRequired:"true" validate:"required"`
+	EntraClientSecret       string        `env:"ENTRA_CLIENT_SECRET"       envRequired:"true" validate:"required"`
+	EntraSyncInterval       time.Duration `env:"ENTRA_SYNC_INTERVAL"                          validate:"gt=0"     envDefault:"15m"`
+	PolicyReconcileInterval time.Duration `env:"POLICY_RECONCILE_INTERVAL"                    validate:"gt=0"     envDefault:"1h"`
 }
 
 // Load reads environment variables into a Config.
@@ -66,5 +68,5 @@ func validateAuthProviders(c Config) error {
 	if hasAdmin || hasMicrosoft {
 		return nil
 	}
-	return fmt.Errorf("admin password or microsoft credentials must be set")
+	return errors.New("admin password or microsoft credentials must be set")
 }

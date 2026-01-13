@@ -43,7 +43,7 @@ func List[T any](
 	ds = applyFilters(ds, cfg, query)
 	ds = applySearch(ds, cfg, query)
 
-	countDS := goqu.From(ds.As("sub")).Select(goqu.COUNT(goqu.Star()))
+	countDS := goqu.From(ds.As("sub")).Select(goqu.COUNT(goqu.L("1")))
 	countSQL, args, err := countDS.ToSQL()
 	if err != nil {
 		return nil, 0, fmt.Errorf("build count sql: %w", err)
