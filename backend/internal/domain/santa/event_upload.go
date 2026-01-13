@@ -3,6 +3,7 @@ package santa
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
@@ -67,8 +68,8 @@ func convertEvent(machineID uuid.UUID, ev *syncv1.Event) events.Event {
 		FileName:                    ev.GetFileName(),
 		ExecutingUser:               ev.GetExecutingUser(),
 		ExecutionTime:               timePtrFromFloat(ev.GetExecutionTime()),
-		LoggedInUsers:               loggedInUsers,
-		CurrentSessions:             currentSessions,
+		LoggedInUsers:               sanitiseStrings(loggedInUsers),
+		CurrentSessions:             sanitiseStrings(currentSessions),
 		FileBundleID:                ev.GetFileBundleId(),
 		FileBundlePath:              ev.GetFileBundlePath(),
 		FileBundleExecutableRelPath: ev.GetFileBundleExecutableRelPath(),
@@ -153,4 +154,23 @@ func timePtrFromUnix(seconds uint32) *time.Time {
 	}
 	t := time.Unix(int64(seconds), 0).UTC()
 	return &t
+}
+
+func sanitiseString(in string) string {
+	if in == "" {
+		return ""
+	}
+	// Postgres TEXT does not allow NUL bytes.
+	return strings.ReplaceAll(in, "\x00", "")
+}
+
+func sanitiseStrings(in []string) []string {
+	if len(in) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(in))
+	for _, item := range in {
+		out = append(out, sanitiseString(item))
+	}
+	return out
 }
