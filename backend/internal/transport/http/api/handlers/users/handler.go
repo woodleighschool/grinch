@@ -3,6 +3,7 @@ package users
 
 import (
 	"github.com/go-chi/chi/v5"
+
 	"github.com/woodleighschool/grinch/internal/domain/users"
 	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
 )

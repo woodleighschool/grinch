@@ -2,6 +2,7 @@ package policies
 
 import (
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/machines"
 )
 

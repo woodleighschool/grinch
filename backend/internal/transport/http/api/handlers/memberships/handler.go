@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/errx"
 	"github.com/woodleighschool/grinch/internal/domain/memberships"
 	"github.com/woodleighschool/grinch/internal/logging"

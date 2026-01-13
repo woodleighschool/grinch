@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/woodleighschool/grinch/internal/domain/errx"
 )
 
 const (

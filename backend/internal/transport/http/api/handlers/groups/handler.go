@@ -3,6 +3,7 @@ package groups
 
 import (
 	"github.com/go-chi/chi/v5"
+
 	"github.com/woodleighschool/grinch/internal/domain/groups"
 	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
 )

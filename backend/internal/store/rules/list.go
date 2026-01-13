@@ -6,6 +6,7 @@ import (
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/woodleighschool/grinch/internal/domain/rules"
 	"github.com/woodleighschool/grinch/internal/listing"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"

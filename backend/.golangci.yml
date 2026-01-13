@@ -39,6 +39,14 @@ formatters:
       local-prefixes:
         - github.com/woodleighschool/grinch
 
+    gci:
+      # Keep import grouping consistent with goimports local-prefixes.
+      sections:
+        - standard
+        - default
+        - prefix(github.com/woodleighschool/grinch)
+      custom-order: true
+
     golines:
       # Target maximum line length.
       # Default: 100

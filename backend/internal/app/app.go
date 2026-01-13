@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/domain/events"
 	"github.com/woodleighschool/grinch/internal/domain/groups"

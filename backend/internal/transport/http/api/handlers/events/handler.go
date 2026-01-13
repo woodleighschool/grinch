@@ -3,6 +3,7 @@ package events
 
 import (
 	"github.com/go-chi/chi/v5"
+
 	"github.com/woodleighschool/grinch/internal/domain/events"
 	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
 )

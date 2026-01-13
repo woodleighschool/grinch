@@ -2,6 +2,7 @@ package apihttp
 
 import (
 	"github.com/go-pkgz/auth/v2"
+
 	"github.com/woodleighschool/grinch/internal/domain/events"
 	"github.com/woodleighschool/grinch/internal/domain/groups"
 	"github.com/woodleighschool/grinch/internal/domain/machines"

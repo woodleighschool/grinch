@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/rules"
 	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
 )

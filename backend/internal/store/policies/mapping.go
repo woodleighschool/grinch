@@ -2,6 +2,7 @@ package policies
 
 import (
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
+
 	"github.com/woodleighschool/grinch/internal/domain/policies"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/errx"
 	"github.com/woodleighschool/grinch/internal/listing"
 )

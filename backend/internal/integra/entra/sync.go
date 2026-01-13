@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/groups"
 	"github.com/woodleighschool/grinch/internal/domain/users"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"

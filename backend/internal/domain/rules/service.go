@@ -5,6 +5,7 @@ import (
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/domain/errx"
 	"github.com/woodleighschool/grinch/internal/listing"
 )
