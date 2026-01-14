@@ -14,17 +14,8 @@ type FrontendConfig struct {
 }
 
 // NewFrontendHandler returns a handler that serves the frontend build from cfg.Dir.
-func NewFrontendHandler(cfg FrontendConfig) (http.Handler, error) {
-	if cfg.Dir == "" {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.NotFound(w, r)
-		}), nil
-	}
-
-	fs, err := rest.NewFileServer("/", cfg.Dir, rest.FsOptSPA)
-	if err != nil {
-		return nil, err
-	}
+func NewFrontendHandler(cfg FrontendConfig) http.Handler {
+	fs, _ := rest.NewFileServer("/", cfg.Dir, rest.FsOptSPA)
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/assets/") {
@@ -45,5 +36,5 @@ func NewFrontendHandler(cfg FrontendConfig) (http.Handler, error) {
 		)(handler)
 	}
 
-	return handler, nil
+	return handler
 }

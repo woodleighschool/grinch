@@ -1,4 +1,3 @@
-// Package httprouter provides HTTP routing for the Grinch server.
 package httprouter
 
 import (
@@ -37,14 +36,11 @@ func NewRouter(cfg RouterConfig) (chi.Router, error) {
 	r.Mount("/api", apihttp.Router(cfg.API))
 	r.Mount("/sync", sync.Router(cfg.Sync))
 
-	spa, err := NewFrontendHandler(FrontendConfig{
-		Dir:        cfg.FrontendDir,
-		EnableGzip: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if spa != nil {
+	if cfg.FrontendDir != "" {
+		spa := NewFrontendHandler(FrontendConfig{
+			Dir:        cfg.FrontendDir,
+			EnableGzip: true,
+		})
 		r.Mount("/", spa)
 	}
 

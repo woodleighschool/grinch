@@ -29,14 +29,13 @@ import (
 	usersrepo "github.com/woodleighschool/grinch/internal/store/users"
 	httprouter "github.com/woodleighschool/grinch/internal/transport/http"
 	apihttp "github.com/woodleighschool/grinch/internal/transport/http/api"
-	"github.com/woodleighschool/grinch/internal/transport/http/httpserver"
 )
 
 // App holds the long lived application components.
 type App struct {
 	Config      config.Config
 	Log         *slog.Logger
-	Server      *httpserver.Server
+	Server      *httprouter.Server
 	EntraRunner *entra.Runner
 }
 
@@ -108,7 +107,7 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("create router: %w", err)
 	}
 
-	server := httpserver.New(router, cfg.Port, log)
+	server := httprouter.NewServer(router, cfg.Port, log)
 
 	entraRunner, err := buildEntraRunner(cfg, services.users, services.groups, log)
 	if err != nil {

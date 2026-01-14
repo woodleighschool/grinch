@@ -1,5 +1,4 @@
-// Package httpserver provides an HTTP server with graceful shutdown.
-package httpserver
+package httprouter
 
 import (
 	"context"
@@ -22,8 +21,8 @@ type Server struct {
 	log    *slog.Logger
 }
 
-// New constructs a Server with standard timeouts.
-func New(handler http.Handler, port int, log *slog.Logger) *Server {
+// NewServer constructs a Server with standard timeouts.
+func NewServer(handler http.Handler, port int, log *slog.Logger) *Server {
 	return &Server{
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
