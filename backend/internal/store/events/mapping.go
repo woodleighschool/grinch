@@ -1,16 +1,16 @@
 package events
 
 import (
-	"github.com/woodleighschool/grinch/internal/domain/events"
+	coreevents "github.com/woodleighschool/grinch/internal/core/events"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
 )
 
 // mapSigningChain converts signing chain query rows into domain certificates.
-func mapSigningChain(rows []sqlc.ListSigningChainEntriesByEventIDRow) []events.Certificate {
-	out := make([]events.Certificate, len(rows))
+func mapSigningChain(rows []sqlc.ListSigningChainEntriesByEventIDRow) []coreevents.Certificate {
+	out := make([]coreevents.Certificate, len(rows))
 	for i, row := range rows {
-		out[i] = events.Certificate{
+		out[i] = coreevents.Certificate{
 			SHA256:     row.Sha256,
 			CN:         row.Cn,
 			Org:        row.Org,
@@ -23,10 +23,10 @@ func mapSigningChain(rows []sqlc.ListSigningChainEntriesByEventIDRow) []events.C
 }
 
 // mapEntitlements converts entitlement query rows into domain entitlements.
-func mapEntitlements(rows []sqlc.ListEntitlementsByEventIDRow) []events.Entitlement {
-	out := make([]events.Entitlement, len(rows))
+func mapEntitlements(rows []sqlc.ListEntitlementsByEventIDRow) []coreevents.Entitlement {
+	out := make([]coreevents.Entitlement, len(rows))
 	for i, row := range rows {
-		out[i] = events.Entitlement{
+		out[i] = coreevents.Entitlement{
 			Key:   row.Key,
 			Value: row.Value,
 		}

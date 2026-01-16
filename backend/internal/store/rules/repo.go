@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
-	"github.com/woodleighschool/grinch/internal/domain/rules"
+	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
+	corerules "github.com/woodleighschool/grinch/internal/core/rules"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/constraints"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
@@ -27,28 +27,28 @@ func New(pool *pgxpool.Pool) *Repo {
 }
 
 // Get returns the rule with the given ID.
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (rules.Rule, error) {
+func (r *Repo) Get(ctx context.Context, id uuid.UUID) (corerules.Rule, error) {
 	row, err := r.q.GetRuleByID(ctx, id)
 	if err != nil {
-		return rules.Rule{}, errx.FromStore(err, nil)
+		return corerules.Rule{}, coreerrors.FromStore(err, nil)
 	}
 	return toDomainRule(row), nil
 }
 
 // GetMany returns rules for the given IDs.
-func (r *Repo) GetMany(ctx context.Context, ids []uuid.UUID) ([]rules.Rule, error) {
+func (r *Repo) GetMany(ctx context.Context, ids []uuid.UUID) ([]corerules.Rule, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	rows, err := r.q.ListRulesByIDs(ctx, ids)
 	if err != nil {
-		return nil, errx.FromStore(err, nil)
+		return nil, coreerrors.FromStore(err, nil)
 	}
 	return toDomainRules(rows), nil
 }
 
 // Create inserts a new rule and returns the stored record.
-func (r *Repo) Create(ctx context.Context, rule rules.Rule) (rules.Rule, error) {
+func (r *Repo) Create(ctx context.Context, rule corerules.Rule) (corerules.Rule, error) {
 	row, err := r.q.CreateRule(ctx, sqlc.CreateRuleParams{
 		Name:                rule.Name,
 		Description:         rule.Description,
@@ -59,13 +59,13 @@ func (r *Repo) Create(ctx context.Context, rule rules.Rule) (rules.Rule, error) 
 		NotificationAppName: rule.NotificationAppName,
 	})
 	if err != nil {
-		return rules.Rule{}, errx.FromStore(err, constraints.RuleFields())
+		return corerules.Rule{}, coreerrors.FromStore(err, constraints.RuleFields())
 	}
 	return toDomainRule(row), nil
 }
 
 // Update updates an existing rule and returns the stored record.
-func (r *Repo) Update(ctx context.Context, rule rules.Rule) (rules.Rule, error) {
+func (r *Repo) Update(ctx context.Context, rule corerules.Rule) (corerules.Rule, error) {
 	row, err := r.q.UpdateRuleByID(ctx, sqlc.UpdateRuleByIDParams{
 		ID:                  rule.ID,
 		Name:                rule.Name,
@@ -77,27 +77,27 @@ func (r *Repo) Update(ctx context.Context, rule rules.Rule) (rules.Rule, error) 
 		NotificationAppName: rule.NotificationAppName,
 	})
 	if err != nil {
-		return rules.Rule{}, errx.FromStore(err, constraints.RuleFields())
+		return corerules.Rule{}, coreerrors.FromStore(err, constraints.RuleFields())
 	}
 	return toDomainRule(row), nil
 }
 
 // Delete deletes the rule with the given ID.
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {
-	return errx.FromStore(r.q.DeleteRuleByID(ctx, id), nil)
+	return coreerrors.FromStore(r.q.DeleteRuleByID(ctx, id), nil)
 }
 
 // List returns rules matching the query and the total result count.
-func (r *Repo) List(ctx context.Context, query listing.Query) ([]rules.Rule, listing.Page, error) {
+func (r *Repo) List(ctx context.Context, query listing.Query) ([]corerules.Rule, listing.Page, error) {
 	items, total, err := listRules(ctx, r.pool, query)
 	if err != nil {
-		return nil, listing.Page{}, errx.FromStore(err, nil)
+		return nil, listing.Page{}, coreerrors.FromStore(err, nil)
 	}
 	return items, listing.Page{Total: total}, nil
 }
 
-func toDomainRule(row sqlc.Rule) rules.Rule {
-	return rules.Rule{
+func toDomainRule(row sqlc.Rule) corerules.Rule {
+	return corerules.Rule{
 		ID:                  row.ID,
 		Name:                row.Name,
 		Description:         row.Description,
@@ -109,8 +109,8 @@ func toDomainRule(row sqlc.Rule) rules.Rule {
 	}
 }
 
-func toDomainRules(rows []sqlc.Rule) []rules.Rule {
-	out := make([]rules.Rule, len(rows))
+func toDomainRules(rows []sqlc.Rule) []corerules.Rule {
+	out := make([]corerules.Rule, len(rows))
 	for i, row := range rows {
 		out[i] = toDomainRule(row)
 	}

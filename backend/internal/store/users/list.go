@@ -6,12 +6,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/users"
+	coreusers "github.com/woodleighschool/grinch/internal/core/users"
 	"github.com/woodleighschool/grinch/internal/listing"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"
 )
 
-func listUsers(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]users.User, int64, error) {
+func listUsers(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]coreusers.User, int64, error) {
 	cfg := dblisting.Config{
 		Table:      "users",
 		SelectCols: []string{"id", "upn", "display_name"},
@@ -26,8 +26,8 @@ func listUsers(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]
 	return dblisting.List(ctx, pool, cfg, query, scanUserListItem)
 }
 
-func scanUserListItem(rows pgx.Rows) (users.User, error) {
-	var u users.User
+func scanUserListItem(rows pgx.Rows) (coreusers.User, error) {
+	var u coreusers.User
 	err := rows.Scan(&u.ID, &u.UPN, &u.DisplayName)
 	return u, err
 }

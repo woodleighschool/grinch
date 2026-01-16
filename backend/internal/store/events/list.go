@@ -8,13 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/events"
+	coreevents "github.com/woodleighschool/grinch/internal/core/events"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"
 )
 
-func listEvents(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]events.ListItem, int64, error) {
+func listEvents(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	query listing.Query,
+) ([]coreevents.EventListItem, int64, error) {
 	cfg := dblisting.Config{
 		Table: "events",
 		SelectCols: []string{
@@ -40,9 +44,9 @@ func listEvents(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([
 	return dblisting.List(ctx, pool, cfg, query, scanEventListItem)
 }
 
-func scanEventListItem(rows pgx.Rows) (events.ListItem, error) {
+func scanEventListItem(rows pgx.Rows) (coreevents.EventListItem, error) {
 	var (
-		item          events.ListItem
+		item          coreevents.EventListItem
 		decision      int32
 		executionTime pgtype.Timestamptz
 	)

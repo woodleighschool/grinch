@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
-	"github.com/woodleighschool/grinch/internal/domain/memberships"
+	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
+	corememberships "github.com/woodleighschool/grinch/internal/core/memberships"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
 )
@@ -28,7 +28,7 @@ func (r *Repo) ListByUser(
 	ctx context.Context,
 	userID uuid.UUID,
 	limit, offset int,
-) ([]memberships.Membership, int64, error) {
+) ([]corememberships.Membership, int64, error) {
 	limitPg, offsetPg := pgconv.LimitOffset(limit, offset)
 	rows, err := r.q.ListMembershipsByUser(ctx, sqlc.ListMembershipsByUserParams{
 		UserID: userID,
@@ -36,12 +36,12 @@ func (r *Repo) ListByUser(
 		Offset: offsetPg,
 	})
 	if err != nil {
-		return nil, 0, errx.FromStore(err, nil)
+		return nil, 0, coreerrors.FromStore(err, nil)
 	}
 
 	total, err := r.q.CountMembershipsByUser(ctx, userID)
 	if err != nil {
-		return nil, 0, errx.FromStore(err, nil)
+		return nil, 0, coreerrors.FromStore(err, nil)
 	}
 
 	return mapMemberships(rows), total, nil
@@ -52,7 +52,7 @@ func (r *Repo) ListByGroup(
 	ctx context.Context,
 	groupID uuid.UUID,
 	limit, offset int,
-) ([]memberships.Membership, int64, error) {
+) ([]corememberships.Membership, int64, error) {
 	limitPg, offsetPg := pgconv.LimitOffset(limit, offset)
 	rows, err := r.q.ListMembershipsByGroup(ctx, sqlc.ListMembershipsByGroupParams{
 		GroupID: groupID,
@@ -60,12 +60,12 @@ func (r *Repo) ListByGroup(
 		Offset:  offsetPg,
 	})
 	if err != nil {
-		return nil, 0, errx.FromStore(err, nil)
+		return nil, 0, coreerrors.FromStore(err, nil)
 	}
 
 	total, err := r.q.CountMembershipsByGroup(ctx, groupID)
 	if err != nil {
-		return nil, 0, errx.FromStore(err, nil)
+		return nil, 0, coreerrors.FromStore(err, nil)
 	}
 
 	return mapMemberships(rows), total, nil
@@ -75,15 +75,15 @@ func (r *Repo) ListByGroup(
 func (r *Repo) GroupIDsForUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
 	ids, err := r.q.ListGroupIDsByUserID(ctx, userID)
 	if err != nil {
-		return nil, errx.FromStore(err, nil)
+		return nil, coreerrors.FromStore(err, nil)
 	}
 	return ids, nil
 }
 
-func mapMemberships(rows []sqlc.GroupMembership) []memberships.Membership {
-	out := make([]memberships.Membership, len(rows))
+func mapMemberships(rows []sqlc.GroupMembership) []corememberships.Membership {
+	out := make([]corememberships.Membership, len(rows))
 	for i, row := range rows {
-		out[i] = memberships.Membership{
+		out[i] = corememberships.Membership{
 			ID:      row.ID,
 			GroupID: row.GroupID,
 			UserID:  row.UserID,

@@ -3,13 +3,13 @@ package policies
 import (
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 
-	"github.com/woodleighschool/grinch/internal/domain/policies"
+	corepolicies "github.com/woodleighschool/grinch/internal/core/policies"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
 )
 
-func toDomainPolicy(row sqlc.Policy) policies.Policy {
-	p := policies.Policy{
+func toDomainPolicy(row sqlc.Policy) corepolicies.Policy {
+	p := corepolicies.Policy{
 		ID:                           row.ID,
 		Name:                         row.Name,
 		Description:                  row.Description,
@@ -36,32 +36,32 @@ func toDomainPolicy(row sqlc.Policy) policies.Policy {
 	return p
 }
 
-func toDomainTargets(rows []sqlc.PolicyTarget) []policies.Target {
-	out := make([]policies.Target, len(rows))
+func toDomainTargets(rows []sqlc.PolicyTarget) []corepolicies.PolicyTarget {
+	out := make([]corepolicies.PolicyTarget, len(rows))
 	for i, row := range rows {
-		t := policies.Target{
+		t := corepolicies.PolicyTarget{
 			ID:       row.ID,
 			PolicyID: row.PolicyID,
-			Kind:     policies.TargetKind(row.Kind),
+			Kind:     corepolicies.PolicyTargetKind(row.Kind),
 		}
 		switch t.Kind {
-		case policies.TargetUser:
+		case corepolicies.TargetUser:
 			t.RefID = row.UserID
-		case policies.TargetGroup:
+		case corepolicies.TargetGroup:
 			t.RefID = row.GroupID
-		case policies.TargetMachine:
+		case corepolicies.TargetMachine:
 			t.RefID = row.MachineID
-		case policies.TargetAll:
+		case corepolicies.TargetAll:
 		}
 		out[i] = t
 	}
 	return out
 }
 
-func toDomainAttachments(rows []sqlc.PolicyRule) []policies.Attachment {
-	out := make([]policies.Attachment, len(rows))
+func toDomainAttachments(rows []sqlc.PolicyRule) []corepolicies.PolicyAttachment {
+	out := make([]corepolicies.PolicyAttachment, len(rows))
 	for i, row := range rows {
-		out[i] = policies.Attachment{
+		out[i] = corepolicies.PolicyAttachment{
 			RuleID:  row.RuleID,
 			Action:  syncv1.Policy(row.Action),
 			CELExpr: pgconv.TextVal(row.CelExpr),
@@ -70,7 +70,7 @@ func toDomainAttachments(rows []sqlc.PolicyRule) []policies.Attachment {
 	return out
 }
 
-func toCreateParams(p policies.Policy) sqlc.CreatePolicyParams {
+func toCreateParams(p corepolicies.Policy) sqlc.CreatePolicyParams {
 	return sqlc.CreatePolicyParams{
 		Name:                         p.Name,
 		Description:                  p.Description,
@@ -95,7 +95,7 @@ func toCreateParams(p policies.Policy) sqlc.CreatePolicyParams {
 	}
 }
 
-func toUpdateParams(p policies.Policy) sqlc.UpdatePolicyByIDParams {
+func toUpdateParams(p corepolicies.Policy) sqlc.UpdatePolicyByIDParams {
 	return sqlc.UpdatePolicyByIDParams{
 		ID:                           p.ID,
 		Name:                         p.Name,

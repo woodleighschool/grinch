@@ -4,13 +4,14 @@ package machines
 import (
 	"github.com/go-chi/chi/v5"
 
-	"github.com/woodleighschool/grinch/internal/domain/machines"
-	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
+	coremachines "github.com/woodleighschool/grinch/internal/core/machines"
+	"github.com/woodleighschool/grinch/internal/service/machines"
+	"github.com/woodleighschool/grinch/internal/transport/http/api/helpers"
 )
 
 // Register mounts machine routes on the router.
-func Register(r chi.Router, svc machines.Service) {
-	res := &rest.Resource[machines.Machine, machines.ListItem, any]{
+func Register(r chi.Router, svc *machines.MachineService) {
+	res := &helpers.Resource[coremachines.Machine, coremachines.MachineListItem, coremachines.Machine]{
 		Name: "machines",
 		List: svc.List,
 		Get:  svc.Get,

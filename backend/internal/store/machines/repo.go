@@ -9,8 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
-	"github.com/woodleighschool/grinch/internal/domain/machines"
+	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
+	coremachines "github.com/woodleighschool/grinch/internal/core/machines"
+	"github.com/woodleighschool/grinch/internal/core/policies"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
@@ -28,28 +29,28 @@ func New(pool *pgxpool.Pool) *Repo {
 }
 
 // Get returns the machine with the given ID.
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (machines.Machine, error) {
+func (r *Repo) Get(ctx context.Context, id uuid.UUID) (coremachines.Machine, error) {
 	row, err := r.q.GetMachineByID(ctx, id)
 	if err != nil {
-		return machines.Machine{}, errx.FromStore(err, nil)
+		return coremachines.Machine{}, coreerrors.FromStore(err, nil)
 	}
 	return mapMachine(row), nil
 }
 
 // Upsert creates or updates a machine and returns the stored record.
-func (r *Repo) Upsert(ctx context.Context, mc machines.Machine) (machines.Machine, error) {
+func (r *Repo) Upsert(ctx context.Context, mc coremachines.Machine) (coremachines.Machine, error) {
 	row, err := r.q.UpsertMachineByID(ctx, toUpsertParams(mc))
 	if err != nil {
-		return machines.Machine{}, errx.FromStore(err, nil)
+		return coremachines.Machine{}, coreerrors.FromStore(err, nil)
 	}
 	return mapMachine(row), nil
 }
 
 // List returns machines matching the query.
-func (r *Repo) List(ctx context.Context, query listing.Query) ([]machines.ListItem, listing.Page, error) {
+func (r *Repo) List(ctx context.Context, query listing.Query) ([]coremachines.MachineListItem, listing.Page, error) {
 	items, total, err := listMachines(ctx, r.pool, query)
 	if err != nil {
-		return nil, listing.Page{}, errx.FromStore(err, nil)
+		return nil, listing.Page{}, coreerrors.FromStore(err, nil)
 	}
 	return items, listing.Page{Total: total}, nil
 }
@@ -59,18 +60,18 @@ func (r *Repo) UpdatePolicyState(
 	ctx context.Context,
 	id uuid.UUID,
 	policyID *uuid.UUID,
-	status machines.PolicyStatus,
+	status policies.Status,
 ) error {
 	err := r.q.UpdateMachinePolicyStateByID(ctx, sqlc.UpdateMachinePolicyStateByIDParams{
 		ID:           id,
 		PolicyID:     policyID,
 		PolicyStatus: int16(status),
 	})
-	return errx.FromStore(err, nil)
+	return coreerrors.FromStore(err, nil)
 }
 
-func mapMachine(row sqlc.Machine) machines.Machine {
-	return machines.Machine{
+func mapMachine(row sqlc.Machine) coremachines.Machine {
+	return coremachines.Machine{
 		ID:                     row.ID,
 		SerialNumber:           row.SerialNumber,
 		Hostname:               row.Hostname,
@@ -99,11 +100,11 @@ func mapMachine(row sqlc.Machine) machines.Machine {
 		AppliedPolicyID:        row.AppliedPolicyID,
 		AppliedSettingsVersion: pgconv.Int32Val(row.AppliedSettingsVersion),
 		AppliedRulesVersion:    pgconv.Int32Val(row.AppliedRulesVersion),
-		PolicyStatus:           machines.PolicyStatus(row.PolicyStatus),
+		PolicyStatus:           policies.Status(row.PolicyStatus),
 	}
 }
 
-func toUpsertParams(mc machines.Machine) sqlc.UpsertMachineByIDParams {
+func toUpsertParams(mc coremachines.Machine) sqlc.UpsertMachineByIDParams {
 	return sqlc.UpsertMachineByIDParams{
 		ID:                     mc.ID,
 		SerialNumber:           mc.SerialNumber,

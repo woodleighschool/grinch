@@ -56,6 +56,14 @@ ON CONFLICT (sha256) DO UPDATE SET
   valid_from = EXCLUDED.valid_from,
   valid_until = EXCLUDED.valid_until;
 
+-- name: PruneEventsBefore :one
+WITH deleted AS (
+  DELETE FROM events
+  WHERE execution_time IS NOT NULL AND execution_time < $1
+  RETURNING 1
+)
+SELECT count(*) FROM deleted;
+
 -- name: ListEntitlementsByEventID :many
 SELECT
   ee.event_id,

@@ -6,21 +6,32 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/woodleighschool/grinch/internal/domain/groups"
-	"github.com/woodleighschool/grinch/internal/domain/users"
+	coregroups "github.com/woodleighschool/grinch/internal/core/groups"
+	coreusers "github.com/woodleighschool/grinch/internal/core/users"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 )
+
+// UserWriter persists user directory data.
+type UserWriter interface {
+	Upsert(ctx context.Context, user coreusers.User) error
+}
+
+// GroupWriter persists group directory data and memberships.
+type GroupWriter interface {
+	Upsert(ctx context.Context, group coregroups.Group) error
+	ReplaceMemberships(ctx context.Context, groupID uuid.UUID, userIDs []uuid.UUID) error
+}
 
 // Syncer syncs users, groups, and group memberships from Entra into the local store.
 type Syncer struct {
 	client *Client
-	users  users.Service
-	groups groups.Service
+	users  UserWriter
+	groups GroupWriter
 	log    *slog.Logger
 }
 
 // NewSyncer constructs a Syncer.
-func NewSyncer(client *Client, users users.Service, groups groups.Service, log *slog.Logger) *Syncer {
+func NewSyncer(client *Client, users UserWriter, groups GroupWriter, log *slog.Logger) *Syncer {
 	return &Syncer{
 		client: client,
 		users:  users,
@@ -46,12 +57,12 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	}
 
 	for _, u := range fetchedUsers {
-		if err = s.users.Upsert(ctx, users.User{
+		if err = s.users.Upsert(ctx, coreusers.User{
 			ID:          u.ID,
 			UPN:         u.UPN,
 			DisplayName: u.DisplayName,
 		}); err != nil {
-			s.log.WarnContext(ctx, "upsert user", "user_id", u.ID, "upn", u.UPN, "error", err)
+			s.log.ErrorContext(ctx, "upsert user", "user_id", u.ID, "upn", u.UPN, "error", err)
 			return err
 		}
 	}
@@ -60,11 +71,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	for _, g := range fetchedGroups {
 		memberIDs, err = s.client.FetchGroupMembers(ctx, g.ID)
 		if err != nil {
-			s.log.WarnContext(ctx, "fetch group members", "group_id", g.ID, "error", err)
+			s.log.ErrorContext(ctx, "fetch group members", "group_id", g.ID, "error", err)
 			return err
 		}
 
-		group := groups.Group{
+		group := coregroups.Group{
 			ID:          g.ID,
 			DisplayName: g.DisplayName,
 			Description: g.Description,
@@ -72,12 +83,12 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		}
 
 		if err = s.groups.Upsert(ctx, group); err != nil {
-			s.log.WarnContext(ctx, "upsert group", "group_id", g.ID, "error", err)
+			s.log.ErrorContext(ctx, "upsert group", "group_id", g.ID, "error", err)
 			return err
 		}
 
 		if err = s.groups.ReplaceMemberships(ctx, g.ID, memberIDs); err != nil {
-			s.log.WarnContext(ctx, "replace memberships", "group_id", g.ID, "error", err)
+			s.log.ErrorContext(ctx, "replace memberships", "group_id", g.ID, "error", err)
 			return err
 		}
 

@@ -6,12 +6,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/groups"
+	coregroups "github.com/woodleighschool/grinch/internal/core/groups"
 	"github.com/woodleighschool/grinch/internal/listing"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"
 )
 
-func listGroups(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]groups.Group, int64, error) {
+func listGroups(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]coregroups.Group, int64, error) {
 	cfg := dblisting.Config{
 		Table:      "groups",
 		SelectCols: []string{"id", "display_name", "description", "member_count"},
@@ -27,8 +27,8 @@ func listGroups(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([
 	return dblisting.List(ctx, pool, cfg, query, scanGroupListItem)
 }
 
-func scanGroupListItem(rows pgx.Rows) (groups.Group, error) {
-	var g groups.Group
+func scanGroupListItem(rows pgx.Rows) (coregroups.Group, error) {
+	var g coregroups.Group
 	err := rows.Scan(&g.ID, &g.DisplayName, &g.Description, &g.MemberCount)
 	return g, err
 }

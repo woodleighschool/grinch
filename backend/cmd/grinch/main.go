@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/woodleighschool/grinch/internal/app"
+	"github.com/woodleighschool/grinch/internal/logging"
 )
 
 func main() {
+	log := logging.NewLogger("info")
+
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "grinch: %v\n", err)
+		log.Error("grinch failed", "error", err)
 		os.Exit(1)
 	}
 }

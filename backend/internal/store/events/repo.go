@@ -4,13 +4,14 @@ package events
 import (
 	"context"
 	"fmt"
+	"time"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
-	"github.com/woodleighschool/grinch/internal/domain/events"
+	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
+	coreevents "github.com/woodleighschool/grinch/internal/core/events"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
@@ -28,23 +29,23 @@ func New(pool *pgxpool.Pool) *Repo {
 }
 
 // Get returns an event by ID, including signing chain and entitlements.
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (events.Event, error) {
+func (r *Repo) Get(ctx context.Context, id uuid.UUID) (coreevents.Event, error) {
 	row, err := r.q.GetEventByID(ctx, id)
 	if err != nil {
-		return events.Event{}, errx.FromStore(err, nil)
+		return coreevents.Event{}, coreerrors.FromStore(err, nil)
 	}
 
 	ev := mapEvent(row)
 
 	chain, err := r.q.ListSigningChainEntriesByEventID(ctx, id)
 	if err != nil {
-		return events.Event{}, errx.FromStore(err, nil)
+		return coreevents.Event{}, coreerrors.FromStore(err, nil)
 	}
 	ev.SigningChain = mapSigningChain(chain)
 
 	ents, err := r.q.ListEntitlementsByEventID(ctx, id)
 	if err != nil {
-		return events.Event{}, errx.FromStore(err, nil)
+		return coreevents.Event{}, coreerrors.FromStore(err, nil)
 	}
 	ev.Entitlements = mapEntitlements(ents)
 
@@ -52,23 +53,23 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (events.Event, error) {
 }
 
 // List returns events matching the query.
-func (r *Repo) List(ctx context.Context, query listing.Query) ([]events.ListItem, listing.Page, error) {
+func (r *Repo) List(ctx context.Context, query listing.Query) ([]coreevents.EventListItem, listing.Page, error) {
 	items, total, err := listEvents(ctx, r.pool, query)
 	if err != nil {
-		return nil, listing.Page{}, errx.FromStore(err, nil)
+		return nil, listing.Page{}, coreerrors.FromStore(err, nil)
 	}
 	return items, listing.Page{Total: total}, nil
 }
 
 // InsertBatch inserts events and their related signing metadata in a single transaction.
-func (r *Repo) InsertBatch(ctx context.Context, items []events.Event) error {
+func (r *Repo) InsertBatch(ctx context.Context, items []coreevents.Event) error {
 	if len(items) == 0 {
 		return nil
 	}
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return errx.FromStore(err, nil)
+		return coreerrors.FromStore(err, nil)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -78,7 +79,7 @@ func (r *Repo) InsertBatch(ctx context.Context, items []events.Event) error {
 	for _, ev := range items {
 		row, err = qtx.CreateEvent(ctx, toCreateParams(ev))
 		if err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 
 		if err = saveSigningChain(ctx, qtx, row.ID, ev.SigningChain); err != nil {
@@ -90,10 +91,19 @@ func (r *Repo) InsertBatch(ctx context.Context, items []events.Event) error {
 		}
 	}
 
-	return errx.FromStore(tx.Commit(ctx), nil)
+	return coreerrors.FromStore(tx.Commit(ctx), nil)
 }
 
-func saveSigningChain(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, chain []events.Certificate) error {
+// PruneBefore deletes events older than the provided timestamp.
+func (r *Repo) PruneBefore(ctx context.Context, before time.Time) (int64, error) {
+	count, err := r.q.PruneEventsBefore(ctx, pgconv.TimeOrNull(&before))
+	if err != nil {
+		return 0, coreerrors.FromStore(err, nil)
+	}
+	return count, nil
+}
+
+func saveSigningChain(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, chain []coreevents.Certificate) error {
 	for _, cert := range chain {
 		if err := q.UpsertCertificate(ctx, sqlc.UpsertCertificateParams{
 			Sha256:     cert.SHA256,
@@ -103,7 +113,7 @@ func saveSigningChain(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, c
 			ValidFrom:  pgconv.TimeOrNull(cert.ValidFrom),
 			ValidUntil: pgconv.TimeOrNull(cert.ValidUntil),
 		}); err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 	}
 
@@ -113,21 +123,21 @@ func saveSigningChain(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, c
 			Ordinal:           pgconv.IntToInt32(i),
 			CertificateSha256: cert.SHA256,
 		}); err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 	}
 
 	return nil
 }
 
-func saveEntitlements(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, ents []events.Entitlement) error {
+func saveEntitlements(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, ents []coreevents.Entitlement) error {
 	for i, ent := range ents {
 		entID, err := q.UpsertEntitlement(ctx, sqlc.UpsertEntitlementParams{
 			Key:   ent.Key,
 			Value: ent.Value,
 		})
 		if err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 
 		if err = q.CreateEventEntitlement(ctx, sqlc.CreateEventEntitlementParams{
@@ -135,15 +145,15 @@ func saveEntitlements(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, e
 			Ordinal:       pgconv.IntToInt32(i),
 			EntitlementID: entID,
 		}); err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 	}
 
 	return nil
 }
 
-func mapEvent(row sqlc.Event) events.Event {
-	return events.Event{
+func mapEvent(row sqlc.Event) coreevents.Event {
+	return coreevents.Event{
 		ID:                          row.ID,
 		MachineID:                   row.MachineID,
 		Decision:                    syncv1.Decision(row.Decision),
@@ -176,7 +186,7 @@ func mapEvent(row sqlc.Event) events.Event {
 	}
 }
 
-func toCreateParams(ev events.Event) sqlc.CreateEventParams {
+func toCreateParams(ev coreevents.Event) sqlc.CreateEventParams {
 	return sqlc.CreateEventParams{
 		MachineID:                   ev.MachineID,
 		Decision:                    int32(ev.Decision),

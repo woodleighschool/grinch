@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/errx"
-	"github.com/woodleighschool/grinch/internal/domain/groups"
+	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
+	coregroups "github.com/woodleighschool/grinch/internal/core/groups"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/db/sqlc"
 )
@@ -25,37 +25,37 @@ func New(pool *pgxpool.Pool) *Repo {
 }
 
 // Get returns the group with the given ID.
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (groups.Group, error) {
+func (r *Repo) Get(ctx context.Context, id uuid.UUID) (coregroups.Group, error) {
 	row, err := r.q.GetGroupByID(ctx, id)
 	if err != nil {
-		return groups.Group{}, errx.FromStore(err, nil)
+		return coregroups.Group{}, coreerrors.FromStore(err, nil)
 	}
 	return toDomainGroup(row), nil
 }
 
 // Upsert inserts or updates the given group.
-func (r *Repo) Upsert(ctx context.Context, g groups.Group) error {
+func (r *Repo) Upsert(ctx context.Context, g coregroups.Group) error {
 	err := r.q.UpsertGroupByID(ctx, sqlc.UpsertGroupByIDParams{
 		ID:          g.ID,
 		DisplayName: g.DisplayName,
 		Description: g.Description,
 		MemberCount: g.MemberCount,
 	})
-	return errx.FromStore(err, nil)
+	return coreerrors.FromStore(err, nil)
 }
 
 // ReplaceMemberships replaces all memberships for the given group in a single transaction.
 func (r *Repo) ReplaceMemberships(ctx context.Context, groupID uuid.UUID, userIDs []uuid.UUID) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return errx.FromStore(err, nil)
+		return coreerrors.FromStore(err, nil)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
 	if err = qtx.DeleteMembershipsByGroupID(ctx, groupID); err != nil {
-		return errx.FromStore(err, nil)
+		return coreerrors.FromStore(err, nil)
 	}
 
 	for _, userID := range userIDs {
@@ -63,24 +63,24 @@ func (r *Repo) ReplaceMemberships(ctx context.Context, groupID uuid.UUID, userID
 			GroupID: groupID,
 			UserID:  userID,
 		}); err != nil {
-			return errx.FromStore(err, nil)
+			return coreerrors.FromStore(err, nil)
 		}
 	}
 
-	return errx.FromStore(tx.Commit(ctx), nil)
+	return coreerrors.FromStore(tx.Commit(ctx), nil)
 }
 
 // List returns groups matching the listing query.
-func (r *Repo) List(ctx context.Context, query listing.Query) ([]groups.Group, listing.Page, error) {
+func (r *Repo) List(ctx context.Context, query listing.Query) ([]coregroups.Group, listing.Page, error) {
 	items, total, err := listGroups(ctx, r.pool, query)
 	if err != nil {
-		return nil, listing.Page{}, errx.FromStore(err, nil)
+		return nil, listing.Page{}, coreerrors.FromStore(err, nil)
 	}
 	return items, listing.Page{Total: total}, nil
 }
 
-func toDomainGroup(row sqlc.Group) groups.Group {
-	return groups.Group{
+func toDomainGroup(row sqlc.Group) coregroups.Group {
+	return coregroups.Group{
 		ID:          row.ID,
 		DisplayName: row.DisplayName,
 		Description: row.Description,

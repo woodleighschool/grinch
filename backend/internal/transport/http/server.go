@@ -40,7 +40,7 @@ func (s *Server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		s.log.Info("http server starting", "addr", s.server.Addr)
+		s.log.InfoContext(ctx, "http server starting", "addr", s.server.Addr)
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}

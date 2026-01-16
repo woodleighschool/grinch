@@ -7,12 +7,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/rules"
+	corerules "github.com/woodleighschool/grinch/internal/core/rules"
 	"github.com/woodleighschool/grinch/internal/listing"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"
 )
 
-func listRules(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]rules.Rule, int64, error) {
+func listRules(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]corerules.Rule, int64, error) {
 	cfg := dblisting.Config{
 		Table: "rules",
 		SelectCols: []string{
@@ -32,9 +32,9 @@ func listRules(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]
 	return dblisting.List(ctx, pool, cfg, query, scanRuleListItem)
 }
 
-func scanRuleListItem(rows pgx.Rows) (rules.Rule, error) {
+func scanRuleListItem(rows pgx.Rows) (corerules.Rule, error) {
 	var (
-		r        rules.Rule
+		r        corerules.Rule
 		ruleType int32
 	)
 	err := rows.Scan(

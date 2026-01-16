@@ -6,8 +6,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/woodleighschool/grinch/internal/domain/santa"
 	"github.com/woodleighschool/grinch/internal/logging"
+	syncsvc "github.com/woodleighschool/grinch/internal/service/sync"
 	apihttp "github.com/woodleighschool/grinch/internal/transport/http/api"
 	"github.com/woodleighschool/grinch/internal/transport/http/sync"
 )
@@ -15,7 +15,7 @@ import (
 // RouterConfig holds dependencies for building the HTTP router.
 type RouterConfig struct {
 	API         apihttp.Services
-	Sync        santa.SyncService
+	Sync        *syncsvc.Service
 	Log         *slog.Logger
 	FrontendDir string
 }
@@ -34,7 +34,7 @@ func NewRouter(cfg RouterConfig) (chi.Router, error) {
 	r.Mount("/avatar", avatarHandler)
 
 	r.Mount("/api", apihttp.Router(cfg.API))
-	r.Mount("/sync", sync.Router(cfg.Sync))
+	r.Mount("/sync", sync.Router(cfg.Sync, cfg.Log))
 
 	if cfg.FrontendDir != "" {
 		spa := NewFrontendHandler(FrontendConfig{

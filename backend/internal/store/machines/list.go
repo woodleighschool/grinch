@@ -9,13 +9,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/woodleighschool/grinch/internal/domain/machines"
+	coremachines "github.com/woodleighschool/grinch/internal/core/machines"
+	"github.com/woodleighschool/grinch/internal/core/policies"
 	"github.com/woodleighschool/grinch/internal/listing"
 	"github.com/woodleighschool/grinch/internal/store/db/pgconv"
 	dblisting "github.com/woodleighschool/grinch/internal/store/listing"
 )
 
-func listMachines(ctx context.Context, pool *pgxpool.Pool, query listing.Query) ([]machines.ListItem, int64, error) {
+func listMachines(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	query listing.Query,
+) ([]coremachines.MachineListItem, int64, error) {
 	cfg := dblisting.Config{
 		Table: "machines",
 		SelectCols: []string{
@@ -41,9 +46,9 @@ func listMachines(ctx context.Context, pool *pgxpool.Pool, query listing.Query) 
 	return dblisting.List(ctx, pool, cfg, query, scanMachineListItem)
 }
 
-func scanMachineListItem(rows pgx.Rows) (machines.ListItem, error) {
+func scanMachineListItem(rows pgx.Rows) (coremachines.MachineListItem, error) {
 	var (
-		item               machines.ListItem
+		item               coremachines.MachineListItem
 		primaryUser        pgtype.Text
 		userID             *uuid.UUID
 		lastSeen           time.Time
@@ -70,7 +75,7 @@ func scanMachineListItem(rows pgx.Rows) (machines.ListItem, error) {
 	item.AppliedPolicyID = appliedPolicyID
 	item.AppliedSettingsVersion = pgconv.Int32Val(appliedSettingsVer)
 	item.AppliedRulesVersion = pgconv.Int32Val(appliedRulesVer)
-	item.PolicyStatus = machines.PolicyStatus(policyStatus)
+	item.PolicyStatus = policies.Status(policyStatus)
 
 	return item, nil
 }

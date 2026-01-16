@@ -3,13 +3,15 @@ package sync
 import (
 	"github.com/go-chi/chi/v5"
 
-	"github.com/woodleighschool/grinch/internal/domain/santa"
+	"github.com/woodleighschool/grinch/internal/logging"
+	syncsvc "github.com/woodleighschool/grinch/internal/service/sync"
+	"github.com/woodleighschool/grinch/internal/transport/http/sync/handlers"
 )
 
 // Router returns the HTTP router implementing the Santa sync protocol.
-func Router(svc santa.SyncService) chi.Router {
+func Router(svc *syncsvc.Service, log logging.Logger) chi.Router {
 	r := chi.NewRouter()
-	h := NewHandler(svc)
+	h := handlers.NewHandler(svc, log)
 
 	// Santa sync protocol endpoints.
 	// TODO: add some sort of authentication middleware that works through Cloudflare.

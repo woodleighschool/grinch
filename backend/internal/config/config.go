@@ -24,18 +24,20 @@ type Config struct {
 	DBName     string `env:"DB_NAME"     envRequired:"true" validate:"required"`
 	DBSSLMode  string `env:"DB_SSLMODE"                     validate:"oneof=disable require verify-ca verify-full" envDefault:"disable"`
 
-	AuthSecret        string        `env:"AUTH_SECRET"             envRequired:"true" validate:"required,min=32"`
-	TokenDuration     time.Duration `env:"TOKEN_DURATION"                             validate:"gt=0"            envDefault:"1h"`
-	CookieDuration    time.Duration `env:"COOKIE_DURATION"                            validate:"gt=0"            envDefault:"24h"`
-	AdminPassword     string        `env:"ADMIN_PASSWORD"`
-	MicrosoftClientID string        `env:"MICROSOFT_CLIENT_ID"`
-	MicrosoftSecret   string        `env:"MICROSOFT_CLIENT_SECRET"`
+	AuthSecret            string        `env:"AUTH_SECRET"             envRequired:"true" validate:"required,min=32"`
+	TokenDuration         time.Duration `env:"TOKEN_DURATION"                             validate:"gt=0"            envDefault:"1h"`
+	CookieDuration        time.Duration `env:"COOKIE_DURATION"                            validate:"gt=0"            envDefault:"24h"`
+	AdminPassword         string        `env:"ADMIN_PASSWORD"`
+	MicrosoftClientID     string        `env:"MICROSOFT_CLIENT_ID"`
+	MicrosoftClientSecret string        `env:"MICROSOFT_CLIENT_SECRET"`
 
-	EntraTenantID           string        `env:"ENTRA_TENANT_ID"           envRequired:"true" validate:"required"`
-	EntraClientID           string        `env:"ENTRA_CLIENT_ID"           envRequired:"true" validate:"required"`
-	EntraClientSecret       string        `env:"ENTRA_CLIENT_SECRET"       envRequired:"true" validate:"required"`
-	EntraSyncInterval       time.Duration `env:"ENTRA_SYNC_INTERVAL"                          validate:"gt=0"     envDefault:"15m"`
-	PolicyReconcileInterval time.Duration `env:"POLICY_RECONCILE_INTERVAL"                    validate:"gt=0"     envDefault:"1h"`
+	EntraTenantID     string `env:"ENTRA_TENANT_ID"     envRequired:"true" validate:"required"`
+	EntraClientID     string `env:"ENTRA_CLIENT_ID"     envRequired:"true" validate:"required"`
+	EntraClientSecret string `env:"ENTRA_CLIENT_SECRET" envRequired:"true" validate:"required"`
+
+	EntraSyncInterval    time.Duration `env:"ENTRA_SYNC_INTERVAL"    validate:"gt=0" envDefault:"15m"`
+	EventPruneInterval   time.Duration `env:"EVENT_PRUNE_INTERVAL"   validate:"gt=0" envDefault:"24h"`
+	EventRetentionPeriod time.Duration `env:"EVENT_RETENTION_PERIOD" validate:"gt=0" envDefault:"2160h"` // 90 days
 }
 
 // Load reads environment variables into a Config.
@@ -64,7 +66,7 @@ func (c Config) Validate() error {
 
 func validateAuthProviders(c Config) error {
 	hasAdmin := c.AdminPassword != ""
-	hasMicrosoft := c.MicrosoftClientID != "" && c.MicrosoftSecret != ""
+	hasMicrosoft := c.MicrosoftClientID != "" && c.MicrosoftClientSecret != ""
 	if hasAdmin || hasMicrosoft {
 		return nil
 	}

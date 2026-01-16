@@ -4,13 +4,14 @@ package events
 import (
 	"github.com/go-chi/chi/v5"
 
-	"github.com/woodleighschool/grinch/internal/domain/events"
-	"github.com/woodleighschool/grinch/internal/transport/http/api/rest"
+	coreevents "github.com/woodleighschool/grinch/internal/core/events"
+	"github.com/woodleighschool/grinch/internal/service/events"
+	"github.com/woodleighschool/grinch/internal/transport/http/api/helpers"
 )
 
 // Register mounts event resource handlers on the router.
-func Register(r chi.Router, svc events.Service) {
-	res := &rest.Resource[events.Event, events.ListItem, any]{
+func Register(r chi.Router, svc *events.EventService) {
+	res := &helpers.Resource[coreevents.Event, coreevents.EventListItem, coreevents.Event]{
 		Name: "events",
 		List: svc.List,
 		Get:  svc.Get,
