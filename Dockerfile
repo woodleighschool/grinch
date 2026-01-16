@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Build the grinch binary
-FROM golang:1.25.5 AS backend
+FROM golang:1.25.6 AS backend
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS
