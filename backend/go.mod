@@ -20,6 +20,8 @@ require (
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/riverqueue/river v0.30.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.30.0
+	github.com/riverqueue/river/rivertype v0.30.0
+	golang.org/x/sync v0.19.0
 )
 
 require (
@@ -48,7 +50,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/klauspost/compress v1.18.2 // indirect
+	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
@@ -64,7 +66,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.30.0 // indirect
 	github.com/riverqueue/river/rivershared v0.30.0 // indirect
-	github.com/riverqueue/river/rivertype v0.30.0 // indirect
 	github.com/rrivera/identicon v0.0.0-20240116195454-d5ba35832c0d // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.8 // indirect
@@ -91,7 +92,6 @@ require (
 	golang.org/x/image v0.35.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
