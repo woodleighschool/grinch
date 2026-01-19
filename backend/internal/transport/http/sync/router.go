@@ -3,7 +3,7 @@ package sync
 import (
 	"github.com/go-chi/chi/v5"
 
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 	syncsvc "github.com/woodleighschool/grinch/internal/service/sync"
 	"github.com/woodleighschool/grinch/internal/transport/http/sync/handlers"
 )

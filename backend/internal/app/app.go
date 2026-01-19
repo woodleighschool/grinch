@@ -15,12 +15,13 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/integra/entra"
 	"github.com/woodleighschool/grinch/internal/jobs"
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/config"
+	"github.com/woodleighschool/grinch/internal/platform/db"
+	"github.com/woodleighschool/grinch/internal/platform/httpserver"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 	"github.com/woodleighschool/grinch/internal/service"
-	"github.com/woodleighschool/grinch/internal/store/db"
 	eventsrepo "github.com/woodleighschool/grinch/internal/store/events"
 	groupsrepo "github.com/woodleighschool/grinch/internal/store/groups"
 	machinesrepo "github.com/woodleighschool/grinch/internal/store/machines"
@@ -36,7 +37,7 @@ import (
 type App struct {
 	Config      config.Config
 	Log         *slog.Logger
-	Server      *httprouter.Server
+	Server      *httpserver.Server
 	RiverClient *river.Client[pgx.Tx]
 	DBPool      *pgxpool.Pool
 }
@@ -114,7 +115,7 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("create router: %w", err)
 	}
 
-	server := httprouter.NewServer(router, cfg.Port, log)
+	server := httpserver.New(router, cfg.Port, log)
 
 	syncer, err := buildEntraSyncer(cfg, services.Users, services.Groups, log)
 	if err != nil {

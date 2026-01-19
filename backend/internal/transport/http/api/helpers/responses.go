@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 	httpstatus "github.com/woodleighschool/grinch/internal/transport/http/status"
 )
 

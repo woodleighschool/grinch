@@ -7,7 +7,7 @@ import (
 	"syscall"
 
 	"github.com/woodleighschool/grinch/internal/app"
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 )
 
 func main() {

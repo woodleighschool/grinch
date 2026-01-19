@@ -334,8 +334,7 @@ export const POLICY = defineEnum(
     {
       id: 5,
       name: "Remove Rule",
-      description:
-        "Remove the matching rule so the client falls back to lower-precedence rules or client mode.",
+      description: "Remove the matching rule so the client falls back to lower-precedence rules or client mode.",
     },
     {
       id: 6,

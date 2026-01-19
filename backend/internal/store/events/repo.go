@@ -103,6 +103,34 @@ func (r *Repo) PruneBefore(ctx context.Context, before time.Time) (int64, error)
 	return count, nil
 }
 
+// Delete removes an event and cleans up orphaned metadata.
+func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return coreerrors.FromStore(err, nil)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := r.q.WithTx(tx)
+
+	err = qtx.DeleteEventByID(ctx, id)
+	if err != nil {
+		return coreerrors.FromStore(err, nil)
+	}
+
+	err = qtx.DeleteUnusedEntitlements(ctx)
+	if err != nil {
+		return coreerrors.FromStore(err, nil)
+	}
+
+	err = qtx.DeleteUnusedCertificates(ctx)
+	if err != nil {
+		return coreerrors.FromStore(err, nil)
+	}
+
+	return coreerrors.FromStore(tx.Commit(ctx), nil)
+}
+
 func saveSigningChain(ctx context.Context, q *sqlc.Queries, eventID uuid.UUID, chain []coreevents.Certificate) error {
 	for _, cert := range chain {
 		if err := q.UpsertCertificate(ctx, sqlc.UpsertCertificateParams{

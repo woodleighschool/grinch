@@ -86,3 +86,18 @@ VALUES ($1, $2)
 ON CONFLICT (key, value) DO UPDATE SET
   key = EXCLUDED.key
 RETURNING id;
+
+-- name: DeleteEventByID :exec
+DELETE FROM events WHERE id = $1;
+
+-- name: DeleteUnusedEntitlements :exec
+DELETE FROM entitlements
+WHERE NOT EXISTS (
+  SELECT 1 FROM event_entitlements ee WHERE ee.entitlement_id = entitlements.id
+);
+
+-- name: DeleteUnusedCertificates :exec
+DELETE FROM certificates
+WHERE NOT EXISTS (
+  SELECT 1 FROM event_signing_chain esc WHERE esc.certificate_sha256 = certificates.sha256
+);

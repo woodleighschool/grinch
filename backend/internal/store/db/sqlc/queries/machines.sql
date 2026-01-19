@@ -53,3 +53,6 @@ UPDATE machines SET
   policy_id = $2,
   policy_status = $3
 WHERE id = $1;
+
+-- name: DeleteMachineByID :exec
+DELETE FROM machines WHERE id = $1;

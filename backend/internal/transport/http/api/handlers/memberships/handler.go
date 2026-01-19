@@ -9,7 +9,7 @@ import (
 
 	coreerrors "github.com/woodleighschool/grinch/internal/core/errors"
 	corememberships "github.com/woodleighschool/grinch/internal/core/memberships"
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 	"github.com/woodleighschool/grinch/internal/service/memberships"
 	"github.com/woodleighschool/grinch/internal/transport/http/api/helpers"
 )

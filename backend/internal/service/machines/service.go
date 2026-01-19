@@ -20,6 +20,7 @@ type MachineStore interface {
 	Upsert(ctx context.Context, mc coremachines.Machine) (coremachines.Machine, error)
 	Get(ctx context.Context, id uuid.UUID) (coremachines.Machine, error)
 	List(ctx context.Context, query listing.Query) ([]coremachines.MachineListItem, listing.Page, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 	UpdatePolicyState(ctx context.Context, id uuid.UUID, policyID *uuid.UUID, status policies.Status) error
 }
 
@@ -51,6 +52,11 @@ func (s *MachineService) List(
 func (s *MachineService) Upsert(ctx context.Context, mc coremachines.Machine) (coremachines.Machine, error) {
 	mc = s.resolveUserID(ctx, mc)
 	return s.store.Upsert(ctx, mc)
+}
+
+// Delete removes a machine by ID.
+func (s *MachineService) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.store.Delete(ctx, id)
 }
 
 // UpdatePolicyState updates policy assignment metadata for a machine.

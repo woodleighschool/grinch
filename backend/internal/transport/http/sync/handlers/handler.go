@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/woodleighschool/grinch/internal/logging"
+	"github.com/woodleighschool/grinch/internal/platform/logging"
 	syncsvc "github.com/woodleighschool/grinch/internal/service/sync"
 )
 

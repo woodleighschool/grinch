@@ -5,6 +5,8 @@ import {
   ChipField,
   DataTable,
   DateField,
+  DeleteButton,
+  ListButton,
   NumberField,
   ReferenceField,
   SelectField,
@@ -12,10 +14,18 @@ import {
   TabbedShowLayout,
   TextArrayField,
   TextField,
+  TopToolbar,
 } from "react-admin";
 
+const EventShowActions = (): ReactElement => (
+  <TopToolbar>
+    <ListButton />
+    <DeleteButton redirect="list" mutationMode="pessimistic" confirmTitle="Delete event?" />
+  </TopToolbar>
+);
+
 export const EventShow = (): ReactElement => (
-  <Show>
+  <Show actions={<EventShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <SelectField source="decision" label="Decision" choices={DECISION_CHOICES} optionText="name" />

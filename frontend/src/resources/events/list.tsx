@@ -20,7 +20,7 @@ const eventFilters: ReactElement[] = [
 
 export const EventList = (): ReactElement => (
   <List sort={{ field: "execution_time", order: "DESC" }} filters={eventFilters}>
-    <DataTable rowClick="show" bulkActionButtons={false}>
+    <DataTable rowClick="show">
       <DataTable.Col source="execution_time" label="Time">
         <DateField source="execution_time" showTime />
       </DataTable.Col>

@@ -55,6 +55,11 @@ func (r *Repo) List(ctx context.Context, query listing.Query) ([]coremachines.Ma
 	return items, listing.Page{Total: total}, nil
 }
 
+// Delete removes a machine by ID.
+func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {
+	return coreerrors.FromStore(r.q.DeleteMachineByID(ctx, id), nil)
+}
+
 // UpdatePolicyState updates policy assignment metadata for a machine.
 func (r *Repo) UpdatePolicyState(
 	ctx context.Context,

@@ -16,6 +16,7 @@ type EventStore interface {
 	Get(ctx context.Context, id uuid.UUID) (coreevents.Event, error)
 	List(ctx context.Context, query listing.Query) ([]coreevents.EventListItem, listing.Page, error)
 	PruneBefore(ctx context.Context, before time.Time) (int64, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // EventService provides event related operations.
@@ -52,4 +53,9 @@ func (s *EventService) InsertBatch(ctx context.Context, items []coreevents.Event
 // Prune removes events older than the given timestamp.
 func (s *EventService) Prune(ctx context.Context, before time.Time) (int64, error) {
 	return s.store.PruneBefore(ctx, before)
+}
+
+// Delete removes an event by ID.
+func (s *EventService) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.store.Delete(ctx, id)
 }

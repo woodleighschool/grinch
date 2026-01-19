@@ -4,6 +4,7 @@ import {
   BooleanField,
   DataTable,
   DateField,
+  DeleteButton,
   ListButton,
   NumberField,
   Pagination,
@@ -19,6 +20,11 @@ import {
 const MachineShowActions = (): ReactElement => (
   <TopToolbar>
     <ListButton />
+    <DeleteButton
+      redirect="list"
+      mutationMode="pessimistic"
+      confirmContent="Deleting this machine also removes all of its events. The record may be recreated if the machine checks in again."
+    />
   </TopToolbar>
 );
 

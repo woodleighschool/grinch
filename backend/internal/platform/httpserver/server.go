@@ -1,4 +1,5 @@
-package httprouter
+// Package httpserver provides an HTTP server wrapper with sane defaults.
+package httpserver
 
 import (
 	"context"
@@ -21,8 +22,8 @@ type Server struct {
 	log    *slog.Logger
 }
 
-// NewServer constructs a Server with standard timeouts.
-func NewServer(handler http.Handler, port int, log *slog.Logger) *Server {
+// New constructs a Server with standard timeouts.
+func New(handler http.Handler, port int, log *slog.Logger) *Server {
 	return &Server{
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
