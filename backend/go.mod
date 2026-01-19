@@ -3,7 +3,7 @@ module github.com/woodleighschool/grinch
 go 1.25.5
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20251231011917-2be19f0ccd02.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260117000123-a65b2bb0fb6d.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/doug-martin/goqu/v9 v9.19.0
