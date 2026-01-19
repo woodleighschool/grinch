@@ -11,18 +11,18 @@ It works for us, it is not fancy, but it will get better over time.
 
 ## ✨ Features
 
--   Santa sync endpoints (`/sync`) for preflight, rule download, event upload, and postflight
--   React Admin UI for rules, policies, machines, events, users, and groups
--   Entra ID sync for users, groups, and memberships
--   Local admin login or Microsoft OAuth
--   Postgres database
+- Santa sync endpoints (`/sync`) for preflight, rule download, event upload, and postflight
+- React Admin UI for rules, policies, machines, events, users, and groups
+- Entra ID sync for users, groups, and memberships
+- Local admin login or Microsoft OAuth
+- Postgres database
 
 ## 🧭 How it fits together
 
--   The backend serves `/api` (admin UI), `/auth` (login/cookies), `/sync` (Santa clients), and `/` when the frontend build is present.
--   The frontend is a React Admin app that talks to `/api`.
--   Policies define client settings and which rules apply to which targets.
--   Santa clients talk to `/sync` and receive policy settings and rule sets.
+- The backend serves `/api` (admin UI), `/auth` (login/cookies), `/sync` (Santa clients), and `/` when the frontend build is present.
+- The frontend is a React Admin app that talks to `/api`.
+- Policies define client settings and which rules apply to which targets.
+- Santa clients talk to `/sync` and receive policy settings and rule sets.
 
 ## 🚀 Deploy (Docker)
 
@@ -37,10 +37,10 @@ The app listens on `http://localhost:8080` and serves the frontend when `FRONTEN
 
 ### Production notes
 
--   ⚠️ Put it behind HTTPS (Caddy, Nginx, whatever you like). ⚠️
--   Set `BASE_URL` to the public URL (used for auth cookies and OAuth callbacks).
--   Set a strong `AUTH_SECRET` (minimum 32 chars).
--   Keep Postgres data on a volume.
+- ⚠️ Put it behind HTTPS (Caddy, Nginx, whatever you like). ⚠️
+- Set `BASE_URL` to the public URL (used for auth cookies and OAuth callbacks).
+- Set a strong `AUTH_SECRET` (minimum 32 chars).
+- Keep Postgres data on a volume.
 
 ## 🧰 Configuration
 
@@ -62,6 +62,7 @@ The app listens on `http://localhost:8080` and serves the frontend when `FRONTEN
 | `ADMIN_PASSWORD`          | Enable local admin login         | No       | Username is always `admin`.                |
 | `MICROSOFT_CLIENT_ID`     | Microsoft OAuth client ID        | No       | Enable Microsoft login.                    |
 | `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret    | No       | Enable Microsoft login.                    |
+| `MICROSOFT_TENANT_ID`     | Microsoft OAuth tenant ID        | No       | Used for Microsoft login                   |
 | `ENTRA_TENANT_ID`         | Entra tenant ID                  | Yes      | Required for Entra sync.                   |
 | `ENTRA_CLIENT_ID`         | Entra client ID                  | Yes      | Required for Entra sync.                   |
 | `ENTRA_CLIENT_SECRET`     | Entra client secret              | Yes      | Required for Entra sync.                   |
@@ -94,17 +95,17 @@ It is expected that `MachineOwner` machines the UPN of the user.
 
 Rules:
 
--   A rule is a reusable template (binary hash, signing ID, team ID, etc).
--   Each rule has a type and an identifier.
--   Rules can include custom message/URL metadata.
+- A rule is a reusable template (binary hash, signing ID, team ID, etc).
+- Each rule has a type and an identifier.
+- Rules can include custom message/URL metadata.
 
 Policies:
 
--   A policy defines the Santa client settings (mode, batch size, regex overrides, etc).
--   Policies target users, groups, machines, or all.
--   You attach rules to policies with an action (allow, block, silent block, or CEL).
--   Priority matters: higher numbers win. A machine only ever ends up with one effective policy.
--   Evaluation picks the highest-priority policy that matches the machine/user/group targets.
+- A policy defines the Santa client settings (mode, batch size, regex overrides, etc).
+- Policies target users, groups, machines, or all.
+- You attach rules to policies with an action (allow, block, silent block, or CEL).
+- Priority matters: higher numbers win. A machine only ever ends up with one effective policy.
+- Evaluation picks the highest-priority policy that matches the machine/user/group targets.
 
 Typical flow:
 
@@ -139,10 +140,10 @@ Vite proxies `/api` and `/auth` to `localhost:8080`.
 
 ## ⚠️ Limitations
 
--   No auth on `/sync` (yet).
--   Only Entra ID sync is implemented.
--   No RBAC; anyone who can log in is an admin.
--   CANNOT be horizontally scaled (yet)
+- No auth on `/sync` (yet).
+- Only Entra ID sync is implemented.
+- No RBAC; anyone who can log in is an admin.
+- CANNOT be horizontally scaled (yet)
 
 ## 🤝 Contributing / PRs
 

@@ -88,6 +88,7 @@ func New(ctx context.Context) (*App, error) {
 		BaseURL:               cfg.BaseURL,
 		MicrosoftClientID:     cfg.MicrosoftClientID,
 		MicrosoftClientSecret: cfg.MicrosoftClientSecret,
+		MicrosoftTenantID:     cfg.MicrosoftTenantID,
 		AdminPassword:         cfg.AdminPassword,
 		TokenDuration:         cfg.TokenDuration,
 		CookieDuration:        cfg.CookieDuration,

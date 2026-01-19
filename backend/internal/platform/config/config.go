@@ -30,6 +30,7 @@ type Config struct {
 	AdminPassword         string        `env:"ADMIN_PASSWORD"`
 	MicrosoftClientID     string        `env:"MICROSOFT_CLIENT_ID"`
 	MicrosoftClientSecret string        `env:"MICROSOFT_CLIENT_SECRET"`
+	MicrosoftTenantID     string        `env:"MICROSOFT_TENANT_ID"`
 
 	EntraTenantID     string `env:"ENTRA_TENANT_ID"     envRequired:"true" validate:"required"`
 	EntraClientID     string `env:"ENTRA_CLIENT_ID"     envRequired:"true" validate:"required"`

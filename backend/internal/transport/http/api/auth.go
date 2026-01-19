@@ -1,6 +1,7 @@
 package apihttp
 
 import (
+	"crypto/sha256"
 	"errors"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-pkgz/auth/v2/avatar"
 	"github.com/go-pkgz/auth/v2/provider"
 	"github.com/go-pkgz/auth/v2/token"
+	"golang.org/x/oauth2/microsoft"
 )
 
 // AuthConfig holds authentication configuration.
@@ -20,6 +22,7 @@ type AuthConfig struct {
 
 	MicrosoftClientID     string
 	MicrosoftClientSecret string
+	MicrosoftTenantID     string
 
 	AdminPassword string
 
@@ -58,7 +61,26 @@ func NewAuthService(cfg AuthConfig) (*auth.Service, error) {
 	// Microsoft OAuth
 	// Could add dynamic OAuth maybe?
 	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
-		service.AddProvider("microsoft", cfg.MicrosoftClientID, cfg.MicrosoftClientSecret)
+		tenantID := cfg.MicrosoftTenantID
+		if tenantID == "" {
+			tenantID = "common"
+		}
+
+		service.AddCustomProvider("microsoft", auth.Client{
+			Cid:     cfg.MicrosoftClientID,
+			Csecret: cfg.MicrosoftClientSecret,
+		}, provider.CustomHandlerOpt{
+			Endpoint: microsoft.AzureADEndpoint(tenantID),
+			Scopes:   []string{"User.Read"},
+			InfoURL:  "https://graph.microsoft.com/v1.0/me",
+			MapUserFn: func(data provider.UserData, _ []byte) token.User {
+				return token.User{
+					ID:      "microsoft_" + token.HashID(sha256.New(), data.Value("id")),
+					Name:    data.Value("displayName"),
+					Picture: "https://graph.microsoft.com/beta/me/photo/$value",
+				}
+			},
+		})
 	}
 
 	// Local auth is only enabled when an admin password is provided.
