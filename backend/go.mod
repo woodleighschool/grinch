@@ -16,11 +16,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/microsoft/kiota-abstractions-go v1.9.3
-	github.com/microsoftgraph/msgraph-sdk-go v1.93.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.94.0
 	github.com/pressly/goose/v3 v3.26.0
-	github.com/riverqueue/river v0.30.1
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.30.1
-	github.com/riverqueue/river/rivertype v0.30.1
+	github.com/riverqueue/river v0.30.2
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.30.2
+	github.com/riverqueue/river/rivertype v0.30.2
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0
 )
@@ -65,8 +65,8 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/riverqueue/river/riverdriver v0.30.1 // indirect
-	github.com/riverqueue/river/rivershared v0.30.1 // indirect
+	github.com/riverqueue/river/riverdriver v0.30.2 // indirect
+	github.com/riverqueue/river/rivershared v0.30.2 // indirect
 	github.com/rrivera/identicon v0.0.0-20240116195454-d5ba35832c0d // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.8 // indirect
