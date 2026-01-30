@@ -3,7 +3,7 @@ module github.com/woodleighschool/grinch
 go 1.25.5
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260117000123-a65b2bb0fb6d.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260130152118-6c3a4cfe5e06.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/doug-martin/goqu/v9 v9.19.0
@@ -12,15 +12,15 @@ require (
 	github.com/go-pkgz/auth/v2 v2.1.1
 	github.com/go-pkgz/rest v1.21.0
 	github.com/go-playground/validator/v10 v10.30.1
-	github.com/google/cel-go v0.26.1
+	github.com/google/cel-go v0.27.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/microsoft/kiota-abstractions-go v1.9.3
-	github.com/microsoftgraph/msgraph-sdk-go v1.93.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.94.0
 	github.com/pressly/goose/v3 v3.26.0
-	github.com/riverqueue/river v0.30.1
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.30.1
-	github.com/riverqueue/river/rivertype v0.30.1
+	github.com/riverqueue/river v0.30.2
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.30.2
+	github.com/riverqueue/river/rivertype v0.30.2
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0
 )
@@ -65,8 +65,8 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/riverqueue/river/riverdriver v0.30.1 // indirect
-	github.com/riverqueue/river/rivershared v0.30.1 // indirect
+	github.com/riverqueue/river/riverdriver v0.30.2 // indirect
+	github.com/riverqueue/river/rivershared v0.30.2 // indirect
 	github.com/rrivera/identicon v0.0.0-20240116195454-d5ba35832c0d // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.8 // indirect
