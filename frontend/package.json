@@ -7,41 +7,43 @@
     "build": "tsc -b && vite build",
     "dev": "vite",
     "format": "prettier --write 'src/**/*.{ts,tsx,js,jsx}'",
-    "gen:icons": "node scripts/gen-icons.js",
+    "gen:api": "openapi-typescript ../backend/api/openapi.yaml -o src/api/openapi.ts",
     "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' --fix"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^7.3.7",
-    "@mui/material": "^7.3.7",
-    "globals": "^17.0.0",
-    "ra-data-simple-rest": "^5.13.5",
-    "react": "^19.2.3",
-    "react-admin": "^5.13.5",
-    "react-dom": "^19.2.3"
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "globals": "^17.4.0",
+    "openapi-fetch": "^0.17.0",
+    "react": "^19.2.4",
+    "react-admin": "^5.14.3",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/node": "^25.0.6",
-    "@types/react": "^19.2.8",
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^5.1.4",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-sonarjs": "^3.0.5",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "prettier": "^3.7.4",
+    "eslint-plugin-sonarjs": "^4.0.0",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.8.1",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.53.0",
+    "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1"
   },
   "engines": {
-    "node": ">=25.2.1"
+    "node": ">=25.7.0"
   }
 }

@@ -1,14 +1,15 @@
+import { GroupCreate } from "@/resources/groups/create";
+import { GroupEdit } from "@/resources/groups/edit";
 import { GroupList } from "@/resources/groups/list";
-import { GroupShow } from "@/resources/groups/show";
 import GroupsIcon from "@mui/icons-material/Groups";
-import type { ComponentType } from "react";
 import type { ResourceProps } from "react-admin";
 
-const groups: Partial<ResourceProps> & { icon?: ComponentType } = {
+const groups: Partial<ResourceProps> = {
   icon: GroupsIcon,
-  recordRepresentation: "display_name",
+  recordRepresentation: "name",
   list: GroupList,
-  show: GroupShow,
+  create: GroupCreate,
+  edit: GroupEdit,
 };
 
 export default groups;

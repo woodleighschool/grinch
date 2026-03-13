@@ -4,11 +4,13 @@ WORKDIR /workspace/frontend
 COPY frontend/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend .
+COPY backend/api/openapi.yaml /workspace/backend/api/openapi.yaml
+RUN npm run gen:api
 ENV NODE_ENV=production
 RUN npm run build
 
 # Build the grinch binary
-FROM golang:1.25.5 AS backend
+FROM golang:1.26.0 AS backend
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS
@@ -20,11 +22,11 @@ COPY backend/go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 # Copy the go source and sqlc config
 COPY backend/cmd/ cmd/
 COPY backend/internal/ internal/
+COPY backend/pkg/ pkg/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -46,7 +48,5 @@ COPY --from=frontend /workspace/frontend/dist ./frontend
 
 USER 65532:65532
 EXPOSE 8080
-
-ENV FRONTEND_DIR=/frontend
 
 ENTRYPOINT ["/grinch"]

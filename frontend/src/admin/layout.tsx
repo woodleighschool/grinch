@@ -7,7 +7,7 @@ const repoUrl = "https://github.com/woodleighschool/grinch";
 
 const AppToolbar = (): ReactElement => (
   <Box sx={{ display: "flex", alignItems: "center", width: "100%", gap: 2 }}>
-    <Typography variant="h6">Grinch</Typography>
+    <Typography variant="h5">Grinch 🎄</Typography>
     <TitlePortal />
     <Box sx={{ flex: 1 }} />
     <IconButton color="inherit" component="a" href={repoUrl} target="_blank" rel="noreferrer">

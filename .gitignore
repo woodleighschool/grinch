@@ -24,7 +24,6 @@ vite.config.d.ts
 
 # Env files
 .env
-.env.*
 
 # Editor / IDE
 .vscode/

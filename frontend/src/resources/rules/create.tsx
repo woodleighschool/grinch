@@ -1,16 +1,23 @@
-import { RULE_TYPE } from "@/api/constants";
 import { RuleFields } from "@/resources/rules/fields";
 import type { ReactElement } from "react";
-import { Create, SimpleForm } from "react-admin";
+import { Create, ListButton, TabbedForm, TopToolbar } from "react-admin";
 
 const defaultRuleValues = {
-  rule_type: RULE_TYPE.BINARY,
-};
+  rule_type: "binary",
+} as const;
+
+const RuleCreateActions = (): ReactElement => (
+  <TopToolbar>
+    <ListButton />
+  </TopToolbar>
+);
 
 export const RuleCreate = (): ReactElement => (
-  <Create redirect="edit">
-    <SimpleForm defaultValues={defaultRuleValues}>
-      <RuleFields />
-    </SimpleForm>
+  <Create redirect="edit" actions={<RuleCreateActions />}>
+    <TabbedForm defaultValues={defaultRuleValues}>
+      <TabbedForm.Tab label="Overview">
+        <RuleFields />
+      </TabbedForm.Tab>
+    </TabbedForm>
   </Create>
 );

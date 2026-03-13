@@ -18,7 +18,7 @@ import { createTypeScriptImportResolver } from "eslint-import-resolver-typescrip
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(
-  { ignores: ["dist", "build", "coverage", "node_modules"] },
+  { ignores: ["dist", "build", "coverage", "node_modules", "src/api/openapi.ts"] },
 
   { files: ["**/*.{ts,tsx}"] },
 

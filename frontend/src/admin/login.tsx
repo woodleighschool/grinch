@@ -1,33 +1,30 @@
 import { listAuthProviders, type AuthProviders } from "@/api/auth";
 import MicrosoftIcon from "@mui/icons-material/Microsoft";
 import { Stack, Typography } from "@mui/material";
-import { useEffect, useState, type EffectCallback, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Button, Login, LoginForm } from "react-admin";
 
 export const LoginPage = (): ReactElement => {
   const [providers, setProviders] = useState<AuthProviders | undefined>();
 
-  const loadProviders: EffectCallback = () => {
-    let active = true;
+  useEffect(() => {
+    const controller = new AbortController();
 
-    listAuthProviders()
-      .then((result): void => {
-        if (active) {
-          setProviders(result);
-        }
+    listAuthProviders(controller.signal)
+      .then((result: AuthProviders): void => {
+        setProviders(result);
       })
-      .catch((): void => {
-        if (active) {
-          setProviders(undefined);
+      .catch((error: unknown): void => {
+        if ((error as { name?: string }).name === "AbortError") {
+          return;
         }
+        setProviders(undefined);
       });
 
     return (): void => {
-      active = false;
+      controller.abort();
     };
-  };
-
-  useEffect(loadProviders, []);
+  }, []);
 
   const origin = globalThis.location.origin;
   const parameters = new URLSearchParams({ site: origin, from: origin });

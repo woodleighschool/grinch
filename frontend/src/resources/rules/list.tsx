@@ -1,15 +1,12 @@
-import { RULE_TYPE_CHOICES } from "@/api/constants";
+import { RULE_TYPE_CHOICES } from "@/resources/rules/fields";
 import type { ReactElement } from "react";
-import { DataTable, List, SearchInput, SelectField, SelectInput } from "react-admin";
+import { DataTable, List, SearchInput, SelectField } from "react-admin";
 
-const ruleFilters: ReactElement[] = [
-  <SearchInput key="q" source="q" alwaysOn />,
-  <SelectInput key="rule_type" source="rule_type" choices={RULE_TYPE_CHOICES} optionText="name" />,
-];
+const ruleFilters = [<SearchInput key="search" source="search" alwaysOn />];
 
 export const RuleList = (): ReactElement => (
-  <List sort={{ field: "name", order: "ASC" }} filters={ruleFilters}>
-    <DataTable rowClick="edit" bulkActionButtons={false}>
+  <List sort={{ field: "name", order: "ASC" }} filters={ruleFilters} perPage={25}>
+    <DataTable rowClick="edit">
       <DataTable.Col source="name" label="Name" />
       <DataTable.Col source="rule_type" label="Rule Type">
         <SelectField source="rule_type" choices={RULE_TYPE_CHOICES} optionText="name" />

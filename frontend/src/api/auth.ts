@@ -1,31 +1,4 @@
-import { fetchUtils } from "react-admin";
-import { getCookie, XSRF_COOKIE_NAME, XSRF_HEADER_NAME } from "./cookies";
-
-const authFetch = (url: string, options: fetchUtils.Options = {}): ReturnType<typeof fetchUtils.fetchJson> => {
-  const xsrfToken = getCookie(XSRF_COOKIE_NAME);
-  const headers = new Headers(options.headers);
-
-  if (xsrfToken) {
-    headers.set(XSRF_HEADER_NAME, xsrfToken);
-  }
-
-  return fetchUtils.fetchJson(url, {
-    ...options,
-    credentials: "include",
-    headers,
-  });
-};
-
-export interface AuthUser {
-  id: string;
-  name?: string;
-  email?: string;
-  picture?: string;
-  aud?: string;
-  ip?: string;
-  attrs?: Record<string, unknown>;
-  role?: string;
-}
+import { authApi, type AuthUser } from "@/api/authClient";
 
 export interface AuthProviders {
   microsoft: boolean;
@@ -40,14 +13,9 @@ export const isAuthError = (error: unknown): boolean => {
   return status === 401 || status === 403;
 };
 
-export async function getCurrentUser(): Promise<AuthUser | undefined> {
+export async function getCurrentUser(signal?: AbortSignal): Promise<AuthUser | undefined> {
   try {
-    const response = await authFetch("/auth/user");
-    const json = response.json as unknown;
-    if (json == undefined) {
-      return undefined;
-    }
-    return json as AuthUser;
+    return await authApi.getUser(signal);
   } catch (error) {
     if (isAuthError(error)) {
       return undefined;
@@ -57,22 +25,12 @@ export async function getCurrentUser(): Promise<AuthUser | undefined> {
 }
 
 export async function loginLocal(username: string, password: string): Promise<void> {
-  await authFetch("/auth/local/login?session=1", {
-    method: "POST",
-    headers: new Headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      user: username,
-      passwd: password,
-      aud: globalThis.location.origin,
-    }),
-  });
+  await authApi.loginLocal({ user: username, passwd: password, aud: globalThis.location.origin });
 }
 
 export async function logout(): Promise<void> {
   try {
-    await authFetch("/auth/logout", {
-      method: "POST",
-    });
+    await authApi.logout();
   } catch (error) {
     if (isAuthError(error)) {
       return;
@@ -81,11 +39,9 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function listAuthProviders(): Promise<AuthProviders> {
-  const response = await authFetch("/auth/list");
-  const json = response.json as unknown;
-  const providers = Array.isArray(json) ? json : [];
-  const normalized = new Set(providers.map((entry): string => String(entry).trim().toLowerCase()));
+export async function listAuthProviders(signal?: AbortSignal): Promise<AuthProviders> {
+  const providers = await authApi.listProviders(signal);
+  const normalized = new Set(providers.map((entry): string => entry.trim().toLowerCase()));
 
   return {
     microsoft: normalized.has("microsoft"),
