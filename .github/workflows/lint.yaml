@@ -3,15 +3,34 @@
 name: Lint
 
 on:
-  push:
   pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/lint.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/lint.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   backend:
-    name: Backend Lint
+    name: Backend lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     defaults:
       run:
         working-directory: backend
@@ -22,26 +41,23 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
-          check-latest: true
-          cache-dependency-path: backend/go.sum
           go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.mod
 
-      - name: Install Dependencies
-        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+      - name: Download Go modules
+        run: go mod download
 
       - name: Generate
         run: go generate ./...
 
-      - name: Run Go linter
+      - name: Lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
           working-directory: backend
 
   frontend:
-    name: Frontend Lint
+    name: Frontend lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     defaults:
       run:
         working-directory: frontend
@@ -49,13 +65,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version-file: frontend/package.json
+          node-version: 25
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Generate API types
+        run: npm run gen:api
+
+      - name: Lint
+        run: npx eslint "src/**/*.{ts,tsx,js,jsx}" --max-warnings=0

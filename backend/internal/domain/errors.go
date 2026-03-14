@@ -5,9 +5,7 @@ import (
 	"strings"
 )
 
-var (
-	ErrGroupReadOnly = errors.New("group read-only")
-)
+var ErrGroupReadOnly = errors.New("group read-only")
 
 type FieldError struct {
 	Field   string
