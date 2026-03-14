@@ -8,98 +8,220 @@ servers:
 security:
   - sessionAuth: []
 paths:
-  /machines:
+  /executables:
     get:
-      operationId: listMachines
+      operationId: listExecutables
       tags:
-        - machines
+        - executables
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/UserIdFilter'
       responses:
         '200':
-          description: Machine list.
+          description: Executable list.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MachineListResponse'
+                $ref: '#/components/schemas/ExecutableListResponse'
         default:
           $ref: '#/components/responses/Problem'
-
-  /machines/{id}:
+  /executables/{id}:
     get:
-      operationId: getMachine
+      operationId: getExecutable
       tags:
-        - machines
+        - executables
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '200':
-          description: Machine detail.
+          description: Executable detail.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Machine'
+                $ref: '#/components/schemas/Executable'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+  /execution-events:
+    get:
+      operationId: listExecutionEvents
+      tags:
+        - execution-events
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/MachineIdFilter'
+        - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/ExecutableIdFilter'
+      responses:
+        '200':
+          description: Execution event list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionEventListResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /execution-events/{id}:
+    get:
+      operationId: getExecutionEvent
+      tags:
+        - execution-events
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Execution event detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionEvent'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
     delete:
-      operationId: deleteMachine
+      operationId: deleteExecutionEvent
       tags:
-        - machines
+        - execution-events
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '204':
-          description: Machine deleted.
+          description: Execution event deleted.
         default:
           $ref: '#/components/responses/Problem'
-
-  /users:
+  /file-access-events:
     get:
-      operationId: listUsers
+      operationId: listFileAccessEvents
       tags:
-        - users
+        - file-access-events
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/MachineIdFilter'
+        - $ref: '#/components/parameters/ExecutableIdFilter'
       responses:
         '200':
-          description: User list.
+          description: File access event list.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserListResponse'
+                $ref: '#/components/schemas/FileAccessEventListResponse'
         default:
           $ref: '#/components/responses/Problem'
-
-  /users/{id}:
+  /file-access-events/{id}:
     get:
-      operationId: getUser
+      operationId: getFileAccessEvent
       tags:
-        - users
+        - file-access-events
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '200':
-          description: User detail.
+          description: File access event detail.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/FileAccessEvent'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
+    delete:
+      operationId: deleteFileAccessEvent
+      tags:
+        - file-access-events
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: File access event deleted.
+        default:
+          $ref: '#/components/responses/Problem'
+  /group-memberships:
+    get:
+      operationId: listGroupMemberships
+      tags:
+        - group-memberships
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/GroupIdFilter'
+        - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/MachineIdFilter'
+      responses:
+        '200':
+          description: Group membership list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMembershipListResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createGroupMembership
+      tags:
+        - group-memberships
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupMembershipCreateRequest'
+      responses:
+        '201':
+          description: Group membership created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMembership'
+        default:
+          $ref: '#/components/responses/Problem'
+  /group-memberships/{id}:
+    get:
+      operationId: getGroupMembership
+      tags:
+        - group-memberships
+      parameters:
+        - $ref: '#/components/parameters/GroupMembershipId'
+      responses:
+        '200':
+          description: Group membership detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMembership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteGroupMembership
+      tags:
+        - group-memberships
+      parameters:
+        - $ref: '#/components/parameters/GroupMembershipId'
+      responses:
+        '204':
+          description: Group membership deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
   /groups:
     get:
       operationId: listGroups
@@ -139,7 +261,6 @@ paths:
                 $ref: '#/components/schemas/Group'
         default:
           $ref: '#/components/responses/Problem'
-
   /groups/{id}:
     get:
       operationId: getGroup
@@ -194,177 +315,56 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
-  /group-memberships:
+  /machines:
     get:
-      operationId: listGroupMemberships
+      operationId: listMachines
       tags:
-        - group-memberships
+        - machines
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/GroupIdFilter'
         - $ref: '#/components/parameters/UserIdFilter'
-        - $ref: '#/components/parameters/MachineIdFilter'
       responses:
         '200':
-          description: Group membership list.
+          description: Machine list.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupMembershipListResponse'
+                $ref: '#/components/schemas/MachineListResponse'
         default:
           $ref: '#/components/responses/Problem'
-    post:
-      operationId: createGroupMembership
-      tags:
-        - group-memberships
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GroupMembershipCreateRequest'
-      responses:
-        '201':
-          description: Group membership created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupMembership'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /group-memberships/{id}:
+  /machines/{id}:
     get:
-      operationId: getGroupMembership
+      operationId: getMachine
       tags:
-        - group-memberships
+        - machines
       parameters:
-        - $ref: '#/components/parameters/GroupMembershipId'
+        - $ref: '#/components/parameters/Id'
       responses:
         '200':
-          description: Group membership detail.
+          description: Machine detail.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupMembership'
+                $ref: '#/components/schemas/Machine'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
     delete:
-      operationId: deleteGroupMembership
+      operationId: deleteMachine
       tags:
-        - group-memberships
-      parameters:
-        - $ref: '#/components/parameters/GroupMembershipId'
-      responses:
-        '204':
-          description: Group membership deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /rules:
-    get:
-      operationId: listRules
-      tags:
-        - rules
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-      responses:
-        '200':
-          description: Rule list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
-    post:
-      operationId: createRule
-      tags:
-        - rules
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RuleCreateRequest'
-      responses:
-        '201':
-          description: Rule created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Rule'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /rules/{id}:
-    get:
-      operationId: getRule
-      tags:
-        - rules
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      responses:
-        '200':
-          description: Rule detail.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Rule'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    patch:
-      operationId: patchRule
-      tags:
-        - rules
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RulePatchRequest'
-      responses:
-        '200':
-          description: Rule updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Rule'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    delete:
-      operationId: deleteRule
-      tags:
-        - rules
+        - machines
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '204':
-          description: Rule deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
+          description: Machine deleted.
         default:
           $ref: '#/components/responses/Problem'
-
   /rule-targets:
     get:
       operationId: listRuleTargets
@@ -409,7 +409,6 @@ paths:
                 $ref: '#/components/schemas/RuleTarget'
         default:
           $ref: '#/components/responses/Problem'
-
   /rule-targets/{id}:
     get:
       operationId: getRuleTarget
@@ -464,12 +463,11 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
-  /executables:
+  /rules:
     get:
-      operationId: listExecutables
+      operationId: listRules
       tags:
-        - executables
+        - rules
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
@@ -478,147 +476,130 @@ paths:
         - $ref: '#/components/parameters/Order'
       responses:
         '200':
-          description: Executable list.
+          description: Rule list.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutableListResponse'
+                $ref: '#/components/schemas/RuleListResponse'
         default:
           $ref: '#/components/responses/Problem'
-
-  /executables/{id}:
-    get:
-      operationId: getExecutable
+    post:
+      operationId: createRule
       tags:
-        - executables
+        - rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleCreateRequest'
+      responses:
+        '201':
+          description: Rule created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        default:
+          $ref: '#/components/responses/Problem'
+  /rules/{id}:
+    get:
+      operationId: getRule
+      tags:
+        - rules
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '200':
-          description: Executable detail.
+          description: Rule detail.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Executable'
+                $ref: '#/components/schemas/Rule'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
-  /execution-events:
-    get:
-      operationId: listExecutionEvents
+    patch:
+      operationId: patchRule
       tags:
-        - execution-events
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/MachineIdFilter'
-        - $ref: '#/components/parameters/UserIdFilter'
-        - $ref: '#/components/parameters/ExecutableIdFilter'
-      responses:
-        '200':
-          description: Execution event list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExecutionEventListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /execution-events/{id}:
-    get:
-      operationId: getExecutionEvent
-      tags:
-        - execution-events
+        - rules
       parameters:
         - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RulePatchRequest'
       responses:
         '200':
-          description: Execution event detail.
+          description: Rule updated.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutionEvent'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    delete:
-      operationId: deleteExecutionEvent
-      tags:
-        - execution-events
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      responses:
-        '204':
-          description: Execution event deleted.
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /file-access-events:
-    get:
-      operationId: listFileAccessEvents
-      tags:
-        - file-access-events
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/MachineIdFilter'
-        - $ref: '#/components/parameters/ExecutableIdFilter'
-      responses:
-        '200':
-          description: File access event list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FileAccessEventListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /file-access-events/{id}:
-    get:
-      operationId: getFileAccessEvent
-      tags:
-        - file-access-events
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      responses:
-        '200':
-          description: File access event detail.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FileAccessEvent'
+                $ref: '#/components/schemas/Rule'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
     delete:
-      operationId: deleteFileAccessEvent
+      operationId: deleteRule
       tags:
-        - file-access-events
+        - rules
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
         '204':
-          description: File access event deleted.
+          description: Rule deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
+  /users:
+    get:
+      operationId: listUsers
+      tags:
+        - users
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: User list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags:
+        - users
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: User detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     sessionAuth:
       type: apiKey
       in: cookie
       name: grinch_session
-
   parameters:
     Id:
       name: id
@@ -718,7 +699,6 @@ components:
       in: query
       schema:
         $ref: '#/components/schemas/RulePolicy'
-
   responses:
     Problem:
       description: Problem response.
@@ -732,92 +712,7 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Problem'
-
   schemas:
-    Problem:
-      type: object
-      required:
-        - type
-        - title
-        - status
-        - detail
-        - code
-      properties:
-        type:
-          type: string
-        title:
-          type: string
-        status:
-          type: integer
-          format: int32
-        detail:
-          type: string
-        code:
-          type: string
-        field_errors:
-          type: array
-          items:
-            $ref: '#/components/schemas/FieldError'
-
-    FieldError:
-      type: object
-      required:
-        - field
-        - message
-      properties:
-        field:
-          type: string
-        message:
-          type: string
-        code:
-          type: string
-
-    Source:
-      type: string
-      enum:
-        - local
-        - entra
-
-    MemberKind:
-      type: string
-      enum:
-        - user
-        - machine
-
-    GroupMembershipKind:
-      type: string
-      enum:
-        - actual
-        - effective
-
-    RuleType:
-      type: string
-      enum:
-        - binary
-        - certificate
-        - team_id
-        - signing_id
-        - cd_hash
-
-    RulePolicy:
-      type: string
-      enum:
-        - allowlist
-        - blocklist
-        - silent_blocklist
-        - cel
-
-    RuleTargetAssignment:
-      type: string
-      enum:
-        - include
-        - exclude
-
-    RuleTargetSubjectKind:
-      type: string
-      enum:
-        - group
-
     EventDecision:
       type: string
       enum:
@@ -837,450 +732,39 @@ components:
         - block_signing_id
         - block_cd_hash
         - bundle_binary
-
-    FileAccessDecision:
-      type: string
-      enum:
-        - unknown
-        - denied
-        - denied_invalid_signature
-        - audit_only
-
-    MachineSummary:
-      type: object
-      required:
-        - id
-        - serial_number
-        - hostname
-        - model_identifier
-        - os_version
-        - santa_version
-        - primary_user
-        - last_seen_at
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        serial_number:
-          type: string
-        hostname:
-          type: string
-        model_identifier:
-          type: string
-        os_version:
-          type: string
-        santa_version:
-          type: string
-        primary_user:
-          type: string
-        primary_user_id:
-          type: string
-          format: uuid
-          nullable: true
-        last_seen_at:
-          type: string
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    Machine:
-      type: object
-      required:
-        - id
-        - serial_number
-        - hostname
-        - model_identifier
-        - os_version
-        - os_build
-        - santa_version
-        - primary_user
-        - request_clean_sync
-        - last_seen_at
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        serial_number:
-          type: string
-        hostname:
-          type: string
-        model_identifier:
-          type: string
-        os_version:
-          type: string
-        os_build:
-          type: string
-        santa_version:
-          type: string
-        primary_user:
-          type: string
-        primary_user_id:
-          type: string
-          format: uuid
-          nullable: true
-        request_clean_sync:
-          type: boolean
-        last_seen_at:
-          type: string
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    User:
-      type: object
-      required:
-        - id
-        - upn
-        - display_name
-        - source
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        upn:
-          type: string
-        display_name:
-          type: string
-        source:
-          $ref: '#/components/schemas/Source'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    Group:
-      type: object
-      required:
-        - id
-        - name
-        - description
-        - source
-        - member_count
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-        source:
-          $ref: '#/components/schemas/Source'
-        member_count:
-          type: integer
-          format: int32
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    GroupCreateRequest:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-
-    GroupPatchRequest:
-      type: object
-      minProperties: 1
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-
-    GroupMembershipGroup:
-      type: object
-      required:
-        - id
-        - name
-        - source
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        source:
-          $ref: '#/components/schemas/Source'
-
-    GroupMembershipMember:
-      type: object
-      required:
-        - kind
-        - id
-      properties:
-        kind:
-          $ref: '#/components/schemas/MemberKind'
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-
-    GroupMembership:
-      type: object
-      required:
-        - id
-        - kind
-        - group
-        - member
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-        kind:
-          $ref: '#/components/schemas/GroupMembershipKind'
-        group:
-          $ref: '#/components/schemas/GroupMembershipGroup'
-        member:
-          $ref: '#/components/schemas/GroupMembershipMember'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    GroupMembershipCreateRequest:
-      type: object
-      required:
-        - group_id
-        - member_kind
-        - member_id
-      properties:
-        group_id:
-          type: string
-          format: uuid
-        member_kind:
-          $ref: '#/components/schemas/MemberKind'
-        member_id:
-          type: string
-          format: uuid
-
-    RuleSummary:
-      type: object
-      required:
-        - id
-        - name
-        - description
-        - rule_type
-        - identifier
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-        rule_type:
-          $ref: '#/components/schemas/RuleType'
-        identifier:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    Rule:
+    Executable:
       allOf:
-        - $ref: '#/components/schemas/RuleSummary'
+        - $ref: '#/components/schemas/ExecutableSummary'
         - type: object
           required:
-            - custom_message
-            - custom_url
+            - signing_chain
+            - entitlements
           properties:
-            custom_message:
-              type: string
-            custom_url:
-              type: string
-
-    RuleCreateRequest:
+            signing_chain:
+              type: array
+              items:
+                $ref: '#/components/schemas/SigningChainEntry'
+            entitlements:
+              type: object
+              additionalProperties: true
+    ExecutableListResponse:
       type: object
       required:
-        - name
-        - rule_type
-        - identifier
+        - total
+        - rows
       properties:
-        name:
-          type: string
-        description:
-          type: string
-        rule_type:
-          $ref: '#/components/schemas/RuleType'
-        identifier:
-          type: string
-        custom_message:
-          type: string
-        custom_url:
-          type: string
-
-    RulePatchRequest:
-      type: object
-      minProperties: 1
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        rule_type:
-          $ref: '#/components/schemas/RuleType'
-        identifier:
-          type: string
-        custom_message:
-          type: string
-        custom_url:
-          type: string
-
-    RuleTargetSummary:
-      type: object
-      required:
-        - id
-        - rule_id
-        - subject_kind
-        - subject_id
-        - assignment
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        rule_id:
-          type: string
-          format: uuid
-        subject_kind:
-          $ref: '#/components/schemas/RuleTargetSubjectKind'
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
+        total:
           type: integer
           format: int32
-          nullable: true
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    RuleTarget:
-      allOf:
-        - $ref: '#/components/schemas/RuleTargetSummary'
-        - type: object
-          properties:
-            cel_expression:
-              type: string
-
-    RuleTargetCreateRequest:
-      type: object
-      required:
-        - rule_id
-        - subject_id
-        - assignment
-      properties:
-        rule_id:
-          type: string
-          format: uuid
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
-          type: integer
-          format: int32
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-        cel_expression:
-          type: string
-
-    RuleTargetPatchRequest:
-      type: object
-      minProperties: 1
-      properties:
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
-          type: integer
-          format: int32
-          nullable: true
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-          nullable: true
-        cel_expression:
-          type: string
-
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExecutableSummary'
     ExecutableSource:
       type: string
       enum:
         - event
         - process
-
-    SigningChainEntry:
-      type: object
-      required:
-        - common_name
-        - organization
-        - organizational_unit
-        - sha256
-        - valid_from
-        - valid_until
-      properties:
-        common_name:
-          type: string
-        organization:
-          type: string
-        organizational_unit:
-          type: string
-        sha256:
-          type: string
-        valid_from:
-          type: string
-          format: date-time
-        valid_until:
-          type: string
-          format: date-time
-
     ExecutableSummary:
       type: object
       required:
@@ -1320,60 +804,6 @@ components:
         created_at:
           type: string
           format: date-time
-
-    Executable:
-      allOf:
-        - $ref: '#/components/schemas/ExecutableSummary'
-        - type: object
-          required:
-            - signing_chain
-            - entitlements
-          properties:
-            signing_chain:
-              type: array
-              items:
-                $ref: '#/components/schemas/SigningChainEntry'
-            entitlements:
-              type: object
-              additionalProperties: true
-
-    ExecutionEventSummary:
-      type: object
-      required:
-        - id
-        - machine_id
-        - executable_id
-        - decision
-        - file_path
-        - file_name
-        - signing_id
-        - created_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        machine_id:
-          type: string
-          format: uuid
-        executable_id:
-          type: string
-          format: uuid
-        decision:
-          $ref: '#/components/schemas/EventDecision'
-        file_path:
-          type: string
-        file_name:
-          type: string
-        signing_id:
-          type: string
-        occurred_at:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-
     ExecutionEvent:
       type: object
       required:
@@ -1447,40 +877,29 @@ components:
         created_at:
           type: string
           format: date-time
-
-    FileAccessEventProcess:
+    ExecutionEventListResponse:
       type: object
       required:
-        - pid
-        - file_path
-        - executable_id
-        - file_name
+        - total
+        - rows
       properties:
-        pid:
+        total:
           type: integer
           format: int32
-        file_path:
-          type: string
-        executable_id:
-          type: string
-          format: uuid
-        file_name:
-          type: string
-
-    FileAccessEventSummary:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExecutionEventSummary'
+    ExecutionEventSummary:
       type: object
       required:
         - id
         - machine_id
         - executable_id
         - decision
-        - rule_name
-        - target
+        - file_path
         - file_name
-        - file_sha256
         - signing_id
-        - team_id
-        - cdhash
         - created_at
       properties:
         id:
@@ -1492,22 +911,13 @@ components:
         executable_id:
           type: string
           format: uuid
-          nullable: true
         decision:
-          $ref: '#/components/schemas/FileAccessDecision'
-        rule_name:
-          type: string
-        target:
+          $ref: '#/components/schemas/EventDecision'
+        file_path:
           type: string
         file_name:
           type: string
-        file_sha256:
-          type: string
         signing_id:
-          type: string
-        team_id:
-          type: string
-        cdhash:
           type: string
         occurred_at:
           type: string
@@ -1516,7 +926,25 @@ components:
         created_at:
           type: string
           format: date-time
-
+    FieldError:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+    FileAccessDecision:
+      type: string
+      enum:
+        - unknown
+        - denied
+        - denied_invalid_signature
+        - audit_only
     FileAccessEvent:
       type: object
       required:
@@ -1573,119 +1001,6 @@ components:
         created_at:
           type: string
           format: date-time
-
-    MachineListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/MachineSummary'
-
-    UserListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/User'
-
-    GroupListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/Group'
-
-    GroupMembershipListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/GroupMembership'
-
-    RuleListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/RuleSummary'
-
-    RuleTargetListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/RuleTargetSummary'
-
-    ExecutableListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExecutableSummary'
-
-    ExecutionEventListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExecutionEventSummary'
-
     FileAccessEventListResponse:
       type: object
       required:
@@ -1699,3 +1014,621 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FileAccessEventSummary'
+    FileAccessEventProcess:
+      type: object
+      required:
+        - pid
+        - file_path
+        - executable_id
+        - file_name
+      properties:
+        pid:
+          type: integer
+          format: int32
+        file_path:
+          type: string
+        executable_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+    FileAccessEventSummary:
+      type: object
+      required:
+        - id
+        - machine_id
+        - executable_id
+        - decision
+        - rule_name
+        - target
+        - file_name
+        - file_sha256
+        - signing_id
+        - team_id
+        - cdhash
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        machine_id:
+          type: string
+          format: uuid
+        executable_id:
+          type: string
+          format: uuid
+          nullable: true
+        decision:
+          $ref: '#/components/schemas/FileAccessDecision'
+        rule_name:
+          type: string
+        target:
+          type: string
+        file_name:
+          type: string
+        file_sha256:
+          type: string
+        signing_id:
+          type: string
+        team_id:
+          type: string
+        cdhash:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    Group:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - source
+        - member_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        source:
+          $ref: '#/components/schemas/Source'
+        member_count:
+          type: integer
+          format: int32
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GroupCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    GroupListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+    GroupMembership:
+      type: object
+      required:
+        - id
+        - kind
+        - group
+        - member
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/GroupMembershipKind'
+        group:
+          $ref: '#/components/schemas/GroupMembershipGroup'
+        member:
+          $ref: '#/components/schemas/GroupMembershipMember'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GroupMembershipCreateRequest:
+      type: object
+      required:
+        - group_id
+        - member_kind
+        - member_id
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        member_kind:
+          $ref: '#/components/schemas/MemberKind'
+        member_id:
+          type: string
+          format: uuid
+    GroupMembershipGroup:
+      type: object
+      required:
+        - id
+        - name
+        - source
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        source:
+          $ref: '#/components/schemas/Source'
+    GroupMembershipKind:
+      type: string
+      enum:
+        - actual
+        - effective
+    GroupMembershipListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMembership'
+    GroupMembershipMember:
+      type: object
+      required:
+        - kind
+        - id
+      properties:
+        kind:
+          $ref: '#/components/schemas/MemberKind'
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    GroupPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    Machine:
+      type: object
+      required:
+        - id
+        - serial_number
+        - hostname
+        - model_identifier
+        - os_version
+        - os_build
+        - santa_version
+        - primary_user
+        - request_clean_sync
+        - last_seen_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        serial_number:
+          type: string
+        hostname:
+          type: string
+        model_identifier:
+          type: string
+        os_version:
+          type: string
+        os_build:
+          type: string
+        santa_version:
+          type: string
+        primary_user:
+          type: string
+        primary_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        request_clean_sync:
+          type: boolean
+        last_seen_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MachineListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/MachineSummary'
+    MachineSummary:
+      type: object
+      required:
+        - id
+        - serial_number
+        - hostname
+        - model_identifier
+        - os_version
+        - santa_version
+        - primary_user
+        - last_seen_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        serial_number:
+          type: string
+        hostname:
+          type: string
+        model_identifier:
+          type: string
+        os_version:
+          type: string
+        santa_version:
+          type: string
+        primary_user:
+          type: string
+        primary_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MemberKind:
+      type: string
+      enum:
+        - user
+        - machine
+    Problem:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        code:
+          type: string
+        field_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    Rule:
+      allOf:
+        - $ref: '#/components/schemas/RuleSummary'
+        - type: object
+          required:
+            - custom_message
+            - custom_url
+          properties:
+            custom_message:
+              type: string
+            custom_url:
+              type: string
+    RuleCreateRequest:
+      type: object
+      required:
+        - name
+        - rule_type
+        - identifier
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rule_type:
+          $ref: '#/components/schemas/RuleType'
+        identifier:
+          type: string
+        custom_message:
+          type: string
+        custom_url:
+          type: string
+    RuleListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleSummary'
+    RulePatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rule_type:
+          $ref: '#/components/schemas/RuleType'
+        identifier:
+          type: string
+        custom_message:
+          type: string
+        custom_url:
+          type: string
+    RulePolicy:
+      type: string
+      enum:
+        - allowlist
+        - blocklist
+        - silent_blocklist
+        - cel
+    RuleSummary:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - rule_type
+        - identifier
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        rule_type:
+          $ref: '#/components/schemas/RuleType'
+        identifier:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RuleTarget:
+      allOf:
+        - $ref: '#/components/schemas/RuleTargetSummary'
+        - type: object
+          properties:
+            cel_expression:
+              type: string
+    RuleTargetAssignment:
+      type: string
+      enum:
+        - include
+        - exclude
+    RuleTargetCreateRequest:
+      type: object
+      required:
+        - rule_id
+        - subject_id
+        - assignment
+      properties:
+        rule_id:
+          type: string
+          format: uuid
+        subject_id:
+          type: string
+          format: uuid
+        assignment:
+          $ref: '#/components/schemas/RuleTargetAssignment'
+        priority:
+          type: integer
+          format: int32
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+        cel_expression:
+          type: string
+    RuleTargetListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleTargetSummary'
+    RuleTargetPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        subject_id:
+          type: string
+          format: uuid
+        assignment:
+          $ref: '#/components/schemas/RuleTargetAssignment'
+        priority:
+          type: integer
+          format: int32
+          nullable: true
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+          nullable: true
+        cel_expression:
+          type: string
+    RuleTargetSubjectKind:
+      type: string
+      enum:
+        - group
+    RuleTargetSummary:
+      type: object
+      required:
+        - id
+        - rule_id
+        - subject_kind
+        - subject_id
+        - assignment
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+          format: uuid
+        subject_kind:
+          $ref: '#/components/schemas/RuleTargetSubjectKind'
+        subject_id:
+          type: string
+          format: uuid
+        assignment:
+          $ref: '#/components/schemas/RuleTargetAssignment'
+        priority:
+          type: integer
+          format: int32
+          nullable: true
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RuleType:
+      type: string
+      enum:
+        - binary
+        - certificate
+        - team_id
+        - signing_id
+        - cd_hash
+    SigningChainEntry:
+      type: object
+      required:
+        - common_name
+        - organization
+        - organizational_unit
+        - sha256
+        - valid_from
+        - valid_until
+      properties:
+        common_name:
+          type: string
+        organization:
+          type: string
+        organizational_unit:
+          type: string
+        sha256:
+          type: string
+        valid_from:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+    Source:
+      type: string
+      enum:
+        - local
+        - entra
+    User:
+      type: object
+      required:
+        - id
+        - upn
+        - display_name
+        - source
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        upn:
+          type: string
+        display_name:
+          type: string
+        source:
+          $ref: '#/components/schemas/Source'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UserListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
