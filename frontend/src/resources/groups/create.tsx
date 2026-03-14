@@ -11,17 +11,8 @@ const GroupCreateActions = (): ReactElement => (
 export const GroupCreate = (): ReactElement => (
   <Create redirect="edit" actions={<GroupCreateActions />}>
     <SimpleForm>
-      <TextInput
-        source="name"
-        label="Name"
-        validate={[trimmedRequired("Name")]}
-      />
-      <TextInput
-        source="description"
-        label="Description"
-        multiline
-        minRows={2}
-      />
+      <TextInput source="name" label="Name" validate={[trimmedRequired("Name")]} />
+      <TextInput source="description" label="Description" multiline minRows={2} />
     </SimpleForm>
   </Create>
 );
