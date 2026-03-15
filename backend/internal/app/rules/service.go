@@ -13,6 +13,7 @@ type RuleCreateInput struct {
 	CustomMessage string
 	CustomURL     string
 	Description   string
+	Enabled       bool
 	Identifier    string
 	Name          string
 	RuleType      domain.RuleType
@@ -22,6 +23,7 @@ type RulePatchInput struct {
 	CustomMessage *string
 	CustomURL     *string
 	Description   *string
+	Enabled       *bool
 	Identifier    *string
 	Name          *string
 	RuleType      *domain.RuleType

@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Create, ListButton, TabbedForm, TopToolbar } from "react-admin";
 
 const defaultRuleValues = {
+  enabled: true,
   rule_type: "binary",
 } as const;
 

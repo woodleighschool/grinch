@@ -8,6 +8,7 @@ export const RuleList = (): ReactElement => (
   <List sort={{ field: "name", order: "ASC" }} filters={ruleFilters} perPage={25}>
     <DataTable rowClick="edit">
       <DataTable.Col source="name" label="Name" />
+      <DataTable.Col source="enabled" label="Enabled" />
       <DataTable.Col source="rule_type" label="Rule Type">
         <SelectField source="rule_type" choices={RULE_TYPE_CHOICES} optionText="name" />
       </DataTable.Col>

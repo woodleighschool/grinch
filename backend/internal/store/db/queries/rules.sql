@@ -6,7 +6,8 @@ INSERT INTO rules (
   rule_type,
   identifier,
   custom_message,
-  custom_url
+  custom_url,
+  enabled
 )
 VALUES (
   $1,
@@ -15,7 +16,8 @@ VALUES (
   $4,
   $5,
   $6,
-  $7
+  $7,
+  $8
 )
 RETURNING
   id,
@@ -25,6 +27,7 @@ RETURNING
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at;
 
@@ -37,6 +40,7 @@ SELECT
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 FROM rules
@@ -51,6 +55,7 @@ SELECT
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 FROM rules
@@ -67,6 +72,7 @@ SET
   identifier = $5,
   custom_message = $6,
   custom_url = $7,
+  enabled = $8,
   updated_at = NOW()
 WHERE id = $1
 RETURNING
@@ -77,6 +83,7 @@ RETURNING
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at;
 
@@ -165,4 +172,5 @@ JOIN winning_includes AS wi
 LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
+  AND r.enabled = true
 ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC;

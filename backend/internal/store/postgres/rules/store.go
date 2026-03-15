@@ -30,6 +30,7 @@ SELECT
   r.description,
   r.rule_type,
   r.identifier,
+  r.enabled,
   r.created_at,
   r.updated_at,
   COUNT(*) OVER()::INT4 AS total
@@ -63,6 +64,7 @@ OFFSET $3
 			&item.Description,
 			&ruleType,
 			&item.Identifier,
+			&item.Enabled,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 			&total,
@@ -87,6 +89,7 @@ func ruleSortColumns() map[string]string {
 		"description": "r.description",
 		"rule_type":   "r.rule_type",
 		"identifier":  "r.identifier",
+		"enabled":     "r.enabled",
 		"created_at":  "r.created_at",
 		"updated_at":  "r.updated_at",
 	}
@@ -107,6 +110,7 @@ func (store *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, err
 			Identifier:    row.Identifier,
 			CustomMessage: row.CustomMessage,
 			CustomURL:     row.CustomUrl,
+			Enabled:       row.Enabled,
 			CreatedAt:     row.CreatedAt,
 			UpdatedAt:     row.UpdatedAt,
 		},
@@ -127,6 +131,7 @@ func (store *Store) CreateRule(ctx context.Context, input apprules.RuleCreateInp
 		Identifier:    input.Identifier,
 		CustomMessage: input.CustomMessage,
 		CustomUrl:     input.CustomURL,
+		Enabled:       input.Enabled,
 	})
 	if err != nil {
 		return domain.Rule{}, err
@@ -141,6 +146,7 @@ func (store *Store) CreateRule(ctx context.Context, input apprules.RuleCreateInp
 			Identifier:    row.Identifier,
 			CustomMessage: row.CustomMessage,
 			CustomURL:     row.CustomUrl,
+			Enabled:       row.Enabled,
 			CreatedAt:     row.CreatedAt,
 			UpdatedAt:     row.UpdatedAt,
 		},
@@ -177,6 +183,10 @@ func (store *Store) PatchRule(ctx context.Context, id uuid.UUID, input apprules.
 	if input.CustomURL != nil {
 		customURL = *input.CustomURL
 	}
+	enabled := current.Enabled
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
 
 	row, err := store.queriesSet().UpdateRule(ctx, db.UpdateRuleParams{
 		ID:            id,
@@ -186,6 +196,7 @@ func (store *Store) PatchRule(ctx context.Context, id uuid.UUID, input apprules.
 		Identifier:    identifier,
 		CustomMessage: customMessage,
 		CustomUrl:     customURL,
+		Enabled:       enabled,
 	})
 	if err != nil {
 		return domain.Rule{}, err
@@ -200,6 +211,7 @@ func (store *Store) PatchRule(ctx context.Context, id uuid.UUID, input apprules.
 			Identifier:    row.Identifier,
 			CustomMessage: row.CustomMessage,
 			CustomURL:     row.CustomUrl,
+			Enabled:       row.Enabled,
 			CreatedAt:     row.CreatedAt,
 			UpdatedAt:     row.UpdatedAt,
 		},
@@ -256,6 +268,7 @@ type ruleFieldsRow struct {
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -274,6 +287,7 @@ func mapRuleFields(row ruleFieldsRow) (domain.Rule, error) {
 		Identifier:    row.Identifier,
 		CustomMessage: row.CustomMessage,
 		CustomURL:     row.CustomURL,
+		Enabled:       row.Enabled,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
 	}, nil

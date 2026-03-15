@@ -125,10 +125,16 @@ func decodeRuleWriteRequest(body CreateRuleJSONRequestBody) (rules.RuleCreateInp
 		return rules.RuleCreateInput{}, badRequestError("invalid rule_type")
 	}
 
+	enabled := true
+	if body.Enabled != nil {
+		enabled = *body.Enabled
+	}
+
 	return rules.RuleCreateInput{
 		CustomMessage: optionalStringValue(body.CustomMessage),
 		CustomURL:     optionalStringValue(body.CustomUrl),
 		Description:   optionalStringValue(body.Description),
+		Enabled:       enabled,
 		Identifier:    body.Identifier,
 		Name:          body.Name,
 		RuleType:      ruleType,
@@ -142,6 +148,7 @@ func decodeRulePatchRequest(body PatchRuleJSONRequestBody) (rules.RulePatchInput
 		Identifier:    body.Identifier,
 		CustomMessage: body.CustomMessage,
 		CustomURL:     body.CustomUrl,
+		Enabled:       body.Enabled,
 	}
 	if body.RuleType != nil {
 		ruleType, err := toDomainRuleType(*body.RuleType)
