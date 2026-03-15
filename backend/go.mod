@@ -13,6 +13,7 @@ require (
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-pkgz/auth v1.25.1
+	github.com/go-pkgz/auth/v2 v2.1.1
 	github.com/go-pkgz/rest v1.21.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6

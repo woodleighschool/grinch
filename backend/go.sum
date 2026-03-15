@@ -83,6 +83,7 @@ github.com/go-openapi/swag v0.23.0/go.mod h1:esZ8ITTYEsH1V2trKHjAN8Ai7xHb8RV+YSZ
 github.com/go-openapi/swag v0.25.5/go.mod h1:B3RT6l8q7X803JRxa2e59tHOiZlX1t8viplOcs9CwTA=
 github.com/go-pkgz/auth v1.25.1 h1:QEyHyz54BiQ8lXQrOr/uodchrn/y8vmVeCsT+dBPVaM=
 github.com/go-pkgz/auth v1.25.1/go.mod h1:xOOVx/OC/0A9BmuLQtViF7s9vHT2Bxo1HQHXKTvRVQM=
+github.com/go-pkgz/auth/v2 v2.1.1/go.mod h1:9LwzESczjMavmXNZo1XhYpfYdKWtoCbXt/ZIi0GTvF0=
 github.com/go-pkgz/repeater v1.2.0 h1:oJFvjyKdTDd5RCzpzxlzYIZFFj6Zfl17rE1aUfu6UjQ=
 github.com/go-pkgz/repeater v1.2.0/go.mod h1:vypP6xamA53MFmafnGUucqOmALKk36xgKu2hSG73LHM=
 github.com/go-pkgz/rest v1.21.0 h1:Y/C4d/TpclJJDxqnH1RAcS6Hmox0RIReAlkwMcUWXK4=
