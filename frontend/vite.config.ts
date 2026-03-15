@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { defineConfig } from "vite";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -42,9 +42,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          mui: ["@mui/material", "@mui/icons-material"],
+        manualChunks: (id) => {
+          if (id.includes("react") || id.includes("react-dom") || id.includes("react-router-dom")) return "react";
+          if (id.includes("@mui/material") || id.includes("@mui/icons-material")) return "mui";
         },
       },
     },

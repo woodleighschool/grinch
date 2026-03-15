@@ -7,13 +7,13 @@ import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
+import { createNodeResolver, importX } from "eslint-plugin-import-x";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
-import jsxA11y from "eslint-plugin-jsx-a11y";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
-import { importX, createNodeResolver } from "eslint-plugin-import-x";
-import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,10 +54,7 @@ export default defineConfig(
     },
     settings: {
       react: { version: "detect" },
-      "import-x/resolver-next": [
-        createTypeScriptImportResolver(),
-        createNodeResolver(),
-      ],
+      "import-x/resolver-next": [createTypeScriptImportResolver(), createNodeResolver()],
     },
     plugins: {
       "react-hooks": reactHooks,
@@ -71,8 +68,11 @@ export default defineConfig(
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
       "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false, ignoreIIFE: false }],
       "@typescript-eslint/no-misused-promises": ["error", { checksVoidReturn: true }],
-      "@typescript-eslint/explicit-function-return-type": ["error", { allowExpressions: false, allowTypedFunctionExpressions: false }],
+      "@typescript-eslint/explicit-function-return-type": [
+        "error",
+        { allowExpressions: false, allowTypedFunctionExpressions: false },
+      ],
       "unicorn/filename-case": "off",
     },
-  }
+  },
 );
