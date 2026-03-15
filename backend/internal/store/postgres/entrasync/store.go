@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	graphsync "github.com/woodleighschool/go-entrasync"
 
 	appentrasync "github.com/woodleighschool/grinch/internal/app/entrasync"
 	"github.com/woodleighschool/grinch/internal/domain"
 	"github.com/woodleighschool/grinch/internal/store/db"
 	"github.com/woodleighschool/grinch/internal/store/postgres"
-	graphsync "github.com/woodleighschool/grinch/pkg/entrasync"
 )
 
 type Store struct {

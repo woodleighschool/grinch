@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	graphsync "github.com/woodleighschool/go-entrasync"
 
 	appauth "github.com/woodleighschool/grinch/internal/app/auth"
 	appentrasync "github.com/woodleighschool/grinch/internal/app/entrasync"
@@ -33,7 +34,6 @@ import (
 	httpapi "github.com/woodleighschool/grinch/internal/transport/http/httpapi"
 	httprouter "github.com/woodleighschool/grinch/internal/transport/http/router"
 	"github.com/woodleighschool/grinch/internal/transport/http/synchttp"
-	graphsync "github.com/woodleighschool/grinch/pkg/entrasync"
 )
 
 const (

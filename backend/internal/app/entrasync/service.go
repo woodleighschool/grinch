@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	graphsync "github.com/woodleighschool/grinch/pkg/entrasync"
+	graphsync "github.com/woodleighschool/go-entrasync"
 )
 
 // GraphClient reads Entra objects from Microsoft Graph.

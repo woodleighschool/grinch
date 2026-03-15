@@ -26,7 +26,6 @@ RUN go mod download
 # Copy the go source and sqlc config
 COPY backend/cmd/ cmd/
 COPY backend/internal/ internal/
-COPY backend/pkg/ pkg/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
