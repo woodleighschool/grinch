@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-pkgz/auth/token"
+	"github.com/go-pkgz/auth/v2/token"
 
 	authhttp "github.com/woodleighschool/grinch/internal/transport/http/auth"
 )

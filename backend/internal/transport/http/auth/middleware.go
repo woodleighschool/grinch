@@ -3,7 +3,7 @@ package authhttp
 import (
 	"net/http"
 
-	"github.com/go-pkgz/auth/token"
+	"github.com/go-pkgz/auth/v2/token"
 
 	"github.com/woodleighschool/grinch/internal/transport/http/apierrors"
 )
