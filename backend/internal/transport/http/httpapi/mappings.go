@@ -458,6 +458,7 @@ func mapRule(rule domain.Rule) (Rule, error) {
 		Identifier:    rule.Identifier,
 		CustomMessage: rule.CustomMessage,
 		CustomUrl:     rule.CustomURL,
+		Enabled:       rule.Enabled,
 		CreatedAt:     rule.CreatedAt,
 		UpdatedAt:     rule.UpdatedAt,
 	}, nil
@@ -475,6 +476,7 @@ func mapRuleSummary(rule domain.RuleSummary) (RuleSummary, error) {
 		Description: rule.Description,
 		RuleType:    ruleType,
 		Identifier:  rule.Identifier,
+		Enabled:     rule.Enabled,
 		CreatedAt:   rule.CreatedAt,
 		UpdatedAt:   rule.UpdatedAt,
 	}, nil

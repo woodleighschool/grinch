@@ -111,6 +111,7 @@ type Rule struct {
 	IdentifierKey pgtype.Text
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

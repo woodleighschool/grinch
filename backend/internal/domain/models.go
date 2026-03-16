@@ -222,6 +222,7 @@ type Rule struct {
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -232,6 +233,7 @@ type RuleSummary struct {
 	Description string
 	RuleType    RuleType
 	Identifier  string
+	Enabled     bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

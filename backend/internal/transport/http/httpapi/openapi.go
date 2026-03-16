@@ -710,6 +710,7 @@ type Rule struct {
 	CustomMessage string             `json:"custom_message"`
 	CustomUrl     string             `json:"custom_url"`
 	Description   string             `json:"description"`
+	Enabled       bool               `json:"enabled"`
 	Id            openapi_types.UUID `json:"id"`
 	Identifier    string             `json:"identifier"`
 	Name          string             `json:"name"`
@@ -719,12 +720,15 @@ type Rule struct {
 
 // RuleCreateRequest defines model for RuleCreateRequest.
 type RuleCreateRequest struct {
-	CustomMessage *string  `json:"custom_message,omitempty"`
-	CustomUrl     *string  `json:"custom_url,omitempty"`
-	Description   *string  `json:"description,omitempty"`
-	Identifier    string   `json:"identifier"`
-	Name          string   `json:"name"`
-	RuleType      RuleType `json:"rule_type"`
+	CustomMessage *string `json:"custom_message,omitempty"`
+	CustomUrl     *string `json:"custom_url,omitempty"`
+	Description   *string `json:"description,omitempty"`
+
+	// Enabled Default true when omitted.
+	Enabled    *bool    `json:"enabled,omitempty"`
+	Identifier string   `json:"identifier"`
+	Name       string   `json:"name"`
+	RuleType   RuleType `json:"rule_type"`
 }
 
 // RuleListResponse defines model for RuleListResponse.
@@ -738,6 +742,7 @@ type RulePatchRequest struct {
 	CustomMessage *string   `json:"custom_message,omitempty"`
 	CustomUrl     *string   `json:"custom_url,omitempty"`
 	Description   *string   `json:"description,omitempty"`
+	Enabled       *bool     `json:"enabled,omitempty"`
 	Identifier    *string   `json:"identifier,omitempty"`
 	Name          *string   `json:"name,omitempty"`
 	RuleType      *RuleType `json:"rule_type,omitempty"`
@@ -750,6 +755,7 @@ type RulePolicy string
 type RuleSummary struct {
 	CreatedAt   time.Time          `json:"created_at"`
 	Description string             `json:"description"`
+	Enabled     bool               `json:"enabled"`
 	Id          openapi_types.UUID `json:"id"`
 	Identifier  string             `json:"identifier"`
 	Name        string             `json:"name"`

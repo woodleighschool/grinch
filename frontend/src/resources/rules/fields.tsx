@@ -2,7 +2,7 @@ import type { RuleType } from "@/api/types";
 import { ruleIdentifierValidator, trimmedRequired } from "@/resources/shared/validation";
 import { Typography } from "@mui/material";
 import type { ReactElement } from "react";
-import { FormDataConsumer, SelectInput, TextInput, required } from "react-admin";
+import { BooleanInput, FormDataConsumer, SelectInput, TextInput, required } from "react-admin";
 
 export const RULE_TYPE_CHOICES = [
   { id: "binary", name: "Binary" },
@@ -30,6 +30,11 @@ const IDENTIFIER_PLACEHOLDER: Record<RuleType, string> = {
 
 export const RuleFields = (): ReactElement => (
   <>
+    <BooleanInput
+      source="enabled"
+      label="Enabled"
+      helperText="Disabled rules are not sent to machines."
+    />
     <TextInput
       source="name"
       label="Name"

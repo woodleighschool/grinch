@@ -47,7 +47,8 @@ INSERT INTO rules (
   rule_type,
   identifier,
   custom_message,
-  custom_url
+  custom_url,
+  enabled
 )
 VALUES (
   $1,
@@ -56,7 +57,8 @@ VALUES (
   $4,
   $5,
   $6,
-  $7
+  $7,
+  $8
 )
 RETURNING
   id,
@@ -66,6 +68,7 @@ RETURNING
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 `
@@ -78,6 +81,7 @@ type CreateRuleParams struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 }
 
 type CreateRuleRow struct {
@@ -88,6 +92,7 @@ type CreateRuleRow struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -101,6 +106,7 @@ func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (CreateR
 		arg.Identifier,
 		arg.CustomMessage,
 		arg.CustomUrl,
+		arg.Enabled,
 	)
 	var i CreateRuleRow
 	err := row.Scan(
@@ -111,6 +117,7 @@ func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (CreateR
 		&i.Identifier,
 		&i.CustomMessage,
 		&i.CustomUrl,
+		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -138,6 +145,7 @@ SELECT
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 FROM rules
@@ -152,6 +160,7 @@ type GetRuleRow struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -167,6 +176,7 @@ func (q *Queries) GetRule(ctx context.Context, id uuid.UUID) (GetRuleRow, error)
 		&i.Identifier,
 		&i.CustomMessage,
 		&i.CustomUrl,
+		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -243,6 +253,7 @@ JOIN winning_includes AS wi
 LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
+  AND r.enabled = true
 ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC
 `
 
@@ -301,6 +312,7 @@ SELECT
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 FROM rules
@@ -322,6 +334,7 @@ type ListRulesRow struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -343,6 +356,7 @@ func (q *Queries) ListRules(ctx context.Context, arg ListRulesParams) ([]ListRul
 			&i.Identifier,
 			&i.CustomMessage,
 			&i.CustomUrl,
+			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -365,6 +379,7 @@ SET
   identifier = $5,
   custom_message = $6,
   custom_url = $7,
+  enabled = $8,
   updated_at = NOW()
 WHERE id = $1
 RETURNING
@@ -375,6 +390,7 @@ RETURNING
   identifier,
   custom_message,
   custom_url,
+  enabled,
   created_at,
   updated_at
 `
@@ -387,6 +403,7 @@ type UpdateRuleParams struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 }
 
 type UpdateRuleRow struct {
@@ -397,6 +414,7 @@ type UpdateRuleRow struct {
 	Identifier    string
 	CustomMessage string
 	CustomUrl     string
+	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -410,6 +428,7 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (UpdateR
 		arg.Identifier,
 		arg.CustomMessage,
 		arg.CustomUrl,
+		arg.Enabled,
 	)
 	var i UpdateRuleRow
 	err := row.Scan(
@@ -420,6 +439,7 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (UpdateR
 		&i.Identifier,
 		&i.CustomMessage,
 		&i.CustomUrl,
+		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

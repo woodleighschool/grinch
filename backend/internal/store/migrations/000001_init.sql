@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS rules (
   identifier_key TEXT GENERATED ALWAYS AS (lower(btrim(identifier))) STORED,
   custom_message TEXT NOT NULL DEFAULT '',
   custom_url TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT rules_rule_type_check CHECK (rule_type IN ('binary', 'certificate', 'team_id', 'signing_id', 'cd_hash')),
