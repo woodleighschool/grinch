@@ -1,7 +1,8 @@
-import type { GroupMembership } from "@/api/types";
+import type { Group, GroupMembership } from "@/api/types";
 import { MEMBER_KIND_CHOICES } from "@/resources/groups/choices";
 import { getErrorMessage } from "@/resources/shared/errors";
 import { ResourceLink } from "@/resources/shared/resourceLinks";
+import { searchFilterToQuery } from "@/resources/shared/search";
 import AddIcon from "@mui/icons-material/Add";
 import LaptopMacOutlinedIcon from "@mui/icons-material/LaptopMacOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
@@ -35,11 +36,6 @@ import {
 } from "react-admin";
 
 type MemberKind = "user" | "machine";
-
-interface GroupRecord {
-  id?: string;
-  source?: string;
-}
 
 interface AddMemberDialogProperties {
   groupID: string;
@@ -103,7 +99,7 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
                     label={isMachine ? "Machine" : "User"}
                     optionText={isMachine ? "hostname" : "display_name"}
                     optionValue="id"
-                    filterToQuery={(searchText: string): { search: string } => ({ search: searchText })}
+                    filterToQuery={searchFilterToQuery}
                     validate={required()}
                     disabled={isPending}
                     fullWidth
@@ -161,7 +157,7 @@ const MemberNameField = (): ReactElement => {
 };
 
 export const GroupMembersTab = (): ReactElement => {
-  const record = useRecordContext<GroupRecord>();
+  const record = useRecordContext<Pick<Group, "id" | "source">>();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (!record?.id) {

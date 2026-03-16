@@ -1,56 +1,21 @@
-import type { EventDecision } from "@/api/types";
-import { EVENT_DECISION_DESCRIPTIONS, eventDecisionName } from "@/resources/executionEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
-import { ResourceLink } from "@/resources/shared/resourceLinks";
-import { SourceField } from "@/resources/shared/sourceField";
+import { EventDecisionField } from "@/resources/shared/decisionField";
+import {
+  GroupMembershipGroupLinkField,
+  GroupMembershipGroupSourceField,
+} from "@/resources/shared/groupMembershipFields";
 import type { ReactElement } from "react";
 import {
   DataTable,
   DateField,
-  FunctionField,
   ListButton,
   Pagination,
-  RecordContextProvider,
   ReferenceField,
   ReferenceManyField,
   Show,
   TabbedShowLayout,
   TextField,
   TopToolbar,
-  useRecordContext,
 } from "react-admin";
-
-interface GroupMembershipRecord {
-  group: {
-    id?: string | null;
-    name?: string | null;
-    source?: string;
-  };
-}
-
-const GroupLinkField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembershipRecord>();
-
-  if (!membership) {
-    return <></>;
-  }
-
-  return <ResourceLink resource="groups" id={membership.group.id} label={membership.group.name} />;
-};
-
-const GroupSourceField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembershipRecord>();
-
-  if (!membership) {
-    return <></>;
-  }
-
-  return (
-    <RecordContextProvider value={{ source: membership.group.source }}>
-      <SourceField />
-    </RecordContextProvider>
-  );
-};
 
 const UserShowActions = (): ReactElement => (
   <TopToolbar>
@@ -72,10 +37,10 @@ export const UserShow = (): ReactElement => (
         <ReferenceManyField reference="group-memberships" target="user_id" pagination={<Pagination />}>
           <DataTable bulkActionButtons={false}>
             <DataTable.Col source="group.name" label="Name">
-              <GroupLinkField />
+              <GroupMembershipGroupLinkField />
             </DataTable.Col>
             <DataTable.Col source="group.source" label="Source">
-              <GroupSourceField />
+              <GroupMembershipGroupSourceField />
             </DataTable.Col>
           </DataTable>
         </ReferenceManyField>
@@ -105,18 +70,7 @@ export const UserShow = (): ReactElement => (
             </DataTable.Col>
             <DataTable.Col source="file_name" label="File Name" />
             <DataTable.Col source="decision" label="Decision">
-              <FunctionField
-                render={(record): ReactElement => {
-                  const { decision } = record as { decision: EventDecision };
-                  return (
-                    <DecisionChip
-                      decision={decision}
-                      label={eventDecisionName(decision)}
-                      description={EVENT_DECISION_DESCRIPTIONS[decision]}
-                    />
-                  );
-                }}
-              />
+              <EventDecisionField />
             </DataTable.Col>
           </DataTable>
         </ReferenceManyField>

@@ -137,7 +137,7 @@ func (store *Store) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domai
 		return domain.FileAccessEvent{}, decisionErr
 	}
 
-	processChain, processErr := unmarshalFileAccessProcessChain(row.ProcessChain)
+	processChain, processErr := pgutil.UnmarshalFileAccessProcessChain(row.ProcessChain)
 	if processErr != nil {
 		return domain.FileAccessEvent{}, processErr
 	}

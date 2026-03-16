@@ -25,13 +25,8 @@ func (handler *Server) ListExecutables(
 		return
 	}
 
-	mapped := make([]ExecutableSummary, 0, len(items))
-	for _, item := range items {
-		mapped = append(mapped, mapExecutableSummary(item))
-	}
-
 	writeJSON(writer, http.StatusOK, ExecutableListResponse{
-		Rows:  mapped,
+		Rows:  mapSliceValue(items, mapExecutableSummary),
 		Total: total,
 	})
 }

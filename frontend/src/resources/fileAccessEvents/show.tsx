@@ -1,13 +1,11 @@
-import type { FileAccessDecision, FileAccessEvent } from "@/api/types";
-import { FILE_ACCESS_DECISION_DESCRIPTIONS, fileAccessDecisionName } from "@/resources/fileAccessEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
+import type { FileAccessEvent } from "@/api/types";
+import { FileAccessDecisionField } from "@/resources/shared/decisionField";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import type { ReactElement } from "react";
 import {
   DateField,
   DeleteButton,
-  FunctionField,
   Labeled,
   ListButton,
   ReferenceField,
@@ -86,19 +84,9 @@ export const FileAccessEventShow = (): ReactElement => (
         <TextField source="rule_name" label="Rule Name" />
         <TextField source="rule_version" label="Rule Version" />
         <TextField source="target" label="Target" />
-        <FunctionField
-          label="Decision"
-          render={(record): ReactElement => {
-            const { decision } = record as { decision: FileAccessDecision };
-            return (
-              <DecisionChip
-                decision={decision}
-                label={fileAccessDecisionName(decision)}
-                description={FILE_ACCESS_DECISION_DESCRIPTIONS[decision]}
-              />
-            );
-          }}
-        />
+        <Labeled label="Decision">
+          <FileAccessDecisionField />
+        </Labeled>
         <DateField source="occurred_at" label="Occurred At" showTime />
         <DateField source="created_at" label="Ingested At" showTime />
       </TabbedShowLayout.Tab>

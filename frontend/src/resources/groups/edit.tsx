@@ -1,3 +1,4 @@
+import type { Group } from "@/api/types";
 import { GroupMembersTab } from "@/resources/groups/membersTab";
 import { trimmedRequired } from "@/resources/shared/validation";
 import type { ReactElement } from "react";
@@ -13,12 +14,8 @@ import {
   useRecordContext,
 } from "react-admin";
 
-interface GroupRecord {
-  source?: string;
-}
-
 const GroupOverviewTab = (): ReactElement => {
-  const record = useRecordContext<GroupRecord>();
+  const record = useRecordContext<Pick<Group, "source">>();
   if (!record) return <></>;
   const isLocal = record.source === "local";
 

@@ -1,59 +1,23 @@
-import type { EventDecision, FileAccessDecision } from "@/api/types";
-import { EVENT_DECISION_DESCRIPTIONS, eventDecisionName } from "@/resources/executionEvents/choices";
-import { FILE_ACCESS_DECISION_DESCRIPTIONS, fileAccessDecisionName } from "@/resources/fileAccessEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
-import { ResourceLink } from "@/resources/shared/resourceLinks";
-import { SourceField } from "@/resources/shared/sourceField";
+import { EventDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
+import {
+  GroupMembershipGroupLinkField,
+  GroupMembershipGroupSourceField,
+} from "@/resources/shared/groupMembershipFields";
 import type { ReactElement } from "react";
 import {
   BooleanField,
   DataTable,
   DateField,
   DeleteButton,
-  FunctionField,
   ListButton,
   Pagination,
-  RecordContextProvider,
   ReferenceField,
   ReferenceManyField,
   Show,
   TabbedShowLayout,
   TextField,
   TopToolbar,
-  useRecordContext,
 } from "react-admin";
-
-interface GroupMembershipRecord {
-  group: {
-    id?: string | null;
-    name?: string | null;
-    source?: string;
-  };
-}
-
-const GroupLinkField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembershipRecord>();
-
-  if (!membership) {
-    return <></>;
-  }
-
-  return <ResourceLink resource="groups" id={membership.group.id} label={membership.group.name} />;
-};
-
-const GroupSourceField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembershipRecord>();
-
-  if (!membership) {
-    return <></>;
-  }
-
-  return (
-    <RecordContextProvider value={{ source: membership.group.source }}>
-      <SourceField />
-    </RecordContextProvider>
-  );
-};
 
 const MachineShowActions = (): ReactElement => (
   <TopToolbar>
@@ -85,10 +49,10 @@ export const MachineShow = (): ReactElement => (
         <ReferenceManyField reference="group-memberships" target="machine_id" pagination={<Pagination />}>
           <DataTable bulkActionButtons={false}>
             <DataTable.Col source="group.name" label="Name">
-              <GroupLinkField />
+              <GroupMembershipGroupLinkField />
             </DataTable.Col>
             <DataTable.Col source="group.source" label="Source">
-              <GroupSourceField />
+              <GroupMembershipGroupSourceField />
             </DataTable.Col>
             <DataTable.Col source="kind" label="Membership" />
             <DataTable.Col source="member.name" label="Via" />
@@ -103,18 +67,7 @@ export const MachineShow = (): ReactElement => (
             </DataTable.Col>
             <DataTable.Col source="file_name" label="File" />
             <DataTable.Col source="decision" label="Decision">
-              <FunctionField
-                render={(record): ReactElement => {
-                  const { decision } = record as { decision: EventDecision };
-                  return (
-                    <DecisionChip
-                      decision={decision}
-                      label={eventDecisionName(decision)}
-                      description={EVENT_DECISION_DESCRIPTIONS[decision]}
-                    />
-                  );
-                }}
-              />
+              <EventDecisionField />
             </DataTable.Col>
             <DataTable.Col source="signing_id" label="Signing ID" />
           </DataTable>
@@ -129,18 +82,7 @@ export const MachineShow = (): ReactElement => (
             <DataTable.Col source="rule_name" label="Rule Name" />
             <DataTable.Col source="target" label="Target" />
             <DataTable.Col source="decision" label="Decision">
-              <FunctionField
-                render={(record): ReactElement => {
-                  const { decision } = record as { decision: FileAccessDecision };
-                  return (
-                    <DecisionChip
-                      decision={decision}
-                      label={fileAccessDecisionName(decision)}
-                      description={FILE_ACCESS_DECISION_DESCRIPTIONS[decision]}
-                    />
-                  );
-                }}
-              />
+              <FileAccessDecisionField />
             </DataTable.Col>
             <DataTable.Col source="file_name" label="Primary Process" />
           </DataTable>

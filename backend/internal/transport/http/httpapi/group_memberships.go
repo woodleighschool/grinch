@@ -3,8 +3,6 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	appgroupmemberships "github.com/woodleighschool/grinch/internal/app/groupmemberships"
 	"github.com/woodleighschool/grinch/internal/domain"
 )
@@ -20,31 +18,13 @@ func (handler *Server) ListGroupMemberships(
 		return
 	}
 
-	var groupID *uuid.UUID
-	if params.GroupId != nil {
-		value := *params.GroupId
-		groupID = &value
-	}
-
-	var userID *uuid.UUID
-	if params.UserId != nil {
-		value := *params.UserId
-		userID = &value
-	}
-
-	var machineID *uuid.UUID
-	if params.MachineId != nil {
-		value := *params.MachineId
-		machineID = &value
-	}
-
 	items, total, err := handler.groupMemberships.ListGroupMemberships(
 		request.Context(),
 		domain.GroupMembershipListOptions{
 			ListOptions: listOptions,
-			GroupID:     groupID,
-			UserID:      userID,
-			MachineID:   machineID,
+			GroupID:     params.GroupId,
+			UserID:      params.UserId,
+			MachineID:   params.MachineId,
 		},
 	)
 	if err != nil {
@@ -52,14 +32,10 @@ func (handler *Server) ListGroupMemberships(
 		return
 	}
 
-	mapped := make([]GroupMembership, 0, len(items))
-	for _, item := range items {
-		output, mapErr := mapGroupMembership(item)
-		if mapErr != nil {
-			writeClassifiedError(writer, mapErr, apiErrorOptions{})
-			return
-		}
-		mapped = append(mapped, output)
+	mapped, err := mapSlice(items, mapGroupMembership)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
 	}
 
 	writeJSON(writer, http.StatusOK, GroupMembershipListResponse{

@@ -3,8 +3,6 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
@@ -19,35 +17,18 @@ func (handler *Server) ListFileAccessEvents(
 		return
 	}
 
-	var machineID *uuid.UUID
-	if params.MachineId != nil {
-		parsed := *params.MachineId
-		machineID = &parsed
-	}
-
-	var executableID *uuid.UUID
-	if params.ExecutableId != nil {
-		parsed := *params.ExecutableId
-		executableID = &parsed
-	}
-
 	items, total, err := handler.admin.ListFileAccessEvents(request.Context(), domain.FileAccessEventListOptions{
 		ListOptions:  listOptions,
-		MachineID:    machineID,
-		ExecutableID: executableID,
+		MachineID:    params.MachineId,
+		ExecutableID: params.ExecutableId,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	mapped := make([]FileAccessEventSummary, 0, len(items))
-	for _, item := range items {
-		mapped = append(mapped, mapFileAccessEventSummary(item))
-	}
-
 	writeJSON(writer, http.StatusOK, FileAccessEventListResponse{
-		Rows:  mapped,
+		Rows:  mapSliceValue(items, mapFileAccessEventSummary),
 		Total: total,
 	})
 }

@@ -1,8 +1,6 @@
-import type { EventDecision } from "@/api/types";
-import { EVENT_DECISION_DESCRIPTIONS, eventDecisionName } from "@/resources/executionEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
+import { EventDecisionField } from "@/resources/shared/decisionField";
 import type { ReactElement } from "react";
-import { DataTable, DateField, FunctionField, List, ReferenceField, SearchInput, TextField } from "react-admin";
+import { DataTable, DateField, List, ReferenceField, SearchInput, TextField } from "react-admin";
 
 const executionEventFilters = [<SearchInput key="search" source="search" alwaysOn />];
 
@@ -13,18 +11,7 @@ export const ExecutionEventList = (): ReactElement => (
         <DateField source="occurred_at" showTime />
       </DataTable.Col>
       <DataTable.Col source="decision" label="Decision">
-        <FunctionField
-          render={(record): ReactElement => {
-            const { decision } = record as { decision: EventDecision };
-            return (
-              <DecisionChip
-                decision={decision}
-                label={eventDecisionName(decision)}
-                description={EVENT_DECISION_DESCRIPTIONS[decision]}
-              />
-            );
-          }}
-        />
+        <EventDecisionField />
       </DataTable.Col>
       <DataTable.Col label="Machine">
         <ReferenceField source="machine_id" reference="machines">

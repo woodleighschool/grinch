@@ -1,6 +1,7 @@
-import type { RulePolicy, RuleTarget } from "@/api/types";
+import type { Rule, RulePolicy, RuleTarget } from "@/api/types";
 import { getErrorMessage } from "@/resources/shared/errors";
 import { SANTA_CEL_PLAYGROUND_URL, SANTA_RULE_POLICY_DOCS } from "@/resources/shared/externalLinks";
+import { searchFilterToQuery } from "@/resources/shared/search";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -46,10 +47,6 @@ import {
 } from "react-admin";
 
 type Assignment = "include" | "exclude";
-
-interface RuleRecord {
-  id?: string;
-}
 
 interface RuleTargetEditorValues {
   subject_id?: string;
@@ -210,7 +207,7 @@ const RuleTargetDialog = ({
                 label="Group"
                 optionText="name"
                 optionValue="id"
-                filterToQuery={(searchText: string): { search: string } => ({ search: searchText })}
+                filterToQuery={searchFilterToQuery}
                 validate={required()}
                 disabled={isSubmitting}
                 fullWidth
@@ -520,7 +517,7 @@ const RuleTargetsSection = ({ assignment, ruleID }: RuleTargetsSectionProperties
 };
 
 export const RuleTargetsTab = (): ReactElement => {
-  const record = useRecordContext<RuleRecord>();
+  const record = useRecordContext<Pick<Rule, "id">>();
 
   if (!record?.id) {
     return <></>;

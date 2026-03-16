@@ -2,7 +2,6 @@ package santa
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,23 +12,8 @@ import (
 	appsanta "github.com/woodleighschool/grinch/internal/app/santa"
 	"github.com/woodleighschool/grinch/internal/domain"
 	"github.com/woodleighschool/grinch/internal/store/db"
+	pgutil "github.com/woodleighschool/grinch/internal/store/postgres/shared"
 )
-
-type signingChainRecord struct {
-	CommonName         string    `json:"common_name"`
-	Organization       string    `json:"organization"`
-	OrganizationalUnit string    `json:"organizational_unit"`
-	SHA256             string    `json:"sha256"`
-	ValidFrom          time.Time `json:"valid_from"`
-	ValidUntil         time.Time `json:"valid_until"`
-}
-
-type fileAccessProcessRecord struct {
-	Position     int32     `json:"position"`
-	Pid          int32     `json:"pid"`
-	FilePath     string    `json:"file_path"`
-	ExecutableID uuid.UUID `json:"executable_id"`
-}
 
 func (store *Store) UpsertMachine(ctx context.Context, machine appsanta.MachineUpsert) error {
 	_, err := store.store.Queries().UpsertMachine(ctx, db.UpsertMachineParams{
@@ -158,12 +142,12 @@ func getOrCreateEventExecutable(
 	queries *db.Queries,
 	event *syncv1.Event,
 ) (uuid.UUID, error) {
-	entitlementsJSON, entitlementsErr := marshalEntitlements(event.GetEntitlementInfo())
+	entitlementsJSON, entitlementsErr := pgutil.MarshalEntitlements(event.GetEntitlementInfo())
 	if entitlementsErr != nil {
 		return uuid.Nil, entitlementsErr
 	}
 
-	signingChainJSON, signingChainErr := marshalSigningChain(event.GetSigningChain())
+	signingChainJSON, signingChainErr := pgutil.MarshalSigningChain(event.GetSigningChain())
 	if signingChainErr != nil {
 		return uuid.Nil, signingChainErr
 	}
@@ -234,9 +218,9 @@ func createFileAccessEvent(
 		return decisionErr
 	}
 
-	processChain := make([]fileAccessProcessRecord, 0, len(event.GetProcessChain()))
+	processChain := make([]domain.FileAccessEventProcess, 0, len(event.GetProcessChain()))
 	var primaryExecutableID *uuid.UUID
-	for index, process := range event.GetProcessChain() {
+	for _, process := range event.GetProcessChain() {
 		if process == nil {
 			continue
 		}
@@ -250,17 +234,16 @@ func createFileAccessEvent(
 			primaryExecutableID = &executableID
 		}
 
-		processChain = append(processChain, fileAccessProcessRecord{
-			Position:     int32(index),
+		processChain = append(processChain, domain.FileAccessEventProcess{
 			Pid:          process.GetPid(),
 			FilePath:     process.GetFilePath(),
 			ExecutableID: executableID,
 		})
 	}
 
-	processChainJSON, processChainErr := json.Marshal(processChain)
+	processChainJSON, processChainErr := pgutil.MarshalFileAccessProcessChain(processChain)
 	if processChainErr != nil {
-		return fmt.Errorf("marshal file access process chain: %w", processChainErr)
+		return processChainErr
 	}
 
 	eventID, idErr := newUUID()
@@ -291,7 +274,7 @@ func getOrCreateProcessExecutable(
 	queries *db.Queries,
 	process *syncv1.Process,
 ) (uuid.UUID, error) {
-	signingChainJSON, signingChainErr := marshalSigningChain(process.GetSigningChain())
+	signingChainJSON, signingChainErr := pgutil.MarshalSigningChain(process.GetSigningChain())
 	if signingChainErr != nil {
 		return uuid.Nil, signingChainErr
 	}
@@ -323,68 +306,4 @@ func nullableUUID(value *uuid.UUID) pgtype.UUID {
 	}
 
 	return pgtype.UUID{Bytes: *value, Valid: true}
-}
-
-func marshalEntitlements(info *syncv1.EntitlementInfo) ([]byte, error) {
-	if info == nil {
-		return []byte("{}"), nil
-	}
-
-	entitlements := make(map[string]any, len(info.GetEntitlements()))
-	for _, entitlement := range info.GetEntitlements() {
-		if entitlement == nil {
-			continue
-		}
-
-		key := entitlement.GetKey()
-		if key == "" {
-			continue
-		}
-
-		rawValue := entitlement.GetValue()
-		if rawValue == "" {
-			entitlements[key] = nil
-			continue
-		}
-
-		var decodedValue any
-		if err := json.Unmarshal([]byte(rawValue), &decodedValue); err != nil {
-			entitlements[key] = rawValue
-			continue
-		}
-
-		entitlements[key] = decodedValue
-	}
-
-	encoded, err := json.Marshal(entitlements)
-	if err != nil {
-		return nil, fmt.Errorf("marshal entitlements: %w", err)
-	}
-
-	return encoded, nil
-}
-
-func marshalSigningChain(certificates []*syncv1.Certificate) ([]byte, error) {
-	records := make([]signingChainRecord, 0, len(certificates))
-	for _, certificate := range certificates {
-		if certificate == nil {
-			continue
-		}
-
-		records = append(records, signingChainRecord{
-			CommonName:         certificate.GetCn(),
-			Organization:       certificate.GetOrg(),
-			OrganizationalUnit: certificate.GetOu(),
-			SHA256:             certificate.GetSha256(),
-			ValidFrom:          time.Unix(int64(certificate.GetValidFrom()), 0).UTC(),
-			ValidUntil:         time.Unix(int64(certificate.GetValidUntil()), 0).UTC(),
-		})
-	}
-
-	encoded, err := json.Marshal(records)
-	if err != nil {
-		return nil, fmt.Errorf("marshal signing chain: %w", err)
-	}
-
-	return encoded, nil
 }

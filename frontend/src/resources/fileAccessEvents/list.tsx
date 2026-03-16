@@ -1,8 +1,6 @@
-import type { FileAccessDecision } from "@/api/types";
-import { FILE_ACCESS_DECISION_DESCRIPTIONS, fileAccessDecisionName } from "@/resources/fileAccessEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
+import { FileAccessDecisionField } from "@/resources/shared/decisionField";
 import type { ReactElement } from "react";
-import { DataTable, DateField, FunctionField, List, ReferenceField, SearchInput, TextField } from "react-admin";
+import { DataTable, DateField, List, ReferenceField, SearchInput, TextField } from "react-admin";
 
 const fileAccessEventFilters = [<SearchInput key="search" source="search" alwaysOn />];
 
@@ -13,18 +11,7 @@ export const FileAccessEventList = (): ReactElement => (
         <DateField source="occurred_at" showTime />
       </DataTable.Col>
       <DataTable.Col source="decision" label="Decision">
-        <FunctionField
-          render={(record): ReactElement => {
-            const { decision } = record as { decision: FileAccessDecision };
-            return (
-              <DecisionChip
-                decision={decision}
-                label={fileAccessDecisionName(decision)}
-                description={FILE_ACCESS_DECISION_DESCRIPTIONS[decision]}
-              />
-            );
-          }}
-        />
+        <FileAccessDecisionField />
       </DataTable.Col>
       <DataTable.Col label="Machine">
         <ReferenceField source="machine_id" reference="machines">

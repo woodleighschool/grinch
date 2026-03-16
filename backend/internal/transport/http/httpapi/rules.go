@@ -20,14 +20,10 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	mapped := make([]RuleSummary, 0, len(items))
-	for _, item := range items {
-		output, mapErr := mapRuleSummary(item)
-		if mapErr != nil {
-			writeClassifiedError(writer, mapErr, apiErrorOptions{})
-			return
-		}
-		mapped = append(mapped, output)
+	mapped, err := mapSlice(items, mapRuleSummary)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
 	}
 
 	writeJSON(writer, http.StatusOK, RuleListResponse{

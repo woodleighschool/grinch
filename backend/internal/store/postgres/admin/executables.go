@@ -2,9 +2,7 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -13,21 +11,6 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/db"
 	pgutil "github.com/woodleighschool/grinch/internal/store/postgres/shared"
 )
-
-type signingChainRecord struct {
-	CommonName         string    `json:"common_name"`
-	Organization       string    `json:"organization"`
-	OrganizationalUnit string    `json:"organizational_unit"`
-	SHA256             string    `json:"sha256"`
-	ValidFrom          time.Time `json:"valid_from"`
-	ValidUntil         time.Time `json:"valid_until"`
-}
-
-type fileAccessProcessRecord struct {
-	Pid          int32     `json:"pid"`
-	FilePath     string    `json:"file_path"`
-	ExecutableID uuid.UUID `json:"executable_id"`
-}
 
 func (store *Store) ListExecutables(
 	ctx context.Context,
@@ -119,12 +102,12 @@ func (store *Store) GetExecutable(ctx context.Context, id uuid.UUID) (domain.Exe
 }
 
 func mapExecutable(row db.Executable) (domain.Executable, error) {
-	entitlements, entitlementsErr := unmarshalEntitlements(row.Entitlements)
+	entitlements, entitlementsErr := pgutil.UnmarshalEntitlements(row.Entitlements)
 	if entitlementsErr != nil {
 		return domain.Executable{}, entitlementsErr
 	}
 
-	signingChain, signingChainErr := unmarshalSigningChain(row.SigningChain)
+	signingChain, signingChainErr := pgutil.UnmarshalSigningChain(row.SigningChain)
 	if signingChainErr != nil {
 		return domain.Executable{}, signingChainErr
 	}
@@ -144,63 +127,4 @@ func mapExecutable(row db.Executable) (domain.Executable, error) {
 		SigningChain:   signingChain,
 		CreatedAt:      row.CreatedAt,
 	}, nil
-}
-
-func unmarshalEntitlements(raw []byte) (map[string]domain.Entitlement, error) {
-	records := make(map[string]any)
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &records); err != nil {
-			return nil, fmt.Errorf("decode entitlements: %w", err)
-		}
-	}
-
-	entitlements := make(map[string]domain.Entitlement, len(records))
-	for key, value := range records {
-		entitlements[key] = domain.Entitlement{Value: value}
-	}
-
-	return entitlements, nil
-}
-
-func unmarshalSigningChain(raw []byte) ([]domain.SigningChainEntry, error) {
-	records := make([]signingChainRecord, 0)
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &records); err != nil {
-			return nil, fmt.Errorf("decode signing chain: %w", err)
-		}
-	}
-
-	signingChain := make([]domain.SigningChainEntry, 0, len(records))
-	for _, record := range records {
-		signingChain = append(signingChain, domain.SigningChainEntry{
-			CommonName:         record.CommonName,
-			Organization:       record.Organization,
-			OrganizationalUnit: record.OrganizationalUnit,
-			SHA256:             record.SHA256,
-			ValidFrom:          record.ValidFrom.UTC(),
-			ValidUntil:         record.ValidUntil.UTC(),
-		})
-	}
-
-	return signingChain, nil
-}
-
-func unmarshalFileAccessProcessChain(raw []byte) ([]domain.FileAccessEventProcess, error) {
-	records := make([]fileAccessProcessRecord, 0)
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &records); err != nil {
-			return nil, fmt.Errorf("decode file access process chain: %w", err)
-		}
-	}
-
-	processes := make([]domain.FileAccessEventProcess, 0, len(records))
-	for _, record := range records {
-		processes = append(processes, domain.FileAccessEventProcess{
-			Pid:          record.Pid,
-			FilePath:     record.FilePath,
-			ExecutableID: record.ExecutableID,
-		})
-	}
-
-	return processes, nil
 }

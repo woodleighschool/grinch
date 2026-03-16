@@ -3,8 +3,6 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	appruletargets "github.com/woodleighschool/grinch/internal/app/ruletargets"
 	"github.com/woodleighschool/grinch/internal/domain"
 )
@@ -20,49 +18,41 @@ func (handler *Server) ListRuleTargets(
 		return
 	}
 
-	var ruleID *uuid.UUID
-	if params.RuleId != nil {
-		value := *params.RuleId
-		ruleID = &value
+	subjectKindValue, hasSubjectKind, err := decodeOptional(params.SubjectKind, toDomainRuleTargetSubjectKind)
+	if err != nil {
+		writeClassifiedError(writer, badRequestError("invalid subject_kind"), apiErrorOptions{})
+		return
 	}
 	var subjectKind *domain.RuleTargetSubjectKind
-	if params.SubjectKind != nil {
-		value, valueErr := toDomainRuleTargetSubjectKind(*params.SubjectKind)
-		if valueErr != nil {
-			writeClassifiedError(writer, badRequestError("invalid subject_kind"), apiErrorOptions{})
-			return
-		}
-		subjectKind = &value
+	if hasSubjectKind {
+		subjectKind = &subjectKindValue
 	}
-	var subjectID *uuid.UUID
-	if params.SubjectId != nil {
-		value := *params.SubjectId
-		subjectID = &value
+
+	assignmentValue, hasAssignment, err := decodeOptional(params.Assignment, toDomainRuleTargetAssignment)
+	if err != nil {
+		writeClassifiedError(writer, badRequestError("invalid assignment"), apiErrorOptions{})
+		return
 	}
 	var assignment *domain.RuleTargetAssignment
-	if params.Assignment != nil {
-		value, valueErr := toDomainRuleTargetAssignment(*params.Assignment)
-		if valueErr != nil {
-			writeClassifiedError(writer, badRequestError("invalid assignment"), apiErrorOptions{})
-			return
-		}
-		assignment = &value
+	if hasAssignment {
+		assignment = &assignmentValue
+	}
+
+	policyValue, hasPolicy, err := decodeOptional(params.Policy, toDomainRulePolicy)
+	if err != nil {
+		writeClassifiedError(writer, badRequestError("invalid policy"), apiErrorOptions{})
+		return
 	}
 	var policy *domain.RulePolicy
-	if params.Policy != nil {
-		value, valueErr := toDomainRulePolicy(*params.Policy)
-		if valueErr != nil {
-			writeClassifiedError(writer, badRequestError("invalid policy"), apiErrorOptions{})
-			return
-		}
-		policy = &value
+	if hasPolicy {
+		policy = &policyValue
 	}
 
 	items, total, err := handler.ruleTargets.ListRuleTargets(request.Context(), domain.RuleTargetListOptions{
 		ListOptions: listOptions,
-		RuleID:      ruleID,
+		RuleID:      params.RuleId,
 		SubjectKind: subjectKind,
-		SubjectID:   subjectID,
+		SubjectID:   params.SubjectId,
 		Assignment:  assignment,
 		Policy:      policy,
 	})
@@ -71,14 +61,10 @@ func (handler *Server) ListRuleTargets(
 		return
 	}
 
-	mapped := make([]RuleTargetSummary, 0, len(items))
-	for _, item := range items {
-		output, mapErr := mapRuleTargetSummary(item)
-		if mapErr != nil {
-			writeClassifiedError(writer, mapErr, apiErrorOptions{})
-			return
-		}
-		mapped = append(mapped, output)
+	mapped, err := mapSlice(items, mapRuleTargetSummary)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
 	}
 
 	writeJSON(writer, http.StatusOK, RuleTargetListResponse{

@@ -1,12 +1,10 @@
-import type { EventDecision } from "@/api/types";
-import { EVENT_DECISION_DESCRIPTIONS, eventDecisionName } from "@/resources/executionEvents/choices";
-import { DecisionChip } from "@/resources/shared/decisionField";
+import { EventDecisionField } from "@/resources/shared/decisionField";
 import { ExecutableEntitlementsArrayField, SigningChainArrayField } from "@/resources/shared/executableFields";
 import type { ReactElement } from "react";
 import {
   DateField,
   DeleteButton,
-  FunctionField,
+  Labeled,
   ListButton,
   ReferenceField,
   Show,
@@ -33,19 +31,9 @@ export const ExecutionEventShow = (): ReactElement => (
         <ReferenceField source="executable_id" reference="executables" label="Executable">
           <TextField source="file_name" />
         </ReferenceField>
-        <FunctionField
-          label="Decision"
-          render={(record): ReactElement => {
-            const { decision } = record as { decision: EventDecision };
-            return (
-              <DecisionChip
-                decision={decision}
-                label={eventDecisionName(decision)}
-                description={EVENT_DECISION_DESCRIPTIONS[decision]}
-              />
-            );
-          }}
-        />
+        <Labeled label="Decision">
+          <EventDecisionField />
+        </Labeled>
         <TextField source="executing_user" label="Executing User" />
         <DateField source="occurred_at" label="Occurred At" showTime />
         <DateField source="created_at" label="Ingested At" showTime />

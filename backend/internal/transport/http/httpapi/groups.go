@@ -27,14 +27,10 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	mapped := make([]Group, 0, len(items))
-	for _, item := range items {
-		output, mapErr := mapGroup(item)
-		if mapErr != nil {
-			writeClassifiedError(writer, mapErr, apiErrorOptions{})
-			return
-		}
-		mapped = append(mapped, output)
+	mapped, err := mapSlice(items, mapGroup)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
 	}
 
 	writeJSON(writer, http.StatusOK, GroupListResponse{

@@ -140,12 +140,12 @@ func (store *Store) GetExecutionEvent(ctx context.Context, id uuid.UUID) (domain
 		return domain.ExecutionEvent{}, decisionErr
 	}
 
-	signingChain, signingChainErr := unmarshalSigningChain(row.SigningChain)
+	signingChain, signingChainErr := pgutil.UnmarshalSigningChain(row.SigningChain)
 	if signingChainErr != nil {
 		return domain.ExecutionEvent{}, signingChainErr
 	}
 
-	entitlements, entitlementsErr := unmarshalEntitlements(row.Entitlements)
+	entitlements, entitlementsErr := pgutil.UnmarshalEntitlements(row.Entitlements)
 	if entitlementsErr != nil {
 		return domain.ExecutionEvent{}, entitlementsErr
 	}

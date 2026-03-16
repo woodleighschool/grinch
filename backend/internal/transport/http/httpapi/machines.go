@@ -3,8 +3,6 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
@@ -15,28 +13,17 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 		return
 	}
 
-	var userID *uuid.UUID
-	if params.UserId != nil {
-		value := *params.UserId
-		userID = &value
-	}
-
 	items, total, err := handler.admin.ListMachines(request.Context(), domain.MachineListOptions{
 		ListOptions: listOptions,
-		UserID:      userID,
+		UserID:      params.UserId,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	mapped := make([]MachineSummary, 0, len(items))
-	for _, item := range items {
-		mapped = append(mapped, mapMachineSummary(item))
-	}
-
 	writeJSON(writer, http.StatusOK, MachineListResponse{
-		Rows:  mapped,
+		Rows:  mapSliceValue(items, mapMachineSummary),
 		Total: total,
 	})
 }

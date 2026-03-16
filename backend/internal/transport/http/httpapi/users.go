@@ -19,14 +19,10 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	mapped := make([]User, 0, len(items))
-	for _, item := range items {
-		output, mapErr := mapUser(item)
-		if mapErr != nil {
-			writeClassifiedError(writer, mapErr, apiErrorOptions{})
-			return
-		}
-		mapped = append(mapped, output)
+	mapped, err := mapSlice(items, mapUser)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
 	}
 
 	writeJSON(writer, http.StatusOK, UserListResponse{
