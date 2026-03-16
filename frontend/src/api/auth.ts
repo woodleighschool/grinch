@@ -10,7 +10,7 @@ export const isAuthError = (error: unknown): boolean => {
     return false;
   }
   const status = (error as { status?: number }).status;
-  return status === 401 || status === 403;
+  return status === 401;
 };
 
 export async function getCurrentUser(signal?: AbortSignal): Promise<AuthUser | undefined> {

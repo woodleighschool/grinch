@@ -9,7 +9,7 @@ interface ResourceLinkProperties {
 }
 
 export const ResourceLink = ({ id, label, resource }: ResourceLinkProperties): ReactElement => {
-  if (!id || !label || label.trim() === "") {
+  if (!id || !label) {
     return <></>;
   }
 
