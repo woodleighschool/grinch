@@ -200,36 +200,61 @@ WITH effective_groups AS (
   WHERE m.machine_id = $1
     AND m.primary_user <> ''
 ),
-matching_excludes AS (
-  SELECT DISTINCT rt.rule_id
+machine_user AS (
+  SELECT u.id
+  FROM machines AS m
+  JOIN users AS u
+    ON u.upn = m.primary_user
+  WHERE m.machine_id = $1
+    AND m.primary_user <> ''
+),
+matching_targets AS (
+  SELECT
+    rt.rule_id,
+    rt.subject_kind,
+    rt.subject_id,
+    rt.assignment,
+    rt.priority,
+    rt.policy,
+    rt.cel_expression
   FROM rule_targets AS rt
-  JOIN effective_groups AS eg
-    ON eg.group_id = rt.subject_id
-  WHERE rt.assignment = 'exclude'
-    AND rt.subject_kind = 'group'
+  WHERE rt.subject_kind = 'all_devices'
+    OR (
+      rt.subject_kind = 'all_users'
+      AND EXISTS (SELECT 1 FROM machine_user)
+    )
+    OR (
+      rt.subject_kind = 'group'
+      AND EXISTS (
+        SELECT 1
+        FROM effective_groups AS eg
+        WHERE eg.group_id = rt.subject_id
+      )
+    )
+),
+matching_excludes AS (
+  SELECT DISTINCT mt.rule_id
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'exclude'
 ),
 matching_includes AS (
   SELECT
-    rt.rule_id,
-    rt.subject_id,
-    rt.priority,
-    rt.policy,
-    rt.cel_expression,
+    mt.rule_id,
+    mt.subject_kind,
+    mt.subject_id,
+    mt.priority,
+    mt.policy,
+    mt.cel_expression,
     ROW_NUMBER() OVER (
-      PARTITION BY rt.rule_id
-      ORDER BY rt.priority ASC, rt.subject_id ASC
+      PARTITION BY mt.rule_id
+      ORDER BY mt.priority ASC, mt.subject_kind ASC, mt.subject_id ASC NULLS FIRST
     ) AS include_rank
-  FROM rule_targets AS rt
-  JOIN effective_groups AS eg
-    ON eg.group_id = rt.subject_id
-  WHERE rt.assignment = 'include'
-    AND rt.subject_kind = 'group'
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'include'
 ),
 winning_includes AS (
   SELECT
     rule_id,
-    subject_id,
-    priority,
     policy,
     cel_expression
   FROM matching_includes
@@ -243,8 +268,6 @@ SELECT
   r.identifier_key,
   r.custom_message,
   r.custom_url,
-  wi.subject_id AS matched_group_id,
-  wi.priority AS matched_priority,
   wi.policy,
   wi.cel_expression
 FROM rules AS r
@@ -258,17 +281,15 @@ ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC
 `
 
 type ListResolvedRulesForMachineRow struct {
-	ID              uuid.UUID
-	Name            string
-	RuleType        string
-	Identifier      string
-	IdentifierKey   pgtype.Text
-	CustomMessage   string
-	CustomUrl       string
-	MatchedGroupID  uuid.UUID
-	MatchedPriority pgtype.Int4
-	Policy          pgtype.Text
-	CelExpression   string
+	ID            uuid.UUID
+	Name          string
+	RuleType      string
+	Identifier    string
+	IdentifierKey pgtype.Text
+	CustomMessage string
+	CustomUrl     string
+	Policy        pgtype.Text
+	CelExpression string
 }
 
 func (q *Queries) ListResolvedRulesForMachine(ctx context.Context, memberID uuid.UUID) ([]ListResolvedRulesForMachineRow, error) {
@@ -288,8 +309,6 @@ func (q *Queries) ListResolvedRulesForMachine(ctx context.Context, memberID uuid
 			&i.IdentifierKey,
 			&i.CustomMessage,
 			&i.CustomUrl,
-			&i.MatchedGroupID,
-			&i.MatchedPriority,
 			&i.Policy,
 			&i.CelExpression,
 		); err != nil {

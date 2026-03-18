@@ -17,7 +17,7 @@ import {
 const ExecutionEventShowActions = (): ReactElement => (
   <TopToolbar>
     <ListButton />
-    <DeleteButton redirect="list" mutationMode="optimistic" />
+    <DeleteButton redirect="list" mutationMode="pessimistic" />
   </TopToolbar>
 );
 

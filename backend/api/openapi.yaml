@@ -279,8 +279,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-    patch:
-      operationId: patchGroup
+    put:
+      operationId: updateGroup
       tags:
         - groups
       parameters:
@@ -290,7 +290,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GroupPatchRequest'
+              $ref: '#/components/schemas/GroupCreateRequest'
       responses:
         '200':
           description: Group updated.
@@ -365,104 +365,6 @@ paths:
           description: Machine deleted.
         default:
           $ref: '#/components/responses/Problem'
-  /rule-targets:
-    get:
-      operationId: listRuleTargets
-      tags:
-        - rule-targets
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/RuleIdFilter'
-        - $ref: '#/components/parameters/SubjectKindFilter'
-        - $ref: '#/components/parameters/SubjectIdFilter'
-        - $ref: '#/components/parameters/RuleTargetAssignmentFilter'
-        - $ref: '#/components/parameters/RulePolicyFilter'
-      responses:
-        '200':
-          description: Rule target list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleTargetListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
-    post:
-      operationId: createRuleTarget
-      tags:
-        - rule-targets
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RuleTargetCreateRequest'
-      responses:
-        '201':
-          description: Rule target created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleTarget'
-        default:
-          $ref: '#/components/responses/Problem'
-  /rule-targets/{id}:
-    get:
-      operationId: getRuleTarget
-      tags:
-        - rule-targets
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      responses:
-        '200':
-          description: Rule target detail.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleTarget'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    patch:
-      operationId: patchRuleTarget
-      tags:
-        - rule-targets
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RuleTargetPatchRequest'
-      responses:
-        '200':
-          description: Rule target updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleTarget'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    delete:
-      operationId: deleteRuleTarget
-      tags:
-        - rule-targets
-      parameters:
-        - $ref: '#/components/parameters/Id'
-      responses:
-        '204':
-          description: Rule target deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
   /rules:
     get:
       operationId: listRules
@@ -520,8 +422,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-    patch:
-      operationId: patchRule
+    put:
+      operationId: updateRule
       tags:
         - rules
       parameters:
@@ -531,7 +433,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RulePatchRequest'
+              $ref: '#/components/schemas/RuleUpdateRequest'
       responses:
         '200':
           description: Rule updated.
@@ -689,11 +591,6 @@ components:
       in: query
       schema:
         $ref: '#/components/schemas/RuleTargetSubjectKind'
-    RuleTargetAssignmentFilter:
-      name: assignment
-      in: query
-      schema:
-        $ref: '#/components/schemas/RuleTargetAssignment'
     RulePolicyFilter:
       name: policy
       in: query
@@ -732,6 +629,16 @@ components:
         - block_signing_id
         - block_cd_hash
         - bundle_binary
+    ExcludedGroup:
+      type: object
+      required:
+        - group_id
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        group_name:
+          type: string
     Executable:
       allOf:
         - $ref: '#/components/schemas/ExecutableSummary'
@@ -1216,13 +1123,23 @@ components:
           format: uuid
         name:
           type: string
-    GroupPatchRequest:
+    IncludeRuleTarget:
       type: object
-      minProperties: 1
+      required:
+        - subject_kind
+        - policy
       properties:
-        name:
+        subject_kind:
+          $ref: '#/components/schemas/RuleTargetSubjectKind'
+        subject_id:
           type: string
-        description:
+          format: uuid
+          nullable: true
+        subject_name:
+          type: string
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+        cel_expression:
           type: string
     Machine:
       type: object
@@ -1364,6 +1281,7 @@ components:
             - custom_message
             - custom_url
             - enabled
+            - targets
           properties:
             custom_message:
               type: string
@@ -1371,12 +1289,15 @@ components:
               type: string
             enabled:
               type: boolean
+            targets:
+              $ref: '#/components/schemas/RuleTargets'
     RuleCreateRequest:
       type: object
       required:
         - name
         - rule_type
         - identifier
+        - targets
       properties:
         name:
           type: string
@@ -1393,6 +1314,8 @@ components:
         enabled:
           type: boolean
           description: Default true when omitted.
+        targets:
+          $ref: '#/components/schemas/RuleTargets'
     RuleListResponse:
       type: object
       required:
@@ -1406,24 +1329,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RuleSummary'
-    RulePatchRequest:
-      type: object
-      minProperties: 1
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        rule_type:
-          $ref: '#/components/schemas/RuleType'
-        identifier:
-          type: string
-        custom_message:
-          type: string
-        custom_url:
-          type: string
-        enabled:
-          type: boolean
     RulePolicy:
       type: string
       enum:
@@ -1462,112 +1367,26 @@ components:
         updated_at:
           type: string
           format: date-time
-    RuleTarget:
-      allOf:
-        - $ref: '#/components/schemas/RuleTargetSummary'
-        - type: object
-          properties:
-            cel_expression:
-              type: string
-    RuleTargetAssignment:
-      type: string
-      enum:
-        - include
-        - exclude
-    RuleTargetCreateRequest:
-      type: object
-      required:
-        - rule_id
-        - subject_id
-        - assignment
-      properties:
-        rule_id:
-          type: string
-          format: uuid
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
-          type: integer
-          format: int32
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-        cel_expression:
-          type: string
-    RuleTargetListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/RuleTargetSummary'
-    RuleTargetPatchRequest:
-      type: object
-      minProperties: 1
-      properties:
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
-          type: integer
-          format: int32
-          nullable: true
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-          nullable: true
-        cel_expression:
-          type: string
     RuleTargetSubjectKind:
       type: string
       enum:
         - group
-    RuleTargetSummary:
+        - all_devices
+        - all_users
+    RuleTargets:
       type: object
       required:
-        - id
-        - rule_id
-        - subject_kind
-        - subject_id
-        - assignment
-        - created_at
-        - updated_at
+        - include
+        - exclude
       properties:
-        id:
-          type: string
-          format: uuid
-        rule_id:
-          type: string
-          format: uuid
-        subject_kind:
-          $ref: '#/components/schemas/RuleTargetSubjectKind'
-        subject_id:
-          type: string
-          format: uuid
-        assignment:
-          $ref: '#/components/schemas/RuleTargetAssignment'
-        priority:
-          type: integer
-          format: int32
-          nullable: true
-        policy:
-          $ref: '#/components/schemas/RulePolicy'
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+        include:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncludeRuleTarget'
+        exclude:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExcludedGroup'
     RuleType:
       type: string
       enum:
@@ -1576,6 +1395,9 @@ components:
         - team_id
         - signing_id
         - cd_hash
+    RuleUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/RuleCreateRequest'
     SigningChainEntry:
       type: object
       required:

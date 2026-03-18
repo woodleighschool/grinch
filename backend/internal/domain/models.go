@@ -56,7 +56,9 @@ const (
 type RuleTargetSubjectKind string
 
 const (
-	RuleTargetSubjectKindGroup RuleTargetSubjectKind = "group"
+	RuleTargetSubjectKindGroup      RuleTargetSubjectKind = "group"
+	RuleTargetSubjectKindAllDevices RuleTargetSubjectKind = "all_devices"
+	RuleTargetSubjectKindAllUsers   RuleTargetSubjectKind = "all_users"
 )
 
 type Machine struct {
@@ -223,6 +225,7 @@ type Rule struct {
 	CustomMessage string
 	CustomURL     string
 	Enabled       bool
+	Targets       RuleTargets
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -239,34 +242,27 @@ type RuleSummary struct {
 }
 
 type GroupTarget struct {
-	SubjectID  uuid.UUID
+	SubjectID  *uuid.UUID
 	Assignment RuleTargetAssignment
 	Priority   *int32
 }
 
-type RuleTarget struct {
-	ID            uuid.UUID
-	RuleID        uuid.UUID
-	SubjectKind   RuleTargetSubjectKind
-	SubjectID     uuid.UUID
-	Assignment    RuleTargetAssignment
-	Priority      *int32
-	Policy        *RulePolicy
-	CELExpression string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+type RuleTargets struct {
+	Include []IncludeRuleTarget
+	Exclude []ExcludedGroup
 }
 
-type RuleTargetSummary struct {
-	ID          uuid.UUID
-	RuleID      uuid.UUID
-	SubjectKind RuleTargetSubjectKind
-	SubjectID   uuid.UUID
-	Assignment  RuleTargetAssignment
-	Priority    *int32
-	Policy      *RulePolicy
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+type IncludeRuleTarget struct {
+	SubjectKind   RuleTargetSubjectKind
+	SubjectID     *uuid.UUID
+	SubjectName   string
+	Policy        RulePolicy
+	CELExpression string
+}
+
+type ExcludedGroup struct {
+	GroupID   uuid.UUID
+	GroupName string
 }
 
 type MachineRuleTarget struct {

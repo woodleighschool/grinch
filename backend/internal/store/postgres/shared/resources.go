@@ -67,7 +67,7 @@ func GetMachine(ctx context.Context, queries *db.Queries, id uuid.UUID) (domain.
 		OSBuild:          row.OsBuild,
 		SantaVersion:     row.SantaVersion,
 		PrimaryUser:      row.PrimaryUser,
-		PrimaryUserID:    UUIDPointer(row.PrimaryUserID),
+		PrimaryUserID:    row.PrimaryUserID,
 		RequestCleanSync: row.RequestCleanSync,
 		LastSeenAt:       row.LastSeenAt,
 		CreatedAt:        row.CreatedAt,

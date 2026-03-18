@@ -101,6 +101,10 @@ func ParseRuleTargetSubjectKind(value string) (RuleTargetSubjectKind, error) {
 	switch RuleTargetSubjectKind(value) {
 	case RuleTargetSubjectKindGroup:
 		return RuleTargetSubjectKindGroup, nil
+	case RuleTargetSubjectKindAllDevices:
+		return RuleTargetSubjectKindAllDevices, nil
+	case RuleTargetSubjectKindAllUsers:
+		return RuleTargetSubjectKindAllUsers, nil
 	default:
 		return "", fmt.Errorf("unsupported rule target subject kind %q", value)
 	}

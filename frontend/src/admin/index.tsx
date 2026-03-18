@@ -32,6 +32,5 @@ export const App = (): ReactElement => (
     <Resource name="users" {...users} />
     <Resource name="groups" {...groups} />
     <Resource name="group-memberships" />
-    <Resource name="rule-targets" />
   </Admin>
 );

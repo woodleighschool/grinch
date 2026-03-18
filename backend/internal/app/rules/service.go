@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -9,7 +10,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-type RuleCreateInput struct {
+type WriteInput struct {
 	CustomMessage string
 	CustomURL     string
 	Description   string
@@ -17,16 +18,23 @@ type RuleCreateInput struct {
 	Identifier    string
 	Name          string
 	RuleType      domain.RuleType
+	Targets       TargetsWriteInput
 }
 
-type RulePatchInput struct {
-	CustomMessage *string
-	CustomURL     *string
-	Description   *string
-	Enabled       *bool
-	Identifier    *string
-	Name          *string
-	RuleType      *domain.RuleType
+type TargetsWriteInput struct {
+	Include []IncludeTargetWriteInput
+	Exclude []ExcludedGroupWriteInput
+}
+
+type IncludeTargetWriteInput struct {
+	SubjectKind   domain.RuleTargetSubjectKind
+	SubjectID     *uuid.UUID
+	Policy        domain.RulePolicy
+	CELExpression string
+}
+
+type ExcludedGroupWriteInput struct {
+	GroupID uuid.UUID
 }
 
 type Service struct {
@@ -36,8 +44,8 @@ type Service struct {
 type Store interface {
 	ListRules(context.Context, domain.RuleListOptions) ([]domain.RuleSummary, int32, error)
 	GetRule(context.Context, uuid.UUID) (domain.Rule, error)
-	CreateRule(context.Context, RuleCreateInput) (domain.Rule, error)
-	PatchRule(context.Context, uuid.UUID, RulePatchInput) (domain.Rule, error)
+	CreateRule(context.Context, WriteInput) (domain.Rule, error)
+	UpdateRule(context.Context, uuid.UUID, WriteInput) (domain.Rule, error)
 	DeleteRule(context.Context, uuid.UUID) error
 	ListResolvedMachineRules(context.Context, uuid.UUID) ([]domain.MachineResolvedRule, error)
 }
@@ -57,22 +65,22 @@ func (service *Service) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule,
 	return service.store.GetRule(ctx, id)
 }
 
-func (service *Service) CreateRule(ctx context.Context, input RuleCreateInput) (domain.Rule, error) {
-	normalized := normalizeCreateInput(input)
-	if validationErr := validateCreateInput(normalized); validationErr != nil {
+func (service *Service) CreateRule(ctx context.Context, input WriteInput) (domain.Rule, error) {
+	normalized := normalizeInput(input)
+	if validationErr := validateInput(normalized); validationErr != nil {
 		return domain.Rule{}, validationErr
 	}
 
 	return service.store.CreateRule(ctx, normalized)
 }
 
-func (service *Service) PatchRule(ctx context.Context, id uuid.UUID, input RulePatchInput) (domain.Rule, error) {
-	normalized := normalizePatchInput(input)
-	if validationErr := validatePatchInput(normalized); validationErr != nil {
+func (service *Service) UpdateRule(ctx context.Context, id uuid.UUID, input WriteInput) (domain.Rule, error) {
+	normalized := normalizeInput(input)
+	if validationErr := validateInput(normalized); validationErr != nil {
 		return domain.Rule{}, validationErr
 	}
 
-	return service.store.PatchRule(ctx, id, normalized)
+	return service.store.UpdateRule(ctx, id, normalized)
 }
 
 func (service *Service) DeleteRule(ctx context.Context, id uuid.UUID) error {
@@ -96,40 +104,23 @@ func (service *Service) ResolveMachineRuleTargets(
 	return targets, nil
 }
 
-func normalizeCreateInput(input RuleCreateInput) RuleCreateInput {
+func normalizeInput(input WriteInput) WriteInput {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.Identifier = strings.TrimSpace(input.Identifier)
 	input.CustomMessage = strings.TrimSpace(input.CustomMessage)
 	input.CustomURL = strings.TrimSpace(input.CustomURL)
-	return input
-}
-
-func normalizePatchInput(input RulePatchInput) RulePatchInput {
-	if input.Name != nil {
-		value := strings.TrimSpace(*input.Name)
-		input.Name = &value
-	}
-	if input.Description != nil {
-		value := strings.TrimSpace(*input.Description)
-		input.Description = &value
-	}
-	if input.Identifier != nil {
-		value := strings.TrimSpace(*input.Identifier)
-		input.Identifier = &value
-	}
-	if input.CustomMessage != nil {
-		value := strings.TrimSpace(*input.CustomMessage)
-		input.CustomMessage = &value
-	}
-	if input.CustomURL != nil {
-		value := strings.TrimSpace(*input.CustomURL)
-		input.CustomURL = &value
+	for index := range input.Targets.Include {
+		target := &input.Targets.Include[index]
+		target.CELExpression = strings.TrimSpace(target.CELExpression)
+		if target.Policy != domain.RulePolicyCEL {
+			target.CELExpression = ""
+		}
 	}
 	return input
 }
 
-func validateCreateInput(input RuleCreateInput) *domain.ValidationError {
+func validateInput(input WriteInput) *domain.ValidationError {
 	err := &domain.ValidationError{
 		Code:   "validation_error",
 		Detail: "Rule is invalid.",
@@ -144,6 +135,12 @@ func validateCreateInput(input RuleCreateInput) *domain.ValidationError {
 	if input.RuleType == "" {
 		err.Add("rule_type", "must not be empty", "required")
 	}
+	for index, target := range input.Targets.Include {
+		validateIncludeTarget(index, target, err)
+	}
+	for index, group := range input.Targets.Exclude {
+		validateExcludedGroup(index, group, err)
+	}
 
 	if !err.HasFieldErrors() {
 		return nil
@@ -151,21 +148,46 @@ func validateCreateInput(input RuleCreateInput) *domain.ValidationError {
 	return err
 }
 
-func validatePatchInput(input RulePatchInput) *domain.ValidationError {
-	err := &domain.ValidationError{
-		Code:   "validation_error",
-		Detail: "Rule is invalid.",
+func validateIncludeTarget(index int, target IncludeTargetWriteInput, err *domain.ValidationError) {
+	validateTargetSubject(fmt.Sprintf("targets.include[%d]", index), target.SubjectKind, target.SubjectID, err)
+	if target.Policy == "" {
+		err.Add(fmt.Sprintf("targets.include[%d].policy", index), "is required for include targets", "required")
+		return
 	}
+	if target.Policy == domain.RulePolicyCEL && target.CELExpression == "" {
+		err.Add(fmt.Sprintf("targets.include[%d].cel_expression", index), "is required when policy is cel", "required")
+	}
+	if target.Policy != domain.RulePolicyCEL && target.CELExpression != "" {
+		err.Add(
+			fmt.Sprintf("targets.include[%d].cel_expression", index),
+			"must be empty unless policy is cel",
+			"invalid",
+		)
+	}
+}
 
-	if input.Name != nil && *input.Name == "" {
-		err.Add("name", "must not be empty", "required")
+func validateExcludedGroup(index int, group ExcludedGroupWriteInput, err *domain.ValidationError) {
+	if group.GroupID == uuid.Nil {
+		err.Add(fmt.Sprintf("targets.exclude[%d].group_id", index), "is required", "required")
 	}
-	if input.Identifier != nil && *input.Identifier == "" {
-		err.Add("identifier", "must not be empty", "required")
-	}
+}
 
-	if !err.HasFieldErrors() {
-		return nil
+func validateTargetSubject(
+	prefix string,
+	subjectKind domain.RuleTargetSubjectKind,
+	subjectID *uuid.UUID,
+	err *domain.ValidationError,
+) {
+	switch subjectKind {
+	case domain.RuleTargetSubjectKindGroup:
+		if subjectID == nil {
+			err.Add(prefix+".subject_id", "is required for group targets", "required")
+		}
+	case domain.RuleTargetSubjectKindAllDevices, domain.RuleTargetSubjectKindAllUsers:
+		if subjectID != nil {
+			err.Add(prefix+".subject_id", "must be empty unless subject_kind is group", "invalid")
+		}
+	default:
+		err.Add(prefix+".subject_kind", "must be group, all_devices, or all_users", "invalid")
 	}
-	return err
 }

@@ -7,7 +7,6 @@ import (
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	appsanta "github.com/woodleighschool/grinch/internal/app/santa"
 	"github.com/woodleighschool/grinch/internal/domain"
@@ -254,7 +253,7 @@ func createFileAccessEvent(
 	_, err := queries.CreateFileAccessEvent(ctx, db.CreateFileAccessEventParams{
 		ID:           eventID,
 		MachineID:    machineID,
-		ExecutableID: nullableUUID(primaryExecutableID),
+		ExecutableID: primaryExecutableID,
 		RuleVersion:  event.GetRuleVersion(),
 		RuleName:     event.GetRuleName(),
 		Target:       event.GetTarget(),
@@ -298,12 +297,4 @@ func getOrCreateProcessExecutable(
 	}
 
 	return row.ID, nil
-}
-
-func nullableUUID(value *uuid.UUID) pgtype.UUID {
-	if value == nil {
-		return pgtype.UUID{}
-	}
-
-	return pgtype.UUID{Bytes: *value, Valid: true}
 }

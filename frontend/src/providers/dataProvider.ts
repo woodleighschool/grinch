@@ -5,19 +5,10 @@ import {
   groupMembershipsApi,
   groupsApi,
   machinesApi,
-  ruleTargetsApi,
   rulesApi,
   usersApi,
 } from "@/api/adminClient";
-import type {
-  GroupCreateRequest,
-  GroupMembershipCreateRequest,
-  GroupPatchRequest,
-  RuleCreateRequest,
-  RulePatchRequest,
-  RuleTargetCreateRequest,
-  RuleTargetPatchRequest,
-} from "@/api/types";
+import type { GroupMembershipCreateRequest } from "@/api/types";
 import type {
   CreateParams,
   CreateResult,
@@ -111,8 +102,7 @@ type ResourceName =
   | "executables"
   | "execution-events"
   | "file-access-events"
-  | "rules"
-  | "rule-targets";
+  | "rules";
 
 const listHandlers: Record<ResourceName, ListHandler> = {
   users: async (parameters, signal): Promise<ListResult> =>
@@ -184,23 +174,6 @@ const listHandlers: Record<ResourceName, ListHandler> = {
 
   rules: async (parameters, signal): Promise<ListResult> =>
     toListResult(await rulesApi.list(asListQuery(parameters), signal)),
-
-  "rule-targets": async (parameters, signal): Promise<ListResult> => {
-    const filter = asRecord(parameters.filter);
-
-    return toListResult(
-      await ruleTargetsApi.list(
-        asListQuery(parameters, {
-          rule_id: getOptionalString(filter.rule_id),
-          subject_kind: getOptionalString(filter.subject_kind),
-          subject_id: getOptionalString(filter.subject_id),
-          assignment: getOptionalString(filter.assignment),
-          policy: getOptionalString(filter.policy),
-        }),
-        signal,
-      ),
-    );
-  },
 };
 
 const getOneHandlers: Record<ResourceName, GetOneHandler> = {
@@ -215,29 +188,23 @@ const getOneHandlers: Record<ResourceName, GetOneHandler> = {
   "file-access-events": (id, signal): Promise<RaRecord> =>
     fileAccessEventsApi.get(String(id), signal) as Promise<RaRecord>,
   rules: (id, signal): Promise<RaRecord> => rulesApi.get(String(id), signal) as Promise<RaRecord>,
-  "rule-targets": (id, signal): Promise<RaRecord> => ruleTargetsApi.get(String(id), signal) as Promise<RaRecord>,
 };
 
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
-  rules: (data): Promise<RaRecord> => rulesApi.create(data as RuleCreateRequest) as Promise<RaRecord>,
-  groups: (data): Promise<RaRecord> => groupsApi.create(data as GroupCreateRequest) as Promise<RaRecord>,
+  rules: (data): Promise<RaRecord> => rulesApi.create(data) as Promise<RaRecord>,
+  groups: (data): Promise<RaRecord> => groupsApi.create(data) as Promise<RaRecord>,
   "group-memberships": (data): Promise<RaRecord> =>
     groupMembershipsApi.create(data as GroupMembershipCreateRequest) as Promise<RaRecord>,
-  "rule-targets": (data): Promise<RaRecord> =>
-    ruleTargetsApi.create(data as RuleTargetCreateRequest) as Promise<RaRecord>,
 };
 
 const updateHandlers: Partial<Record<ResourceName, UpdateHandler>> = {
-  rules: (id, data): Promise<RaRecord> => rulesApi.patch(String(id), data as RulePatchRequest) as Promise<RaRecord>,
-  groups: (id, data): Promise<RaRecord> => groupsApi.patch(String(id), data as GroupPatchRequest) as Promise<RaRecord>,
-  "rule-targets": (id, data): Promise<RaRecord> =>
-    ruleTargetsApi.patch(String(id), data as RuleTargetPatchRequest) as Promise<RaRecord>,
+  rules: (id, data): Promise<RaRecord> => rulesApi.update(String(id), data) as Promise<RaRecord>,
+  groups: (id, data): Promise<RaRecord> => groupsApi.update(String(id), data) as Promise<RaRecord>,
 };
 
 const deleteHandlers: Partial<Record<ResourceName, DeleteHandler>> = {
   "group-memberships": (id): Promise<void> => groupMembershipsApi.delete(String(id)),
   rules: (id): Promise<void> => rulesApi.delete(String(id)),
-  "rule-targets": (id): Promise<void> => ruleTargetsApi.delete(String(id)),
   groups: (id): Promise<void> => groupsApi.delete(String(id)),
   machines: (id): Promise<void> => machinesApi.delete(String(id)),
   "execution-events": (id): Promise<void> => executionEventsApi.delete(String(id)),

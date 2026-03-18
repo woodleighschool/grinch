@@ -1,8 +1,34 @@
-import type { RuleType } from "@/api/types";
+import type { RulePolicy, RuleTargetSubjectKind, RuleType } from "@/api/types";
+import { SANTA_CEL_PLAYGROUND_URL } from "@/resources/shared/externalLinks";
+import { searchFilterToQuery } from "@/resources/shared/search";
 import { ruleIdentifierValidator, trimmedRequired } from "@/resources/shared/validation";
-import { Typography } from "@mui/material";
-import type { ReactElement } from "react";
-import { BooleanInput, FormDataConsumer, SelectInput, TextInput, required } from "react-admin";
+import CodeIcon from "@mui/icons-material/Code";
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormHelperText,
+  IconButton,
+  Link as MuiLink,
+  Typography,
+} from "@mui/material";
+import { useState, type ReactElement } from "react";
+import {
+  ArrayInput,
+  AutocompleteInput,
+  BooleanInput,
+  FormDataConsumer,
+  ReferenceInput,
+  SelectInput,
+  SimpleFormIterator,
+  TextInput,
+  required,
+  useSimpleFormIteratorItem,
+} from "react-admin";
+import { useWatch } from "react-hook-form";
 
 export const RULE_TYPE_CHOICES = [
   { id: "binary", name: "Binary" },
@@ -11,6 +37,19 @@ export const RULE_TYPE_CHOICES = [
   { id: "signing_id", name: "Signing ID" },
   { id: "cd_hash", name: "CD Hash" },
 ] as { id: RuleType; name: string }[];
+
+const RULE_POLICY_CHOICES = [
+  { id: "allowlist", name: "Allowlist" },
+  { id: "blocklist", name: "Blocklist" },
+  { id: "silent_blocklist", name: "Silent Blocklist" },
+  { id: "cel", name: "CEL" },
+] as { id: RulePolicy; name: string }[];
+
+const RULE_TARGET_SUBJECT_KIND_CHOICES = [
+  { id: "group", name: "Group" },
+  { id: "all_devices", name: "All Devices" },
+  { id: "all_users", name: "All Users" },
+] as { id: RuleTargetSubjectKind; name: string }[];
 
 const RULE_TYPE_DESCRIPTION: Record<RuleType, string> = {
   binary: "SHA-256 hash of the exact binary.",
@@ -28,13 +67,8 @@ const IDENTIFIER_PLACEHOLDER: Record<RuleType, string> = {
   cd_hash: "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
 };
 
-export const RuleFields = (): ReactElement => (
+export const RuleDetailsFields = (): ReactElement => (
   <>
-    <BooleanInput
-      source="enabled"
-      label="Enabled"
-      helperText="Disabled rules are not sent to machines."
-    />
     <TextInput
       source="name"
       label="Name"
@@ -50,6 +84,7 @@ export const RuleFields = (): ReactElement => (
       minRows={2}
       fullWidth
     />
+    <BooleanInput source="enabled" label="Enabled" helperText="Disabled rules are not sent to machines." />
     <Typography variant="body2" color="text">
       These fields are part of the payload sent to machines and are included in rule hash comparison.
     </Typography>
@@ -99,5 +134,130 @@ export const RuleFields = (): ReactElement => (
       placeholder="https://helpdesk.example.com/software?app=%bundle_or_file_identifier%"
       fullWidth
     />
+  </>
+);
+
+const CelExpressionInput = ({ source, showRequired }: { source: string; showRequired: boolean }): ReactElement => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Box>
+      <IconButton
+        size="small"
+        color={showRequired ? "error" : "default"}
+        onClick={() => {
+          setOpen(true);
+        }}
+        aria-label="Edit CEL expression"
+      >
+        <CodeIcon fontSize="small" />
+      </IconButton>
+      {showRequired ? <FormHelperText error>CEL required</FormHelperText> : null}
+      <Dialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>CEL Expression</DialogTitle>
+        <DialogContent>
+          <Box mb={1}>
+            <MuiLink href={SANTA_CEL_PLAYGROUND_URL} target="_blank" rel="noreferrer" variant="body2">
+              Open CEL playground
+            </MuiLink>
+          </Box>
+          <TextInput
+            source={source}
+            label="CEL expression"
+            helperText="Not validated — malformed expressions will be sent to clients."
+            validate={[required()]}
+            fullWidth
+            multiline
+            minRows={6}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Done
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+const IncludeTargetCelField = (): ReactElement | null => {
+  const { index } = useSimpleFormIteratorItem();
+  const policy = useWatch({ name: `targets.include.${index}.policy` }) as RulePolicy | undefined;
+  const celExpression = useWatch({ name: `targets.include.${index}.cel_expression` }) as string | undefined;
+  if (policy !== "cel") return null;
+  return <CelExpressionInput source="cel_expression" showRequired={celExpression?.trim() === "" || celExpression == null} />;
+};
+
+const SubjectField = (): ReactElement => (
+  <FormDataConsumer>
+    {({ scopedFormData }): ReactElement => {
+      const subjectKind = scopedFormData?.subject_kind as RuleTargetSubjectKind | undefined;
+      const isGroup = subjectKind === "group" || subjectKind === undefined;
+      return (
+        <ReferenceInput reference="groups" source="subject_id">
+          <AutocompleteInput
+            label="Group"
+            optionText="name"
+            optionValue="id"
+            filterToQuery={searchFilterToQuery}
+            validate={isGroup ? [required()] : []}
+            disabled={!isGroup}
+          />
+        </ReferenceInput>
+      );
+    }}
+  </FormDataConsumer>
+);
+
+export const RuleTargetsFields = (): ReactElement => (
+  <>
+    <Typography variant="h6">Include Targets</Typography>
+    <Typography variant="body2" color="text.secondary">
+      Include target order determines rule priority.
+    </Typography>
+    <ArrayInput source="targets.include" label={false}>
+      <SimpleFormIterator inline>
+        <SelectInput
+          source="subject_kind"
+          label="Target"
+          choices={RULE_TARGET_SUBJECT_KIND_CHOICES}
+          validate={[required()]}
+        />
+        <SubjectField />
+        <SelectInput source="policy" label="Policy" choices={RULE_POLICY_CHOICES} validate={[required()]} />
+        <IncludeTargetCelField />
+      </SimpleFormIterator>
+    </ArrayInput>
+    <Typography variant="h6" sx={{ mt: 2 }}>
+      Excluded Groups
+    </Typography>
+    <Typography variant="body2" color="text.secondary">
+      Machines in any excluded group are skipped regardless of include targets.
+    </Typography>
+    <ArrayInput source="targets.exclude" label={false}>
+      <SimpleFormIterator inline>
+        <ReferenceInput reference="groups" source="group_id">
+          <AutocompleteInput
+            label="Group"
+            optionText="name"
+            optionValue="id"
+            filterToQuery={searchFilterToQuery}
+            validate={[required()]}
+          />
+        </ReferenceInput>
+      </SimpleFormIterator>
+    </ArrayInput>
   </>
 );

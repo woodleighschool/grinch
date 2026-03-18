@@ -449,6 +449,10 @@ func mapRule(rule domain.Rule) (Rule, error) {
 	if err != nil {
 		return Rule{}, err
 	}
+	targets, err := mapRuleTargets(rule.Targets)
+	if err != nil {
+		return Rule{}, err
+	}
 
 	return Rule{
 		Id:            rule.ID,
@@ -459,6 +463,7 @@ func mapRule(rule domain.Rule) (Rule, error) {
 		CustomMessage: rule.CustomMessage,
 		CustomUrl:     rule.CustomURL,
 		Enabled:       rule.Enabled,
+		Targets:       targets,
 		CreatedAt:     rule.CreatedAt,
 		UpdatedAt:     rule.UpdatedAt,
 	}, nil
@@ -482,32 +487,14 @@ func mapRuleSummary(rule domain.RuleSummary) (RuleSummary, error) {
 	}, nil
 }
 
-func mapRuleTargetAssignment(assignment domain.RuleTargetAssignment) (RuleTargetAssignment, error) {
-	switch assignment {
-	case domain.RuleTargetAssignmentInclude:
-		return Include, nil
-	case domain.RuleTargetAssignmentExclude:
-		return Exclude, nil
-	default:
-		return "", fmt.Errorf("unsupported rule target assignment %q", assignment)
-	}
-}
-
-func toDomainRuleTargetAssignment(assignment RuleTargetAssignment) (domain.RuleTargetAssignment, error) {
-	switch assignment {
-	case Include:
-		return domain.RuleTargetAssignmentInclude, nil
-	case Exclude:
-		return domain.RuleTargetAssignmentExclude, nil
-	default:
-		return "", fmt.Errorf("unsupported rule target assignment %q", assignment)
-	}
-}
-
 func mapRuleTargetSubjectKind(subjectKind domain.RuleTargetSubjectKind) (RuleTargetSubjectKind, error) {
 	switch subjectKind {
 	case domain.RuleTargetSubjectKindGroup:
 		return RuleTargetSubjectKindGroup, nil
+	case domain.RuleTargetSubjectKindAllDevices:
+		return RuleTargetSubjectKindAllDevices, nil
+	case domain.RuleTargetSubjectKindAllUsers:
+		return RuleTargetSubjectKindAllUsers, nil
 	default:
 		return "", fmt.Errorf("unsupported rule target subject kind %q", subjectKind)
 	}
@@ -517,37 +504,50 @@ func toDomainRuleTargetSubjectKind(subjectKind RuleTargetSubjectKind) (domain.Ru
 	switch subjectKind {
 	case RuleTargetSubjectKindGroup:
 		return domain.RuleTargetSubjectKindGroup, nil
+	case RuleTargetSubjectKindAllDevices:
+		return domain.RuleTargetSubjectKindAllDevices, nil
+	case RuleTargetSubjectKindAllUsers:
+		return domain.RuleTargetSubjectKindAllUsers, nil
 	default:
 		return "", fmt.Errorf("unsupported rule target subject kind %q", subjectKind)
 	}
 }
 
-func mapRuleTarget(target domain.RuleTarget) (RuleTarget, error) {
-	assignment, err := mapRuleTargetAssignment(target.Assignment)
+func mapRuleTargets(targets domain.RuleTargets) (RuleTargets, error) {
+	include, err := mapSlice(targets.Include, mapIncludeRuleTarget)
 	if err != nil {
-		return RuleTarget{}, err
+		return RuleTargets{}, err
 	}
-	subjectKind, err := mapRuleTargetSubjectKind(target.SubjectKind)
+	exclude, err := mapSlice(targets.Exclude, mapExcludeRuleTarget)
 	if err != nil {
-		return RuleTarget{}, err
+		return RuleTargets{}, err
 	}
 
-	result := RuleTarget{
-		Id:          target.ID,
-		RuleId:      target.RuleID,
-		SubjectKind: subjectKind,
-		SubjectId:   target.SubjectID,
-		Assignment:  assignment,
-		Priority:    target.Priority,
-		CreatedAt:   target.CreatedAt,
-		UpdatedAt:   target.UpdatedAt,
+	return RuleTargets{
+		Include: include,
+		Exclude: exclude,
+	}, nil
+}
+
+func mapIncludeRuleTarget(target domain.IncludeRuleTarget) (IncludeRuleTarget, error) {
+	subjectKind, err := mapRuleTargetSubjectKind(target.SubjectKind)
+	if err != nil {
+		return IncludeRuleTarget{}, err
 	}
-	if target.Policy != nil {
-		policy, policyErr := mapRulePolicy(*target.Policy)
-		if policyErr != nil {
-			return RuleTarget{}, policyErr
-		}
-		result.Policy = &policy
+	policy, err := mapRulePolicy(target.Policy)
+	if err != nil {
+		return IncludeRuleTarget{}, err
+	}
+
+	result := IncludeRuleTarget{
+		SubjectKind: subjectKind,
+		Policy:      policy,
+	}
+	if target.SubjectID != nil {
+		result.SubjectId = target.SubjectID
+	}
+	if target.SubjectName != "" {
+		result.SubjectName = toStringPointer(target.SubjectName)
 	}
 	if target.CELExpression != "" {
 		result.CelExpression = toStringPointer(target.CELExpression)
@@ -556,32 +556,12 @@ func mapRuleTarget(target domain.RuleTarget) (RuleTarget, error) {
 	return result, nil
 }
 
-func mapRuleTargetSummary(target domain.RuleTargetSummary) (RuleTargetSummary, error) {
-	assignment, err := mapRuleTargetAssignment(target.Assignment)
-	if err != nil {
-		return RuleTargetSummary{}, err
+func mapExcludeRuleTarget(target domain.ExcludedGroup) (ExcludedGroup, error) {
+	result := ExcludedGroup{
+		GroupId: target.GroupID,
 	}
-	subjectKind, err := mapRuleTargetSubjectKind(target.SubjectKind)
-	if err != nil {
-		return RuleTargetSummary{}, err
-	}
-
-	result := RuleTargetSummary{
-		Id:          target.ID,
-		RuleId:      target.RuleID,
-		SubjectKind: subjectKind,
-		SubjectId:   target.SubjectID,
-		Assignment:  assignment,
-		Priority:    target.Priority,
-		CreatedAt:   target.CreatedAt,
-		UpdatedAt:   target.UpdatedAt,
-	}
-	if target.Policy != nil {
-		policy, policyErr := mapRulePolicy(*target.Policy)
-		if policyErr != nil {
-			return RuleTargetSummary{}, policyErr
-		}
-		result.Policy = &policy
+	if target.GroupName != "" {
+		result.GroupName = toStringPointer(target.GroupName)
 	}
 
 	return result, nil

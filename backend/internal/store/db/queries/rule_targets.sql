@@ -1,4 +1,4 @@
--- name: CreateRuleTarget :one
+-- name: CreateRuleTarget :exec
 INSERT INTO rule_targets (
   id,
   rule_id,
@@ -18,87 +18,33 @@ VALUES (
   $6,
   $7,
   $8
-)
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at;
-
--- name: GetRuleTarget :one
-SELECT
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
-FROM rule_targets
-WHERE id = $1;
+);
 
 -- name: ListRuleTargetsByRule :many
 SELECT
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
-FROM rule_targets
-WHERE rule_id = $1
+  rt.subject_kind,
+  rt.subject_id,
+  rt.assignment,
+  rt.priority,
+  rt.policy,
+  rt.cel_expression,
+  CASE
+    WHEN rt.subject_kind = 'group' THEN COALESCE(g.name, '')
+    WHEN rt.subject_kind = 'all_devices' THEN 'All Devices'
+    WHEN rt.subject_kind = 'all_users' THEN 'All Users'
+    ELSE ''
+  END AS subject_name
+FROM rule_targets AS rt
+LEFT JOIN groups AS g
+  ON rt.subject_kind = 'group'
+  AND g.id = rt.subject_id
+WHERE rt.rule_id = $1
 ORDER BY
-  CASE WHEN assignment = 'include' THEN 0 ELSE 1 END ASC,
-  priority ASC NULLS LAST,
-  subject_id ASC;
+  CASE WHEN rt.assignment = 'include' THEN 0 ELSE 1 END ASC,
+  rt.priority ASC NULLS LAST,
+  rt.subject_kind ASC,
+  rt.subject_id ASC;
 
--- name: UpdateRuleTarget :one
-UPDATE rule_targets
-SET
-  subject_kind = $2,
-  subject_id = $3,
-  assignment = $4,
-  priority = $5,
-  policy = $6,
-  cel_expression = $7,
-  updated_at = NOW()
-WHERE id = $1
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at;
-
--- name: DeleteRuleTarget :one
+-- name: DeleteRuleTargetsByRule :exec
 DELETE FROM rule_targets
-WHERE id = $1
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at;
+WHERE rule_id = $1;

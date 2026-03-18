@@ -150,7 +150,7 @@ func (store *Store) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domai
 	return domain.FileAccessEvent{
 		ID:           row.ID,
 		MachineID:    row.MachineID,
-		ExecutableID: pgutil.UUIDPointer(row.ExecutableID),
+		ExecutableID: row.ExecutableID,
 		RuleVersion:  row.RuleVersion,
 		RuleName:     row.RuleName,
 		Target:       row.Target,

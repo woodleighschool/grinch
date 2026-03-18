@@ -43,7 +43,7 @@ const GroupEditActions = (): ReactElement => (
 );
 
 export const GroupEdit = (): ReactElement => (
-  <Edit mutationMode="optimistic" redirect="edit" actions={<GroupEditActions />}>
+  <Edit mutationMode="pessimistic" redirect="edit" actions={<GroupEditActions />}>
     <TabbedForm>
       <TabbedForm.Tab label="Overview">
         <GroupOverviewTab />

@@ -175,7 +175,7 @@ type UpdateGroupParams struct {
 
 type UpdateGroupRow struct {
 	Status      string
-	ID          pgtype.UUID
+	ID          *uuid.UUID
 	Name        pgtype.Text
 	Description pgtype.Text
 	Source      pgtype.Text

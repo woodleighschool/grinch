@@ -180,32 +180,20 @@ func (e RulePolicy) Valid() bool {
 	}
 }
 
-// Defines values for RuleTargetAssignment.
-const (
-	Exclude RuleTargetAssignment = "exclude"
-	Include RuleTargetAssignment = "include"
-)
-
-// Valid indicates whether the value is a known member of the RuleTargetAssignment enum.
-func (e RuleTargetAssignment) Valid() bool {
-	switch e {
-	case Exclude:
-		return true
-	case Include:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for RuleTargetSubjectKind.
 const (
-	RuleTargetSubjectKindGroup RuleTargetSubjectKind = "group"
+	RuleTargetSubjectKindAllDevices RuleTargetSubjectKind = "all_devices"
+	RuleTargetSubjectKindAllUsers   RuleTargetSubjectKind = "all_users"
+	RuleTargetSubjectKindGroup      RuleTargetSubjectKind = "group"
 )
 
 // Valid indicates whether the value is a known member of the RuleTargetSubjectKind enum.
 func (e RuleTargetSubjectKind) Valid() bool {
 	switch e {
+	case RuleTargetSubjectKindAllDevices:
+		return true
+	case RuleTargetSubjectKindAllUsers:
+		return true
 	case RuleTargetSubjectKindGroup:
 		return true
 	default:
@@ -384,24 +372,6 @@ func (e ListMachinesParamsOrder) Valid() bool {
 	}
 }
 
-// Defines values for ListRuleTargetsParamsOrder.
-const (
-	ListRuleTargetsParamsOrderAsc  ListRuleTargetsParamsOrder = "asc"
-	ListRuleTargetsParamsOrderDesc ListRuleTargetsParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListRuleTargetsParamsOrder enum.
-func (e ListRuleTargetsParamsOrder) Valid() bool {
-	switch e {
-	case ListRuleTargetsParamsOrderAsc:
-		return true
-	case ListRuleTargetsParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ListRulesParamsOrder.
 const (
 	ListRulesParamsOrderAsc  ListRulesParamsOrder = "asc"
@@ -422,16 +392,16 @@ func (e ListRulesParamsOrder) Valid() bool {
 
 // Defines values for ListUsersParamsOrder.
 const (
-	ListUsersParamsOrderAsc  ListUsersParamsOrder = "asc"
-	ListUsersParamsOrderDesc ListUsersParamsOrder = "desc"
+	Asc  ListUsersParamsOrder = "asc"
+	Desc ListUsersParamsOrder = "desc"
 )
 
 // Valid indicates whether the value is a known member of the ListUsersParamsOrder enum.
 func (e ListUsersParamsOrder) Valid() bool {
 	switch e {
-	case ListUsersParamsOrderAsc:
+	case Asc:
 		return true
-	case ListUsersParamsOrderDesc:
+	case Desc:
 		return true
 	default:
 		return false
@@ -440,6 +410,12 @@ func (e ListUsersParamsOrder) Valid() bool {
 
 // EventDecision defines model for EventDecision.
 type EventDecision string
+
+// ExcludedGroup defines model for ExcludedGroup.
+type ExcludedGroup struct {
+	GroupId   openapi_types.UUID `json:"group_id"`
+	GroupName *string            `json:"group_name,omitempty"`
+}
 
 // Executable defines model for Executable.
 type Executable struct {
@@ -647,10 +623,13 @@ type GroupMembershipMember struct {
 	Name *string            `json:"name,omitempty"`
 }
 
-// GroupPatchRequest defines model for GroupPatchRequest.
-type GroupPatchRequest struct {
-	Description *string `json:"description,omitempty"`
-	Name        *string `json:"name,omitempty"`
+// IncludeRuleTarget defines model for IncludeRuleTarget.
+type IncludeRuleTarget struct {
+	CelExpression *string               `json:"cel_expression,omitempty"`
+	Policy        RulePolicy            `json:"policy"`
+	SubjectId     *openapi_types.UUID   `json:"subject_id,omitempty"`
+	SubjectKind   RuleTargetSubjectKind `json:"subject_kind"`
+	SubjectName   *string               `json:"subject_name,omitempty"`
 }
 
 // Machine defines model for Machine.
@@ -715,6 +694,7 @@ type Rule struct {
 	Identifier    string             `json:"identifier"`
 	Name          string             `json:"name"`
 	RuleType      RuleType           `json:"rule_type"`
+	Targets       RuleTargets        `json:"targets"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
@@ -725,27 +705,17 @@ type RuleCreateRequest struct {
 	Description   *string `json:"description,omitempty"`
 
 	// Enabled Default true when omitted.
-	Enabled    *bool    `json:"enabled,omitempty"`
-	Identifier string   `json:"identifier"`
-	Name       string   `json:"name"`
-	RuleType   RuleType `json:"rule_type"`
+	Enabled    *bool       `json:"enabled,omitempty"`
+	Identifier string      `json:"identifier"`
+	Name       string      `json:"name"`
+	RuleType   RuleType    `json:"rule_type"`
+	Targets    RuleTargets `json:"targets"`
 }
 
 // RuleListResponse defines model for RuleListResponse.
 type RuleListResponse struct {
 	Rows  []RuleSummary `json:"rows"`
 	Total int32         `json:"total"`
-}
-
-// RulePatchRequest defines model for RulePatchRequest.
-type RulePatchRequest struct {
-	CustomMessage *string   `json:"custom_message,omitempty"`
-	CustomUrl     *string   `json:"custom_url,omitempty"`
-	Description   *string   `json:"description,omitempty"`
-	Enabled       *bool     `json:"enabled,omitempty"`
-	Identifier    *string   `json:"identifier,omitempty"`
-	Name          *string   `json:"name,omitempty"`
-	RuleType      *RuleType `json:"rule_type,omitempty"`
 }
 
 // RulePolicy defines model for RulePolicy.
@@ -763,66 +733,20 @@ type RuleSummary struct {
 	UpdatedAt   time.Time          `json:"updated_at"`
 }
 
-// RuleTarget defines model for RuleTarget.
-type RuleTarget struct {
-	Assignment    RuleTargetAssignment  `json:"assignment"`
-	CelExpression *string               `json:"cel_expression,omitempty"`
-	CreatedAt     time.Time             `json:"created_at"`
-	Id            openapi_types.UUID    `json:"id"`
-	Policy        *RulePolicy           `json:"policy,omitempty"`
-	Priority      *int32                `json:"priority,omitempty"`
-	RuleId        openapi_types.UUID    `json:"rule_id"`
-	SubjectId     openapi_types.UUID    `json:"subject_id"`
-	SubjectKind   RuleTargetSubjectKind `json:"subject_kind"`
-	UpdatedAt     time.Time             `json:"updated_at"`
-}
-
-// RuleTargetAssignment defines model for RuleTargetAssignment.
-type RuleTargetAssignment string
-
-// RuleTargetCreateRequest defines model for RuleTargetCreateRequest.
-type RuleTargetCreateRequest struct {
-	Assignment    RuleTargetAssignment `json:"assignment"`
-	CelExpression *string              `json:"cel_expression,omitempty"`
-	Policy        *RulePolicy          `json:"policy,omitempty"`
-	Priority      *int32               `json:"priority,omitempty"`
-	RuleId        openapi_types.UUID   `json:"rule_id"`
-	SubjectId     openapi_types.UUID   `json:"subject_id"`
-}
-
-// RuleTargetListResponse defines model for RuleTargetListResponse.
-type RuleTargetListResponse struct {
-	Rows  []RuleTargetSummary `json:"rows"`
-	Total int32               `json:"total"`
-}
-
-// RuleTargetPatchRequest defines model for RuleTargetPatchRequest.
-type RuleTargetPatchRequest struct {
-	Assignment    *RuleTargetAssignment `json:"assignment,omitempty"`
-	CelExpression *string               `json:"cel_expression,omitempty"`
-	Policy        *RulePolicy           `json:"policy,omitempty"`
-	Priority      *int32                `json:"priority,omitempty"`
-	SubjectId     *openapi_types.UUID   `json:"subject_id,omitempty"`
-}
-
 // RuleTargetSubjectKind defines model for RuleTargetSubjectKind.
 type RuleTargetSubjectKind string
 
-// RuleTargetSummary defines model for RuleTargetSummary.
-type RuleTargetSummary struct {
-	Assignment  RuleTargetAssignment  `json:"assignment"`
-	CreatedAt   time.Time             `json:"created_at"`
-	Id          openapi_types.UUID    `json:"id"`
-	Policy      *RulePolicy           `json:"policy,omitempty"`
-	Priority    *int32                `json:"priority,omitempty"`
-	RuleId      openapi_types.UUID    `json:"rule_id"`
-	SubjectId   openapi_types.UUID    `json:"subject_id"`
-	SubjectKind RuleTargetSubjectKind `json:"subject_kind"`
-	UpdatedAt   time.Time             `json:"updated_at"`
+// RuleTargets defines model for RuleTargets.
+type RuleTargets struct {
+	Exclude []ExcludedGroup     `json:"exclude"`
+	Include []IncludeRuleTarget `json:"include"`
 }
 
 // RuleType defines model for RuleType.
 type RuleType string
+
+// RuleUpdateRequest defines model for RuleUpdateRequest.
+type RuleUpdateRequest = RuleCreateRequest
 
 // SigningChainEntry defines model for SigningChainEntry.
 type SigningChainEntry struct {
@@ -882,9 +806,6 @@ type RuleIdFilter = openapi_types.UUID
 
 // RulePolicyFilter defines model for RulePolicyFilter.
 type RulePolicyFilter = RulePolicy
-
-// RuleTargetAssignmentFilter defines model for RuleTargetAssignmentFilter.
-type RuleTargetAssignmentFilter = RuleTargetAssignment
 
 // Search defines model for Search.
 type Search = string
@@ -997,25 +918,6 @@ type ListMachinesParams struct {
 // ListMachinesParamsOrder defines parameters for ListMachines.
 type ListMachinesParamsOrder string
 
-// ListRuleTargetsParams defines parameters for ListRuleTargets.
-type ListRuleTargetsParams struct {
-	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-	Search *Search `form:"search,omitempty" json:"search,omitempty"`
-
-	// Sort Sort field name.
-	Sort        *Sort                       `form:"sort,omitempty" json:"sort,omitempty"`
-	Order       *ListRuleTargetsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	RuleId      *RuleIdFilter               `form:"rule_id,omitempty" json:"rule_id,omitempty"`
-	SubjectKind *SubjectKindFilter          `form:"subject_kind,omitempty" json:"subject_kind,omitempty"`
-	SubjectId   *SubjectIdFilter            `form:"subject_id,omitempty" json:"subject_id,omitempty"`
-	Assignment  *RuleTargetAssignmentFilter `form:"assignment,omitempty" json:"assignment,omitempty"`
-	Policy      *RulePolicyFilter           `form:"policy,omitempty" json:"policy,omitempty"`
-}
-
-// ListRuleTargetsParamsOrder defines parameters for ListRuleTargets.
-type ListRuleTargetsParamsOrder string
-
 // ListRulesParams defines parameters for ListRules.
 type ListRulesParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
@@ -1050,20 +952,14 @@ type CreateGroupMembershipJSONRequestBody = GroupMembershipCreateRequest
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupCreateRequest
 
-// PatchGroupJSONRequestBody defines body for PatchGroup for application/json ContentType.
-type PatchGroupJSONRequestBody = GroupPatchRequest
-
-// CreateRuleTargetJSONRequestBody defines body for CreateRuleTarget for application/json ContentType.
-type CreateRuleTargetJSONRequestBody = RuleTargetCreateRequest
-
-// PatchRuleTargetJSONRequestBody defines body for PatchRuleTarget for application/json ContentType.
-type PatchRuleTargetJSONRequestBody = RuleTargetPatchRequest
+// UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
+type UpdateGroupJSONRequestBody = GroupCreateRequest
 
 // CreateRuleJSONRequestBody defines body for CreateRule for application/json ContentType.
 type CreateRuleJSONRequestBody = RuleCreateRequest
 
-// PatchRuleJSONRequestBody defines body for PatchRule for application/json ContentType.
-type PatchRuleJSONRequestBody = RulePatchRequest
+// UpdateRuleJSONRequestBody defines body for UpdateRule for application/json ContentType.
+type UpdateRuleJSONRequestBody = RuleUpdateRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -1116,8 +1012,8 @@ type ServerInterface interface {
 	// (GET /groups/{id})
 	GetGroup(w http.ResponseWriter, r *http.Request, id Id)
 
-	// (PATCH /groups/{id})
-	PatchGroup(w http.ResponseWriter, r *http.Request, id Id)
+	// (PUT /groups/{id})
+	UpdateGroup(w http.ResponseWriter, r *http.Request, id Id)
 
 	// (GET /machines)
 	ListMachines(w http.ResponseWriter, r *http.Request, params ListMachinesParams)
@@ -1127,21 +1023,6 @@ type ServerInterface interface {
 
 	// (GET /machines/{id})
 	GetMachine(w http.ResponseWriter, r *http.Request, id Id)
-
-	// (GET /rule-targets)
-	ListRuleTargets(w http.ResponseWriter, r *http.Request, params ListRuleTargetsParams)
-
-	// (POST /rule-targets)
-	CreateRuleTarget(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /rule-targets/{id})
-	DeleteRuleTarget(w http.ResponseWriter, r *http.Request, id Id)
-
-	// (GET /rule-targets/{id})
-	GetRuleTarget(w http.ResponseWriter, r *http.Request, id Id)
-
-	// (PATCH /rule-targets/{id})
-	PatchRuleTarget(w http.ResponseWriter, r *http.Request, id Id)
 
 	// (GET /rules)
 	ListRules(w http.ResponseWriter, r *http.Request, params ListRulesParams)
@@ -1155,8 +1036,8 @@ type ServerInterface interface {
 	// (GET /rules/{id})
 	GetRule(w http.ResponseWriter, r *http.Request, id Id)
 
-	// (PATCH /rules/{id})
-	PatchRule(w http.ResponseWriter, r *http.Request, id Id)
+	// (PUT /rules/{id})
+	UpdateRule(w http.ResponseWriter, r *http.Request, id Id)
 
 	// (GET /users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
@@ -1249,8 +1130,8 @@ func (_ Unimplemented) GetGroup(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (PATCH /groups/{id})
-func (_ Unimplemented) PatchGroup(w http.ResponseWriter, r *http.Request, id Id) {
+// (PUT /groups/{id})
+func (_ Unimplemented) UpdateGroup(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1266,31 +1147,6 @@ func (_ Unimplemented) DeleteMachine(w http.ResponseWriter, r *http.Request, id 
 
 // (GET /machines/{id})
 func (_ Unimplemented) GetMachine(w http.ResponseWriter, r *http.Request, id Id) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (GET /rule-targets)
-func (_ Unimplemented) ListRuleTargets(w http.ResponseWriter, r *http.Request, params ListRuleTargetsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (POST /rule-targets)
-func (_ Unimplemented) CreateRuleTarget(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (DELETE /rule-targets/{id})
-func (_ Unimplemented) DeleteRuleTarget(w http.ResponseWriter, r *http.Request, id Id) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (GET /rule-targets/{id})
-func (_ Unimplemented) GetRuleTarget(w http.ResponseWriter, r *http.Request, id Id) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (PATCH /rule-targets/{id})
-func (_ Unimplemented) PatchRuleTarget(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1314,8 +1170,8 @@ func (_ Unimplemented) GetRule(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (PATCH /rules/{id})
-func (_ Unimplemented) PatchRule(w http.ResponseWriter, r *http.Request, id Id) {
+// (PUT /rules/{id})
+func (_ Unimplemented) UpdateRule(w http.ResponseWriter, r *http.Request, id Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2046,8 +1902,8 @@ func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
-// PatchGroup operation middleware
-func (siw *ServerInterfaceWrapper) PatchGroup(w http.ResponseWriter, r *http.Request) {
+// UpdateGroup operation middleware
+func (siw *ServerInterfaceWrapper) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2067,7 +1923,7 @@ func (siw *ServerInterfaceWrapper) PatchGroup(w http.ResponseWriter, r *http.Req
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PatchGroup(w, r, id)
+		siw.Handler.UpdateGroup(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2203,224 +2059,6 @@ func (siw *ServerInterfaceWrapper) GetMachine(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMachine(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListRuleTargets operation middleware
-func (siw *ServerInterfaceWrapper) ListRuleTargets(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListRuleTargetsParams
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "search" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "sort" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "rule_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "rule_id", r.URL.Query(), &params.RuleId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "subject_kind" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "subject_kind", r.URL.Query(), &params.SubjectKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject_kind", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "subject_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "subject_id", r.URL.Query(), &params.SubjectId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subject_id", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "assignment" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "assignment", r.URL.Query(), &params.Assignment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "assignment", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "policy" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "policy", r.URL.Query(), &params.Policy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "policy", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListRuleTargets(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateRuleTarget operation middleware
-func (siw *ServerInterfaceWrapper) CreateRuleTarget(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateRuleTarget(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteRuleTarget operation middleware
-func (siw *ServerInterfaceWrapper) DeleteRuleTarget(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id Id
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteRuleTarget(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetRuleTarget operation middleware
-func (siw *ServerInterfaceWrapper) GetRuleTarget(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id Id
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetRuleTarget(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PatchRuleTarget operation middleware
-func (siw *ServerInterfaceWrapper) PatchRuleTarget(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id Id
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PatchRuleTarget(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2577,8 +2215,8 @@ func (siw *ServerInterfaceWrapper) GetRule(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
-// PatchRule operation middleware
-func (siw *ServerInterfaceWrapper) PatchRule(w http.ResponseWriter, r *http.Request) {
+// UpdateRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRule(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2598,7 +2236,7 @@ func (siw *ServerInterfaceWrapper) PatchRule(w http.ResponseWriter, r *http.Requ
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PatchRule(w, r, id)
+		siw.Handler.UpdateRule(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2866,7 +2504,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/groups/{id}", wrapper.GetGroup)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/groups/{id}", wrapper.PatchGroup)
+		r.Put(options.BaseURL+"/groups/{id}", wrapper.UpdateGroup)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines", wrapper.ListMachines)
@@ -2876,21 +2514,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines/{id}", wrapper.GetMachine)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/rule-targets", wrapper.ListRuleTargets)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/rule-targets", wrapper.CreateRuleTarget)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/rule-targets/{id}", wrapper.DeleteRuleTarget)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/rule-targets/{id}", wrapper.GetRuleTarget)
-	})
-	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/rule-targets/{id}", wrapper.PatchRuleTarget)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/rules", wrapper.ListRules)
@@ -2905,7 +2528,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/rules/{id}", wrapper.GetRule)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/rules/{id}", wrapper.PatchRule)
+		r.Put(options.BaseURL+"/rules/{id}", wrapper.UpdateRule)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/users", wrapper.ListUsers)

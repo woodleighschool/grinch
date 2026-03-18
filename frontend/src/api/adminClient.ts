@@ -15,8 +15,6 @@ import type {
   MachineListResponse,
   Rule,
   RuleListResponse,
-  RuleTarget,
-  RuleTargetListResponse,
   User,
   UserListResponse,
 } from "@/api/types";
@@ -138,10 +136,10 @@ const createOne =
   (body: unknown): Promise<R> =>
     expectBody(client.POST(path as never, { body } as never));
 
-const patchOne =
+const updateOne =
   <R>(path: keyof paths) =>
   (id: string, body: unknown): Promise<R> =>
-    expectBody(client.PATCH(path as never, { ...withPath(id), body } as never));
+    expectBody(client.PUT(path as never, { ...withPath(id), body } as never));
 
 const deleteOne =
   (path: keyof paths) =>
@@ -175,23 +173,15 @@ export const rulesApi = {
   list: list<RuleListResponse>("/rules"),
   get: getOne<Rule>("/rules/{id}"),
   create: createOne<Rule>("/rules"),
-  patch: patchOne<Rule>("/rules/{id}"),
+  update: updateOne<Rule>("/rules/{id}"),
   delete: deleteOne("/rules/{id}"),
-};
-
-export const ruleTargetsApi = {
-  list: list<RuleTargetListResponse>("/rule-targets"),
-  get: getOne<RuleTarget>("/rule-targets/{id}"),
-  create: createOne<RuleTarget>("/rule-targets"),
-  patch: patchOne<RuleTarget>("/rule-targets/{id}"),
-  delete: deleteOne("/rule-targets/{id}"),
 };
 
 export const groupsApi = {
   list: list<GroupListResponse>("/groups"),
   get: getOne<Group>("/groups/{id}"),
   create: createOne<Group>("/groups"),
-  patch: patchOne<Group>("/groups/{id}"),
+  update: updateOne<Group>("/groups/{id}"),
   delete: deleteOne("/groups/{id}"),
 };
 

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createFileAccessEvent = `-- name: CreateFileAccessEvent :one
@@ -52,7 +51,7 @@ RETURNING
 type CreateFileAccessEventParams struct {
 	ID           uuid.UUID
 	MachineID    uuid.UUID
-	ExecutableID pgtype.UUID
+	ExecutableID *uuid.UUID
 	RuleVersion  string
 	RuleName     string
 	Target       string
@@ -137,7 +136,7 @@ WHERE fe.id = $1
 type GetFileAccessEventRow struct {
 	ID           uuid.UUID
 	MachineID    uuid.UUID
-	ExecutableID pgtype.UUID
+	ExecutableID *uuid.UUID
 	RuleVersion  string
 	RuleName     string
 	Target       string

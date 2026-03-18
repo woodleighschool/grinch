@@ -12,6 +12,16 @@ type groupWriteRequest struct {
 	name        *string
 }
 
+type groupWriteRequestBody struct {
+	ID          *string `json:"id,omitempty"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Source      *string `json:"source,omitempty"`
+	MemberCount *int32  `json:"member_count,omitempty"`
+	CreatedAt   *string `json:"created_at,omitempty"`
+	UpdatedAt   *string `json:"updated_at,omitempty"`
+}
+
 func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Request, params ListGroupsParams) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
 	if err != nil {
@@ -40,7 +50,7 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 }
 
 func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Request) {
-	var body CreateGroupJSONRequestBody
+	var body groupWriteRequestBody
 	decodeErr := decodeJSONBody(request, &body)
 	if decodeErr != nil {
 		writeClassifiedError(writer, decodeErr, apiErrorOptions{})
@@ -94,17 +104,34 @@ func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Reques
 	writeJSON(writer, http.StatusOK, mapped)
 }
 
-func (handler *Server) PatchGroup(writer http.ResponseWriter, request *http.Request, id Id) {
-	var body PatchGroupJSONRequestBody
+func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Request, id Id) {
+	var body groupWriteRequestBody
 	decodeErr := decodeJSONBody(request, &body)
 	if decodeErr != nil {
 		writeClassifiedError(writer, decodeErr, apiErrorOptions{})
 		return
 	}
 
-	input := decodeGroupPatchRequest(body)
+	input, inputErr := decodeGroupWriteRequest(body)
+	if inputErr != nil {
+		writeClassifiedError(writer, &domain.ValidationError{
+			Code:   "validation_error",
+			Detail: "Group is invalid.",
+			FieldErrors: []domain.FieldError{{
+				Field:   "name",
+				Message: inputErr.Error(),
+				Code:    "required",
+			}},
+		}, apiErrorOptions{})
+		return
+	}
 
-	updated, err := handler.admin.PatchGroup(request.Context(), id, input.name, input.description)
+	updated, err := handler.admin.UpdateGroup(
+		request.Context(),
+		id,
+		*input.name,
+		optionalStringValue(input.description),
+	)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group not found"})
 		return
@@ -129,7 +156,7 @@ func (handler *Server) DeleteGroup(writer http.ResponseWriter, request *http.Req
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func decodeGroupWriteRequest(body CreateGroupJSONRequestBody) (groupWriteRequest, error) {
+func decodeGroupWriteRequest(body groupWriteRequestBody) (groupWriteRequest, error) {
 	name := strings.TrimSpace(body.Name)
 	if name == "" {
 		return groupWriteRequest{}, badRequestError("name is required")
@@ -140,17 +167,4 @@ func decodeGroupWriteRequest(body CreateGroupJSONRequestBody) (groupWriteRequest
 		description: &description,
 		name:        &name,
 	}, nil
-}
-
-func decodeGroupPatchRequest(body PatchGroupJSONRequestBody) groupWriteRequest {
-	result := groupWriteRequest{}
-	if body.Name != nil {
-		name := strings.TrimSpace(*body.Name)
-		result.name = &name
-	}
-	if body.Description != nil {
-		description := *body.Description
-		result.description = &description
-	}
-	return result
 }

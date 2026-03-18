@@ -43,7 +43,7 @@ type ExecutionEvent struct {
 type FileAccessEvent struct {
 	ID           uuid.UUID
 	MachineID    uuid.UUID
-	ExecutableID pgtype.UUID
+	ExecutableID *uuid.UUID
 	RuleVersion  string
 	RuleName     string
 	Target       string
@@ -120,13 +120,11 @@ type RuleTarget struct {
 	ID            uuid.UUID
 	RuleID        uuid.UUID
 	SubjectKind   string
-	SubjectID     uuid.UUID
+	SubjectID     *uuid.UUID
 	Assignment    string
 	Priority      pgtype.Int4
 	Policy        pgtype.Text
 	CelExpression string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
 }
 
 type User struct {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const deleteMachine = `-- name: DeleteMachine :exec
@@ -62,7 +61,7 @@ type GetMachineRow struct {
 	LastSeenAt           time.Time
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-	PrimaryUserID        pgtype.UUID
+	PrimaryUserID        *uuid.UUID
 }
 
 func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachineRow, error) {
@@ -129,7 +128,7 @@ type ListMachinesRow struct {
 	LastSeenAt           time.Time
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-	PrimaryUserID        pgtype.UUID
+	PrimaryUserID        *uuid.UUID
 }
 
 func (q *Queries) ListMachines(ctx context.Context, arg ListMachinesParams) ([]ListMachinesRow, error) {

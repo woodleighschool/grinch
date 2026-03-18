@@ -69,7 +69,7 @@ const ProcessChainField = (): ReactElement | undefined => {
 const FileAccessEventShowActions = (): ReactElement => (
   <TopToolbar>
     <ListButton />
-    <DeleteButton redirect="list" mutationMode="optimistic" />
+    <DeleteButton redirect="list" mutationMode="pessimistic" />
   </TopToolbar>
 );
 

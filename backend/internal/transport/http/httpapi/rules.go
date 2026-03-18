@@ -3,9 +3,25 @@ package httpapi
 import (
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/woodleighschool/grinch/internal/app/rules"
 	"github.com/woodleighschool/grinch/internal/domain"
 )
+
+type ruleWriteRequestBody struct {
+	ID            *string    `json:"id,omitempty"`
+	Name          string     `json:"name"`
+	Description   *string    `json:"description,omitempty"`
+	RuleType      RuleType   `json:"rule_type"`
+	Identifier    string     `json:"identifier"`
+	CustomMessage *string    `json:"custom_message,omitempty"`
+	CustomUrl     *string    `json:"custom_url,omitempty"`
+	Enabled       *bool      `json:"enabled,omitempty"`
+	Targets       RuleTargets `json:"targets"`
+	CreatedAt     *string    `json:"created_at,omitempty"`
+	UpdatedAt     *string    `json:"updated_at,omitempty"`
+}
 
 func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Request, params ListRulesParams) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
@@ -33,7 +49,7 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 }
 
 func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Request) {
-	var body CreateRuleJSONRequestBody
+	var body ruleWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -76,20 +92,20 @@ func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request
 	writeJSON(writer, http.StatusOK, mapped)
 }
 
-func (handler *Server) PatchRule(writer http.ResponseWriter, request *http.Request, id Id) {
-	var body PatchRuleJSONRequestBody
+func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Request, id Id) {
+	var body ruleWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	input, err := decodeRulePatchRequest(body)
+	input, err := decodeRuleWriteRequest(body)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	updated, err := handler.rules.PatchRule(request.Context(), id, input)
+	updated, err := handler.rules.UpdateRule(request.Context(), id, input)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{
 			NotFoundMessage: "rule not found",
@@ -115,10 +131,10 @@ func (handler *Server) DeleteRule(writer http.ResponseWriter, request *http.Requ
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func decodeRuleWriteRequest(body CreateRuleJSONRequestBody) (rules.RuleCreateInput, error) {
+func decodeRuleWriteRequest(body ruleWriteRequestBody) (rules.WriteInput, error) {
 	ruleType, err := toDomainRuleType(body.RuleType)
 	if err != nil {
-		return rules.RuleCreateInput{}, badRequestError("invalid rule_type")
+		return rules.WriteInput{}, badRequestError("invalid rule_type")
 	}
 
 	enabled := true
@@ -126,7 +142,12 @@ func decodeRuleWriteRequest(body CreateRuleJSONRequestBody) (rules.RuleCreateInp
 		enabled = *body.Enabled
 	}
 
-	return rules.RuleCreateInput{
+	targets, err := decodeRuleTargets(body.Targets)
+	if err != nil {
+		return rules.WriteInput{}, err
+	}
+
+	return rules.WriteInput{
 		CustomMessage: optionalStringValue(body.CustomMessage),
 		CustomURL:     optionalStringValue(body.CustomUrl),
 		Description:   optionalStringValue(body.Description),
@@ -134,24 +155,42 @@ func decodeRuleWriteRequest(body CreateRuleJSONRequestBody) (rules.RuleCreateInp
 		Identifier:    body.Identifier,
 		Name:          body.Name,
 		RuleType:      ruleType,
+		Targets:       targets,
 	}, nil
 }
 
-func decodeRulePatchRequest(body PatchRuleJSONRequestBody) (rules.RulePatchInput, error) {
-	result := rules.RulePatchInput{
-		Name:          body.Name,
-		Description:   body.Description,
-		Identifier:    body.Identifier,
-		CustomMessage: body.CustomMessage,
-		CustomURL:     body.CustomUrl,
-		Enabled:       body.Enabled,
-	}
-	if body.RuleType != nil {
-		ruleType, err := toDomainRuleType(*body.RuleType)
+func decodeRuleTargets(targets RuleTargets) (rules.TargetsWriteInput, error) {
+	include := make([]rules.IncludeTargetWriteInput, 0, len(targets.Include))
+	for _, target := range targets.Include {
+		subjectKind, err := toDomainRuleTargetSubjectKind(target.SubjectKind)
 		if err != nil {
-			return rules.RulePatchInput{}, badRequestError("invalid rule_type")
+			return rules.TargetsWriteInput{}, badRequestError("invalid subject_kind")
 		}
-		result.RuleType = &ruleType
+		policy, policyErr := toDomainRulePolicy(target.Policy)
+		if policyErr != nil {
+			return rules.TargetsWriteInput{}, badRequestError("invalid policy")
+		}
+
+		item := rules.IncludeTargetWriteInput{
+			SubjectKind: subjectKind,
+			SubjectID:   target.SubjectId,
+			Policy:      policy,
+		}
+		if target.CelExpression != nil {
+			item.CELExpression = *target.CelExpression
+		}
+		include = append(include, item)
 	}
-	return result, nil
+
+	exclude := make([]rules.ExcludedGroupWriteInput, 0, len(targets.Exclude))
+	for _, target := range targets.Exclude {
+		exclude = append(exclude, rules.ExcludedGroupWriteInput{
+			GroupID: uuid.UUID(target.GroupId),
+		})
+	}
+
+	return rules.TargetsWriteInput{
+		Include: include,
+		Exclude: exclude,
+	}, nil
 }

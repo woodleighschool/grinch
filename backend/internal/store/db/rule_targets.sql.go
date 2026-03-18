@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createRuleTarget = `-- name: CreateRuleTarget :one
+const createRuleTarget = `-- name: CreateRuleTarget :exec
 INSERT INTO rule_targets (
   id,
   rule_id,
@@ -33,32 +33,21 @@ VALUES (
   $7,
   $8
 )
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
 `
 
 type CreateRuleTargetParams struct {
 	ID            uuid.UUID
 	RuleID        uuid.UUID
 	SubjectKind   string
-	SubjectID     uuid.UUID
+	SubjectID     *uuid.UUID
 	Assignment    string
 	Priority      pgtype.Int4
 	Policy        pgtype.Text
 	CelExpression string
 }
 
-func (q *Queries) CreateRuleTarget(ctx context.Context, arg CreateRuleTargetParams) (RuleTarget, error) {
-	row := q.db.QueryRow(ctx, createRuleTarget,
+func (q *Queries) CreateRuleTarget(ctx context.Context, arg CreateRuleTargetParams) error {
+	_, err := q.db.Exec(ctx, createRuleTarget,
 		arg.ID,
 		arg.RuleID,
 		arg.SubjectKind,
@@ -68,130 +57,72 @@ func (q *Queries) CreateRuleTarget(ctx context.Context, arg CreateRuleTargetPara
 		arg.Policy,
 		arg.CelExpression,
 	)
-	var i RuleTarget
-	err := row.Scan(
-		&i.ID,
-		&i.RuleID,
-		&i.SubjectKind,
-		&i.SubjectID,
-		&i.Assignment,
-		&i.Priority,
-		&i.Policy,
-		&i.CelExpression,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	return err
 }
 
-const deleteRuleTarget = `-- name: DeleteRuleTarget :one
+const deleteRuleTargetsByRule = `-- name: DeleteRuleTargetsByRule :exec
 DELETE FROM rule_targets
-WHERE id = $1
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
+WHERE rule_id = $1
 `
 
-func (q *Queries) DeleteRuleTarget(ctx context.Context, id uuid.UUID) (RuleTarget, error) {
-	row := q.db.QueryRow(ctx, deleteRuleTarget, id)
-	var i RuleTarget
-	err := row.Scan(
-		&i.ID,
-		&i.RuleID,
-		&i.SubjectKind,
-		&i.SubjectID,
-		&i.Assignment,
-		&i.Priority,
-		&i.Policy,
-		&i.CelExpression,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getRuleTarget = `-- name: GetRuleTarget :one
-SELECT
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
-FROM rule_targets
-WHERE id = $1
-`
-
-func (q *Queries) GetRuleTarget(ctx context.Context, id uuid.UUID) (RuleTarget, error) {
-	row := q.db.QueryRow(ctx, getRuleTarget, id)
-	var i RuleTarget
-	err := row.Scan(
-		&i.ID,
-		&i.RuleID,
-		&i.SubjectKind,
-		&i.SubjectID,
-		&i.Assignment,
-		&i.Priority,
-		&i.Policy,
-		&i.CelExpression,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) DeleteRuleTargetsByRule(ctx context.Context, ruleID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteRuleTargetsByRule, ruleID)
+	return err
 }
 
 const listRuleTargetsByRule = `-- name: ListRuleTargetsByRule :many
 SELECT
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
-FROM rule_targets
-WHERE rule_id = $1
+  rt.subject_kind,
+  rt.subject_id,
+  rt.assignment,
+  rt.priority,
+  rt.policy,
+  rt.cel_expression,
+  CASE
+    WHEN rt.subject_kind = 'group' THEN COALESCE(g.name, '')
+    WHEN rt.subject_kind = 'all_devices' THEN 'All Devices'
+    WHEN rt.subject_kind = 'all_users' THEN 'All Users'
+    ELSE ''
+  END AS subject_name
+FROM rule_targets AS rt
+LEFT JOIN groups AS g
+  ON rt.subject_kind = 'group'
+  AND g.id = rt.subject_id
+WHERE rt.rule_id = $1
 ORDER BY
-  CASE WHEN assignment = 'include' THEN 0 ELSE 1 END ASC,
-  priority ASC NULLS LAST,
-  subject_id ASC
+  CASE WHEN rt.assignment = 'include' THEN 0 ELSE 1 END ASC,
+  rt.priority ASC NULLS LAST,
+  rt.subject_kind ASC,
+  rt.subject_id ASC
 `
 
-func (q *Queries) ListRuleTargetsByRule(ctx context.Context, ruleID uuid.UUID) ([]RuleTarget, error) {
+type ListRuleTargetsByRuleRow struct {
+	SubjectKind   string
+	SubjectID     *uuid.UUID
+	Assignment    string
+	Priority      pgtype.Int4
+	Policy        pgtype.Text
+	CelExpression string
+	SubjectName   string
+}
+
+func (q *Queries) ListRuleTargetsByRule(ctx context.Context, ruleID uuid.UUID) ([]ListRuleTargetsByRuleRow, error) {
 	rows, err := q.db.Query(ctx, listRuleTargetsByRule, ruleID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []RuleTarget
+	var items []ListRuleTargetsByRuleRow
 	for rows.Next() {
-		var i RuleTarget
+		var i ListRuleTargetsByRuleRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.RuleID,
 			&i.SubjectKind,
 			&i.SubjectID,
 			&i.Assignment,
 			&i.Priority,
 			&i.Policy,
 			&i.CelExpression,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.SubjectName,
 		); err != nil {
 			return nil, err
 		}
@@ -201,64 +132,4 @@ func (q *Queries) ListRuleTargetsByRule(ctx context.Context, ruleID uuid.UUID) (
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateRuleTarget = `-- name: UpdateRuleTarget :one
-UPDATE rule_targets
-SET
-  subject_kind = $2,
-  subject_id = $3,
-  assignment = $4,
-  priority = $5,
-  policy = $6,
-  cel_expression = $7,
-  updated_at = NOW()
-WHERE id = $1
-RETURNING
-  id,
-  rule_id,
-  subject_kind,
-  subject_id,
-  assignment,
-  priority,
-  policy,
-  cel_expression,
-  created_at,
-  updated_at
-`
-
-type UpdateRuleTargetParams struct {
-	ID            uuid.UUID
-	SubjectKind   string
-	SubjectID     uuid.UUID
-	Assignment    string
-	Priority      pgtype.Int4
-	Policy        pgtype.Text
-	CelExpression string
-}
-
-func (q *Queries) UpdateRuleTarget(ctx context.Context, arg UpdateRuleTargetParams) (RuleTarget, error) {
-	row := q.db.QueryRow(ctx, updateRuleTarget,
-		arg.ID,
-		arg.SubjectKind,
-		arg.SubjectID,
-		arg.Assignment,
-		arg.Priority,
-		arg.Policy,
-		arg.CelExpression,
-	)
-	var i RuleTarget
-	err := row.Scan(
-		&i.ID,
-		&i.RuleID,
-		&i.SubjectKind,
-		&i.SubjectID,
-		&i.Assignment,
-		&i.Priority,
-		&i.Policy,
-		&i.CelExpression,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }

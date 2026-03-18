@@ -16,7 +16,6 @@ import (
 
 	appgroupmemberships "github.com/woodleighschool/grinch/internal/app/groupmemberships"
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
-	appruletargets "github.com/woodleighschool/grinch/internal/app/ruletargets"
 	"github.com/woodleighschool/grinch/internal/domain"
 	pgutil "github.com/woodleighschool/grinch/internal/store/postgres/shared"
 )
@@ -29,7 +28,6 @@ type Server struct {
 	admin            AdminService
 	rules            RuleService
 	groupMemberships GroupMembershipService
-	ruleTargets      RuleTargetService
 }
 
 type AdminService interface {
@@ -38,7 +36,7 @@ type AdminService interface {
 	ListGroups(context.Context, domain.GroupListOptions) ([]domain.Group, int32, error)
 	CreateLocalGroup(context.Context, string, string) (domain.Group, error)
 	GetGroup(context.Context, uuid.UUID) (domain.Group, error)
-	PatchGroup(context.Context, uuid.UUID, *string, *string) (domain.Group, error)
+	UpdateGroup(context.Context, uuid.UUID, string, string) (domain.Group, error)
 	DeleteGroup(context.Context, uuid.UUID) error
 	ListMachines(context.Context, domain.MachineListOptions) ([]domain.MachineSummary, int32, error)
 	GetMachine(context.Context, uuid.UUID) (domain.Machine, error)
@@ -62,8 +60,8 @@ type AdminService interface {
 type RuleService interface {
 	ListRules(context.Context, domain.RuleListOptions) ([]domain.RuleSummary, int32, error)
 	GetRule(context.Context, uuid.UUID) (domain.Rule, error)
-	CreateRule(context.Context, apprules.RuleCreateInput) (domain.Rule, error)
-	PatchRule(context.Context, uuid.UUID, apprules.RulePatchInput) (domain.Rule, error)
+	CreateRule(context.Context, apprules.WriteInput) (domain.Rule, error)
+	UpdateRule(context.Context, uuid.UUID, apprules.WriteInput) (domain.Rule, error)
 	DeleteRule(context.Context, uuid.UUID) error
 }
 
@@ -77,25 +75,15 @@ type GroupMembershipService interface {
 	DeleteGroupMembership(context.Context, uuid.UUID) error
 }
 
-type RuleTargetService interface {
-	ListRuleTargets(context.Context, domain.RuleTargetListOptions) ([]domain.RuleTargetSummary, int32, error)
-	GetRuleTarget(context.Context, uuid.UUID) (domain.RuleTarget, error)
-	CreateRuleTarget(context.Context, appruletargets.WriteInput) (domain.RuleTarget, error)
-	PatchRuleTarget(context.Context, uuid.UUID, appruletargets.PatchInput) (domain.RuleTarget, error)
-	DeleteRuleTarget(context.Context, uuid.UUID) error
-}
-
 func New(
 	adminService AdminService,
 	ruleService RuleService,
 	groupMembershipService GroupMembershipService,
-	ruleTargetService RuleTargetService,
 ) *Server {
 	return &Server{
 		admin:            adminService,
 		rules:            ruleService,
 		groupMemberships: groupMembershipService,
-		ruleTargets:      ruleTargetService,
 	}
 }
 
@@ -146,21 +134,6 @@ func optionalStringValue(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func decodeOptional[T any, U any](value *T, decode func(T) (U, error)) (U, bool, error) {
-	var zero U
-
-	if value == nil {
-		return zero, false, nil
-	}
-
-	decoded, err := decode(*value)
-	if err != nil {
-		return zero, false, err
-	}
-
-	return decoded, true, nil
 }
 
 func mapSlice[T any, U any](items []T, mapper func(T) (U, error)) ([]U, error) {

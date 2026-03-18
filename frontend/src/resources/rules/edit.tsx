@@ -1,5 +1,4 @@
-import { RuleFields } from "@/resources/rules/fields";
-import { RuleTargetsTab } from "@/resources/rules/targetsTab";
+import { RuleDetailsFields, RuleTargetsFields } from "@/resources/rules/fields";
 import type { ReactElement } from "react";
 import { Edit, ListButton, TabbedForm, TopToolbar } from "react-admin";
 
@@ -10,13 +9,13 @@ const RuleEditActions = (): ReactElement => (
 );
 
 export const RuleEdit = (): ReactElement => (
-  <Edit mutationMode="optimistic" redirect="edit" actions={<RuleEditActions />}>
+  <Edit mutationMode="pessimistic" redirect="edit" actions={<RuleEditActions />}>
     <TabbedForm>
-      <TabbedForm.Tab label="Overview">
-        <RuleFields />
+      <TabbedForm.Tab label="Details">
+        <RuleDetailsFields />
       </TabbedForm.Tab>
       <TabbedForm.Tab label="Targets">
-        <RuleTargetsTab />
+        <RuleTargetsFields />
       </TabbedForm.Tab>
     </TabbedForm>
   </Edit>

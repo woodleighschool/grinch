@@ -111,30 +111,16 @@ func (store *Store) CreateLocalGroup(ctx context.Context, name string, descripti
 	return store.GetGroup(ctx, row.ID)
 }
 
-func (store *Store) PatchGroup(
+func (store *Store) UpdateGroup(
 	ctx context.Context,
 	id uuid.UUID,
-	name *string,
-	description *string,
+	name string,
+	description string,
 ) (domain.Group, error) {
-	current, err := store.GetGroup(ctx, id)
-	if err != nil {
-		return domain.Group{}, err
-	}
-
-	resolvedName := current.Name
-	if name != nil {
-		resolvedName = *name
-	}
-	resolvedDescription := current.Description
-	if description != nil {
-		resolvedDescription = *description
-	}
-
 	row, err := store.queries.UpdateGroup(ctx, db.UpdateGroupParams{
 		ID:          id,
-		Name:        resolvedName,
-		Description: resolvedDescription,
+		Name:        name,
+		Description: description,
 	})
 	if err != nil {
 		return domain.Group{}, err
@@ -145,11 +131,11 @@ func (store *Store) PatchGroup(
 	if row.Status == groupMutationStatusReadOnly {
 		return domain.Group{}, domain.ErrGroupReadOnly
 	}
-	if !row.ID.Valid {
+	if row.ID == nil {
 		return domain.Group{}, errors.New("update group returned incomplete row")
 	}
 
-	return store.GetGroup(ctx, uuid.UUID(row.ID.Bytes))
+	return store.GetGroup(ctx, *row.ID)
 }
 
 func (store *Store) DeleteGroup(ctx context.Context, id uuid.UUID) error {

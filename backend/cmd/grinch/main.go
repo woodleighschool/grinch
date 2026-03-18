@@ -19,7 +19,6 @@ import (
 	appevents "github.com/woodleighschool/grinch/internal/app/events"
 	appgroupmemberships "github.com/woodleighschool/grinch/internal/app/groupmemberships"
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
-	appruletargets "github.com/woodleighschool/grinch/internal/app/ruletargets"
 	appsanta "github.com/woodleighschool/grinch/internal/app/santa"
 	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/platform/logging"
@@ -28,7 +27,6 @@ import (
 	entrasyncpostgres "github.com/woodleighschool/grinch/internal/store/postgres/entrasync"
 	groupmembershipspostgres "github.com/woodleighschool/grinch/internal/store/postgres/groupmemberships"
 	rulespostgres "github.com/woodleighschool/grinch/internal/store/postgres/rules"
-	ruletargetspostgres "github.com/woodleighschool/grinch/internal/store/postgres/ruletargets"
 	santapostgres "github.com/woodleighschool/grinch/internal/store/postgres/santa"
 	authhttp "github.com/woodleighschool/grinch/internal/transport/http/auth"
 	httpapi "github.com/woodleighschool/grinch/internal/transport/http/httpapi"
@@ -125,7 +123,6 @@ func buildServer(
 	adminStore := adminpostgres.New(store)
 	ruleService := apprules.New(rulespostgres.New(store))
 	groupMembershipService := appgroupmemberships.New(groupmembershipspostgres.New(store))
-	ruleTargetService := appruletargets.New(ruletargetspostgres.New(store))
 	santaStore := santapostgres.New(store)
 	syncService := appsanta.New(
 		logger,
@@ -153,7 +150,7 @@ func buildServer(
 	apiAuthMiddleware := authhttp.NewAPIMiddleware(
 		authService.SessionAuthMiddleware(),
 	)
-	apiHandler := httpapi.New(adminStore, ruleService, groupMembershipService, ruleTargetService)
+	apiHandler := httpapi.New(adminStore, ruleService, groupMembershipService)
 
 	server := &http.Server{
 		Handler: httprouter.New(
