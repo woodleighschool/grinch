@@ -9,7 +9,7 @@ const fileAccessEventFilters = [
 ];
 
 export const FileAccessEventList = (): ReactElement => (
-  <List sort={{ field: "created_at", order: "DESC" }} filters={fileAccessEventFilters}>
+  <List sort={{ field: "occurred_at", order: "DESC" }} filters={fileAccessEventFilters}>
     <DataTable rowClick="show">
       <DataTable.Col source="occurred_at" label="Occurred At">
         <DateField source="occurred_at" showTime />

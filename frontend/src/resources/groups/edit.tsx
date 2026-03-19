@@ -1,27 +1,19 @@
-import type { Group } from "@/api/types";
+import type { components } from "@/api/openapi";
 import { GroupMembersTab } from "@/resources/groups/membersTab";
-import { trimmedRequired } from "@/resources/shared/validation";
+import { ShowActions } from "@/resources/shared/actions";
 import type { ReactElement } from "react";
-import {
-  DateField,
-  Edit,
-  Labeled,
-  ListButton,
-  NumberField,
-  TabbedForm,
-  TextInput,
-  TopToolbar,
-  useRecordContext,
-} from "react-admin";
+import { DateField, Edit, Labeled, NumberField, TabbedForm, TextInput, useRecordContext } from "react-admin";
 
-const GroupOverviewTab = (): ReactElement => {
+type Group = components["schemas"]["Group"];
+
+const GroupOverviewTab = (): ReactElement | undefined => {
   const record = useRecordContext<Pick<Group, "source">>();
-  if (!record) return <></>;
+  if (!record) return undefined;
   const isLocal = record.source === "local";
 
   return (
     <>
-      <TextInput source="name" label="Name" validate={[trimmedRequired("Name")]} fullWidth disabled={!isLocal} />
+      <TextInput source="name" label="Name" fullWidth disabled={!isLocal} />
       <TextInput source="description" label="Description" fullWidth disabled={!isLocal} />
       <Labeled label="Members">
         <NumberField source="member_count" />
@@ -36,14 +28,8 @@ const GroupOverviewTab = (): ReactElement => {
   );
 };
 
-const GroupEditActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-  </TopToolbar>
-);
-
 export const GroupEdit = (): ReactElement => (
-  <Edit mutationMode="pessimistic" redirect="edit" actions={<GroupEditActions />}>
+  <Edit mutationMode="pessimistic" redirect="edit" actions={<ShowActions />}>
     <TabbedForm>
       <TabbedForm.Tab label="Overview">
         <GroupOverviewTab />

@@ -1,6 +1,5 @@
-import type { Group, GroupMembershipListItem } from "@/api/types";
+import type { components } from "@/api/openapi";
 import { MEMBER_KIND_CHOICES } from "@/resources/groups/choices";
-import { getErrorMessage } from "@/resources/shared/errors";
 import { ResourceLink } from "@/resources/shared/resourceLinks";
 import { searchFilterToQuery } from "@/resources/shared/search";
 import AddIcon from "@mui/icons-material/Add";
@@ -35,7 +34,9 @@ import {
   useRefresh,
 } from "react-admin";
 
-type MemberKind = "user" | "machine";
+type Group = components["schemas"]["Group"];
+type GroupMembershipListItem = components["schemas"]["GroupMembershipListItem"];
+type MemberKind = components["schemas"]["MemberKind"];
 
 interface AddMemberDialogProperties {
   groupID: string;
@@ -66,7 +67,9 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
       refresh();
       onClose();
     } catch (error) {
-      notify(getErrorMessage(error, "Failed to add member"), { type: "error" });
+      notify(error instanceof Error && error.message.trim() !== "" ? error.message : "Failed to add member", {
+        type: "error",
+      });
     }
   };
 
@@ -123,11 +126,11 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
   );
 };
 
-const MemberKindField = (): ReactElement => {
+const MemberKindField = (): ReactElement | undefined => {
   const membership = useRecordContext<GroupMembershipListItem>();
 
   if (!membership) {
-    return <></>;
+    return undefined;
   }
 
   const isUser = membership.member.kind === "user";
@@ -140,11 +143,11 @@ const MemberKindField = (): ReactElement => {
   );
 };
 
-const MemberNameField = (): ReactElement => {
+const MemberNameField = (): ReactElement | undefined => {
   const membership = useRecordContext<GroupMembershipListItem>();
 
   if (!membership) {
-    return <></>;
+    return undefined;
   }
 
   return (
@@ -156,12 +159,12 @@ const MemberNameField = (): ReactElement => {
   );
 };
 
-export const GroupMembersTab = (): ReactElement => {
+export const GroupMembersTab = (): ReactElement | undefined => {
   const record = useRecordContext<Pick<Group, "id" | "source">>();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (!record?.id) {
-    return <></>;
+    return undefined;
   }
 
   const canManage = record.source === "local";

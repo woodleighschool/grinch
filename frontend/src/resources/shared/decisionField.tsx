@@ -1,9 +1,16 @@
-import type { EventDecision, FileAccessDecision } from "@/api/types";
-import { EVENT_DECISION_DESCRIPTIONS, eventDecisionName } from "@/resources/executionEvents/choices";
-import { FILE_ACCESS_DECISION_DESCRIPTIONS, fileAccessDecisionName } from "@/resources/fileAccessEvents/choices";
+import type { components } from "@/api/openapi";
+import {
+  EVENT_DECISION_DESCRIPTIONS,
+  FILE_ACCESS_DECISION_DESCRIPTIONS,
+  eventDecisionName,
+  fileAccessDecisionName,
+} from "@/resources/shared/decisionChoices";
 import { Chip, Tooltip } from "@mui/material";
 import type { ReactElement } from "react";
 import { useRecordContext } from "react-admin";
+
+type EventDecision = components["schemas"]["EventDecision"];
+type FileAccessDecision = components["schemas"]["FileAccessDecision"];
 
 const getDecisionColor = (value: string): "default" | "error" | "info" | "success" | "warning" => {
   if (value.startsWith("allow") || value === "audit_only") {
@@ -33,11 +40,11 @@ export const DecisionChip = ({ decision, label, description }: DecisionChipPrope
   </Tooltip>
 );
 
-export const EventDecisionField = (): ReactElement => {
+export const EventDecisionField = (): ReactElement | undefined => {
   const record = useRecordContext<{ decision: EventDecision }>();
 
   if (!record) {
-    return <></>;
+    return undefined;
   }
 
   return (
@@ -49,11 +56,11 @@ export const EventDecisionField = (): ReactElement => {
   );
 };
 
-export const FileAccessDecisionField = (): ReactElement => {
+export const FileAccessDecisionField = (): ReactElement | undefined => {
   const record = useRecordContext<{ decision: FileAccessDecision }>();
 
   if (!record) {
-    return <></>;
+    return undefined;
   }
 
   return (

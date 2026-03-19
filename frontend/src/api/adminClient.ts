@@ -1,25 +1,5 @@
-import { getCookie, XSRF_COOKIE_NAME, XSRF_HEADER_NAME } from "@/api/cookies";
+import { withXsrfHeaders } from "@/api/cookies";
 import type { components, paths } from "@/api/openapi";
-import type {
-  Executable,
-  ExecutableListResponse,
-  ExecutionEvent,
-  ExecutionEventListResponse,
-  FileAccessEvent,
-  FileAccessEventListResponse,
-  Group,
-  GroupListResponse,
-  GroupMembership,
-  GroupMembershipListResponse,
-  Machine,
-  MachineListResponse,
-  MachineRuleListResponse,
-  Rule,
-  RuleListResponse,
-  RuleMachineListResponse,
-  User,
-  UserListResponse,
-} from "@/api/types";
 import createClient from "openapi-fetch";
 import { HttpError } from "react-admin";
 
@@ -30,20 +10,27 @@ interface ApiResult<T> {
 }
 
 type Problem = components["schemas"]["Problem"];
+type Executable = components["schemas"]["Executable"];
+type ExecutableListResponse = components["schemas"]["ExecutableListResponse"];
+type ExecutionEvent = components["schemas"]["ExecutionEvent"];
+type ExecutionEventListResponse = components["schemas"]["ExecutionEventListResponse"];
+type FileAccessEvent = components["schemas"]["FileAccessEvent"];
+type FileAccessEventListResponse = components["schemas"]["FileAccessEventListResponse"];
+type Group = components["schemas"]["Group"];
+type GroupListResponse = components["schemas"]["GroupListResponse"];
+type GroupMembership = components["schemas"]["GroupMembership"];
+type GroupMembershipListResponse = components["schemas"]["GroupMembershipListResponse"];
+type Machine = components["schemas"]["Machine"];
+type MachineListResponse = components["schemas"]["MachineListResponse"];
+type MachineRuleListResponse = components["schemas"]["MachineRuleListResponse"];
+type Rule = components["schemas"]["Rule"];
+type RuleListResponse = components["schemas"]["RuleListResponse"];
+type RuleMachineListResponse = components["schemas"]["RuleMachineListResponse"];
+type User = components["schemas"]["User"];
+type UserListResponse = components["schemas"]["UserListResponse"];
 type QueryScalar = string | number | boolean;
 type QueryParameters = Record<string, QueryScalar | QueryScalar[] | undefined>;
 type Compacted<T extends QueryParameters> = { [K in keyof T]?: NonNullable<T[K]> };
-
-const withXsrfHeaders = (headers?: HeadersInit): Headers => {
-  const result = new Headers(headers);
-  const xsrfToken = getCookie(XSRF_COOKIE_NAME);
-
-  if (xsrfToken) {
-    result.set(XSRF_HEADER_NAME, xsrfToken);
-  }
-
-  return result;
-};
 
 const client = createClient<paths>({
   baseUrl: "/api/v1",

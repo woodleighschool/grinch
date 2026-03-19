@@ -10,7 +10,7 @@ import {
   rulesApi,
   usersApi,
 } from "@/api/adminClient";
-import type { GroupMembershipCreateRequest, GroupMembershipListItem } from "@/api/types";
+import type { components } from "@/api/openapi";
 import type {
   CreateParams,
   CreateResult,
@@ -35,6 +35,8 @@ import type {
   UpdateResult,
 } from "react-admin";
 
+type GroupMembershipCreateRequest = components["schemas"]["GroupMembershipCreateRequest"];
+type GroupMembershipListItem = components["schemas"]["GroupMembershipListItem"];
 type RecordShape = Record<string, unknown>;
 type QueryScalar = string | number | boolean;
 type QueryValue = QueryScalar | QueryScalar[];
@@ -165,9 +167,8 @@ const listHandlers: Record<ResourceName, ListHandler> = {
   users: async (parameters, signal): Promise<ListResult> =>
     toListResult(await usersApi.list(asListQuery(parameters), signal)),
 
-  groups: async (parameters, signal): Promise<ListResult> => {
-    return toListResult(await groupsApi.list(asListQuery(parameters), signal));
-  },
+  groups: async (parameters, signal): Promise<ListResult> =>
+    toListResult(await groupsApi.list(asListQuery(parameters), signal)),
 
   "group-memberships": async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
@@ -298,32 +299,6 @@ const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   rules: (id, signal): Promise<RaRecord> => rulesApi.get(String(id), signal) as Promise<RaRecord>,
 };
 
-const getGetOneHandler = (resourceName: ResourceName): GetOneHandler => {
-  const handler = getOneHandlers[resourceName];
-  if (!handler) {
-    return unsupported("GetOne", resourceName);
-  }
-
-  return handler;
-};
-
-const getGetManyListHandler = (resourceName: ResourceName): ListHandler | undefined => {
-  switch (resourceName) {
-    case "users":
-    case "groups":
-    case "machines":
-    case "executables":
-    case "execution-events":
-    case "file-access-events":
-    case "rules": {
-      return listHandlers[resourceName];
-    }
-    default: {
-      return undefined;
-    }
-  }
-};
-
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
   rules: (data): Promise<RaRecord> => rulesApi.create(data) as Promise<RaRecord>,
   groups: (data): Promise<RaRecord> => groupsApi.create(data) as Promise<RaRecord>,
@@ -355,33 +330,6 @@ const assertResourceName = (operation: string, resource: string): ResourceName =
   return resource as ResourceName;
 };
 
-const getCreateHandler = (resourceName: ResourceName): CreateHandler => {
-  const handler = createHandlers[resourceName];
-  if (!handler) {
-    return unsupported("Create", resourceName);
-  }
-
-  return handler;
-};
-
-const getUpdateHandler = (resourceName: ResourceName): UpdateHandler => {
-  const handler = updateHandlers[resourceName];
-  if (!handler) {
-    return unsupported("Update", resourceName);
-  }
-
-  return handler;
-};
-
-const getDeleteHandler = (operation: string, resourceName: ResourceName): DeleteHandler => {
-  const handler = deleteHandlers[resourceName];
-  if (!handler) {
-    return unsupported(operation, resourceName);
-  }
-
-  return handler;
-};
-
 export const dataProvider: DataProvider = {
   supportAbortSignal: true,
 
@@ -401,7 +349,10 @@ export const dataProvider: DataProvider = {
     parameters: GetOneParams<RecordType>,
   ): Promise<GetOneResult<RecordType>> {
     const resourceName = assertResourceName("GetOne", resource);
-    const handler = getGetOneHandler(resourceName);
+    const handler = getOneHandlers[resourceName];
+    if (!handler) {
+      return unsupported("GetOne", resourceName);
+    }
 
     const data = await handler(parameters.id, parameters.signal);
     return { data: data as RecordType };
@@ -412,14 +363,26 @@ export const dataProvider: DataProvider = {
     parameters: GetManyParams<RecordType>,
   ): Promise<GetManyResult<RecordType>> {
     const resourceName = assertResourceName("GetMany", resource);
-    const listHandler = getGetManyListHandler(resourceName);
+    const listHandler =
+      resourceName === "users" ||
+      resourceName === "groups" ||
+      resourceName === "machines" ||
+      resourceName === "executables" ||
+      resourceName === "execution-events" ||
+      resourceName === "file-access-events" ||
+      resourceName === "rules"
+        ? listHandlers[resourceName]
+        : undefined;
     const requestedIds = [...new Set(parameters.ids.map(String))];
     if (requestedIds.length === 0) {
       return { data: [] };
     }
 
     if (!listHandler) {
-      const handler = getGetOneHandler(resourceName);
+      const handler = getOneHandlers[resourceName];
+      if (!handler) {
+        return unsupported("GetMany", resourceName);
+      }
       const records = await Promise.all(parameters.ids.map((id): Promise<RaRecord> => handler(id, parameters.signal)));
       return { data: records as RecordType[] };
     }
@@ -435,13 +398,12 @@ export const dataProvider: DataProvider = {
     const recordsById = new Map<string, RaRecord>(
       result.data.map((record): [string, RaRecord] => [String(record.id), record]),
     );
-    const missingIds = requestedIds.filter((id): boolean => !recordsById.has(id));
-    if (missingIds.length > 0) {
-      throw new Error(`GetMany returned incomplete data for ${resourceName}: ${missingIds.join(", ")}`);
-    }
 
     return {
-      data: parameters.ids.map((id): RecordType => recordsById.get(String(id)) as RecordType),
+      data: parameters.ids.flatMap((id): RecordType[] => {
+        const record = recordsById.get(String(id));
+        return record ? ([record as RecordType] satisfies RecordType[]) : [];
+      }),
     };
   },
 
@@ -471,7 +433,10 @@ export const dataProvider: DataProvider = {
     ResultRecordType extends RaRecord = RecordType & RaRecord,
   >(resource: string, parameters: CreateParams<RecordType>): Promise<CreateResult<ResultRecordType>> {
     const resourceName = assertResourceName("Create", resource);
-    const handler = getCreateHandler(resourceName);
+    const handler = createHandlers[resourceName];
+    if (!handler) {
+      return unsupported("Create", resourceName);
+    }
 
     const created = await handler(asRecord(parameters.data));
     return { data: created as ResultRecordType };
@@ -482,7 +447,10 @@ export const dataProvider: DataProvider = {
     parameters: UpdateParams,
   ): Promise<UpdateResult<RecordType>> {
     const resourceName = assertResourceName("Update", resource);
-    const handler = getUpdateHandler(resourceName);
+    const handler = updateHandlers[resourceName];
+    if (!handler) {
+      return unsupported("Update", resourceName);
+    }
     const id: Identifier = parameters.id as Identifier;
 
     const updated = await handler(id, asRecord(parameters.data));
@@ -503,12 +471,18 @@ export const dataProvider: DataProvider = {
     parameters: DeleteParams<RecordType>,
   ): Promise<DeleteResult<RecordType>> {
     const resourceName = assertResourceName("Delete", resource);
-    const handler = getDeleteHandler("Delete", resourceName);
+    const handler = deleteHandlers[resourceName];
+    if (!handler) {
+      return unsupported("Delete", resourceName);
+    }
 
     await handler(parameters.id);
+    if (!parameters.previousData) {
+      throw new Error(`Delete is missing previousData for ${resourceName}`);
+    }
 
     return {
-      data: parameters.previousData ?? ({ id: parameters.id } as RecordType),
+      data: parameters.previousData,
     };
   },
 
@@ -517,10 +491,12 @@ export const dataProvider: DataProvider = {
     parameters: DeleteManyParams<RecordType>,
   ): Promise<DeleteManyResult<RecordType>> {
     const resourceName = assertResourceName("DeleteMany", resource);
-    const handler = getDeleteHandler("DeleteMany", resourceName);
+    const handler = deleteHandlers[resourceName];
+    if (!handler) {
+      return unsupported("DeleteMany", resourceName);
+    }
 
-    const ids: Identifier[] = [...parameters.ids];
-    await Promise.all(ids.map((id: Identifier): Promise<void> => handler(id)));
+    await Promise.all(parameters.ids.map((id: Identifier): Promise<void> => handler(id)));
     return { data: parameters.ids };
   },
 };

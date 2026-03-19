@@ -24,10 +24,6 @@ export async function getCurrentUser(signal?: AbortSignal): Promise<AuthUser | u
   }
 }
 
-export async function loginLocal(username: string, password: string): Promise<void> {
-  await authApi.loginLocal({ user: username, passwd: password, aud: globalThis.location.origin });
-}
-
 export async function logout(): Promise<void> {
   try {
     await authApi.logout();
@@ -41,10 +37,9 @@ export async function logout(): Promise<void> {
 
 export async function listAuthProviders(signal?: AbortSignal): Promise<AuthProviders> {
   const providers = await authApi.listProviders(signal);
-  const normalized = new Set(providers.map((entry): string => entry.trim().toLowerCase()));
 
   return {
-    microsoft: normalized.has("microsoft"),
-    local: normalized.has("local"),
+    microsoft: providers.includes("microsoft"),
+    local: providers.includes("local"),
   };
 }

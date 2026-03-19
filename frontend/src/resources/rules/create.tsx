@@ -1,6 +1,7 @@
 import { RuleDetailsFields, RuleTargetsFields } from "@/resources/rules/fields";
+import { ShowActions } from "@/resources/shared/actions";
 import type { ReactElement } from "react";
-import { Create, ListButton, TabbedForm, TopToolbar } from "react-admin";
+import { Create, TabbedForm } from "react-admin";
 
 const defaultRuleValues = {
   enabled: true,
@@ -11,14 +12,8 @@ const defaultRuleValues = {
   },
 } as const;
 
-const RuleCreateActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-  </TopToolbar>
-);
-
 export const RuleCreate = (): ReactElement => (
-  <Create mutationMode="pessimistic" redirect="edit" actions={<RuleCreateActions />}>
+  <Create mutationMode="pessimistic" redirect="edit" actions={<ShowActions />}>
     <TabbedForm defaultValues={defaultRuleValues}>
       <TabbedForm.Tab label="Details">
         <RuleDetailsFields />

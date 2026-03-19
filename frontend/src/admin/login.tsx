@@ -15,7 +15,7 @@ export const LoginPage = (): ReactElement => {
         setProviders(result);
       })
       .catch((error: unknown): void => {
-        if ((error as { name?: string }).name === "AbortError") {
+        if (error instanceof Error && error.name === "AbortError") {
           return;
         }
         setProviders(undefined);

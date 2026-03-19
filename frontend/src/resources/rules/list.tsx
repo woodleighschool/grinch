@@ -1,11 +1,6 @@
-import { RULE_TYPE_CHOICES } from "@/resources/rules/fields";
+import { RULE_ENABLED_CHOICES, RULE_TYPE_CHOICES } from "@/resources/rules/choices";
 import type { ReactElement } from "react";
 import { DataTable, List, SearchInput, SelectArrayInput, SelectField } from "react-admin";
-
-const RULE_ENABLED_CHOICES = [
-  { id: true, name: "Enabled" },
-  { id: false, name: "Disabled" },
-];
 
 const ruleFilters = [
   <SearchInput key="search" source="search" alwaysOn />,

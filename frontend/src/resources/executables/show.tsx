@@ -1,15 +1,10 @@
+import { ShowActions } from "@/resources/shared/actions";
 import { ExecutableEntitlementsArrayField, SigningChainArrayField } from "@/resources/shared/executableFields";
 import type { ReactElement } from "react";
-import { DateField, ListButton, Show, TabbedShowLayout, TextField, TopToolbar } from "react-admin";
-
-const ExecutableShowActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-  </TopToolbar>
-);
+import { DateField, Show, TabbedShowLayout, TextField } from "react-admin";
 
 export const ExecutableShow = (): ReactElement => (
-  <Show actions={<ExecutableShowActions />}>
+  <Show actions={<ShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <TextField source="file_name" label="File Name" />

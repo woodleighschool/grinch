@@ -1,4 +1,4 @@
-import { getCookie, XSRF_COOKIE_NAME, XSRF_HEADER_NAME } from "@/api/cookies";
+import { withXsrfHeaders } from "@/api/cookies";
 import { HttpError } from "react-admin";
 
 // go-pkgz/auth user payload returned by GET /auth/user.
@@ -18,15 +18,6 @@ export interface LocalLoginRequest {
   passwd: string;
   aud?: string;
 }
-
-const withXsrfHeaders = (headers?: HeadersInit): Headers => {
-  const result = new Headers(headers);
-  const token = getCookie(XSRF_COOKIE_NAME);
-  if (token) {
-    result.set(XSRF_HEADER_NAME, token);
-  }
-  return result;
-};
 
 const authFetch = (path: string, init?: RequestInit): Promise<Response> =>
   fetch(path, { ...init, credentials: "include", headers: withXsrfHeaders(init?.headers) });

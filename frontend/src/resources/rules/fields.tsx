@@ -1,7 +1,7 @@
-import type { RulePolicy, RuleTargetSubjectKind, RuleType } from "@/api/types";
+import type { components } from "@/api/openapi";
+import { RULE_POLICY_CHOICES, RULE_TARGET_SUBJECT_KIND_CHOICES, RULE_TYPE_CHOICES } from "@/resources/rules/choices";
 import { SANTA_CEL_PLAYGROUND_URL } from "@/resources/shared/externalLinks";
 import { searchFilterToQuery } from "@/resources/shared/search";
-import { ruleIdentifierValidator, trimmedRequired } from "@/resources/shared/validation";
 import CodeIcon from "@mui/icons-material/Code";
 import {
   Box,
@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useState, type ReactElement } from "react";
+import type { Validator } from "react-admin";
 import {
   ArrayInput,
   AutocompleteInput,
@@ -30,26 +31,29 @@ import {
 } from "react-admin";
 import { useWatch } from "react-hook-form";
 
-export const RULE_TYPE_CHOICES = [
-  { id: "binary", name: "Binary" },
-  { id: "certificate", name: "Certificate" },
-  { id: "team_id", name: "Team ID" },
-  { id: "signing_id", name: "Signing ID" },
-  { id: "cd_hash", name: "CD Hash" },
-] as { id: RuleType; name: string }[];
+type RulePolicy = components["schemas"]["RulePolicy"];
+type RuleTargetSubjectKind = components["schemas"]["RuleTargetSubjectKind"];
+type RuleType = components["schemas"]["RuleType"];
 
-export const RULE_POLICY_CHOICES = [
-  { id: "allowlist", name: "Allowlist" },
-  { id: "blocklist", name: "Blocklist" },
-  { id: "silent_blocklist", name: "Silent Blocklist" },
-  { id: "cel", name: "CEL" },
-] as { id: RulePolicy; name: string }[];
+type FormValues = Record<string, unknown>;
+const identifierPatterns: Record<RuleType, RegExp> = {
+  binary: /^[0-9a-fA-F]{64}$/,
+  certificate: /^[0-9a-fA-F]{64}$/,
+  cd_hash: /^[0-9a-fA-F]{40}$/,
+  signing_id: /^(?:[A-Z0-9]{10}|platform):[a-zA-Z0-9.-]+$/,
+  team_id: /^[A-Z0-9]{10}$/,
+};
 
-const RULE_TARGET_SUBJECT_KIND_CHOICES = [
-  { id: "group", name: "Group" },
-  { id: "all_devices", name: "All Devices" },
-  { id: "all_users", name: "All Users" },
-] as { id: RuleTargetSubjectKind; name: string }[];
+const ruleIdentifierValidator: Validator = (value: unknown, allValues?: FormValues): string | undefined => {
+  const ruleType = allValues?.rule_type;
+  if (typeof ruleType !== "string" || !(ruleType in identifierPatterns)) {
+    return undefined;
+  }
+  if (typeof value === "string" && identifierPatterns[ruleType as RuleType].test(value)) {
+    return undefined;
+  }
+  return "Identifier format is invalid.";
+};
 
 const RULE_TYPE_DESCRIPTION: Record<RuleType, string> = {
   binary: "SHA-256 hash of the exact binary.",
@@ -69,13 +73,7 @@ const IDENTIFIER_PLACEHOLDER: Record<RuleType, string> = {
 
 export const RuleDetailsFields = (): ReactElement => (
   <>
-    <TextInput
-      source="name"
-      label="Name"
-      placeholder="Visual Studio Code"
-      validate={[trimmedRequired("Name")]}
-      fullWidth
-    />
+    <TextInput source="name" label="Name" placeholder="Visual Studio Code" validate={[required()]} fullWidth />
     <TextInput
       source="description"
       label="Description"
@@ -112,7 +110,7 @@ export const RuleDetailsFields = (): ReactElement => (
             label="Identifier"
             helperText="Identifier for the selected rule type."
             placeholder={values.rule_type ? IDENTIFIER_PLACEHOLDER[values.rule_type] : ""}
-            validate={[trimmedRequired("Identifier"), ruleIdentifierValidator]}
+            validate={ruleIdentifierValidator}
             fullWidth
           />
         );

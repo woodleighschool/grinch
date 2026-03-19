@@ -1,4 +1,6 @@
-import type { RulePolicy } from "@/api/types";
+import type { components } from "@/api/openapi";
+
+type RulePolicy = components["schemas"]["RulePolicy"];
 
 export const SANTA_RULE_POLICY_DOCS: Record<RulePolicy, string> = {
   allowlist: "https://northpole.dev/features/binary-authorization/#allowlist",
@@ -7,4 +9,5 @@ export const SANTA_RULE_POLICY_DOCS: Record<RulePolicy, string> = {
   cel: "https://northpole.dev/features/binary-authorization/#cel",
 };
 
+export const SANTA_CEL_COOKBOOK_URL = "https://northpole.dev/cookbook/cel/";
 export const SANTA_CEL_PLAYGROUND_URL = "https://northpole.dev/cookbook/cel-playground/";

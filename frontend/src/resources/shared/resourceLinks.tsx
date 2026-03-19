@@ -8,9 +8,9 @@ interface ResourceLinkProperties {
   resource: string;
 }
 
-export const ResourceLink = ({ id, label, resource }: ResourceLinkProperties): ReactElement => {
+export const ResourceLink = ({ id, label, resource }: ResourceLinkProperties): ReactElement | undefined => {
   if (!id || !label) {
-    return <></>;
+    return undefined;
   }
 
   return (

@@ -1,21 +1,12 @@
-import type { FileAccessEvent } from "@/api/types";
+import type { components } from "@/api/openapi";
+import { EditableShowActions } from "@/resources/shared/actions";
 import { FileAccessDecisionField } from "@/resources/shared/decisionField";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import type { ReactElement } from "react";
-import {
-  DateField,
-  DeleteButton,
-  Labeled,
-  ListButton,
-  ReferenceField,
-  Show,
-  TabbedShowLayout,
-  TextField,
-  TopToolbar,
-  useRecordContext,
-} from "react-admin";
+import { DateField, Labeled, ReferenceField, Show, TabbedShowLayout, TextField, useRecordContext } from "react-admin";
 
+type FileAccessEvent = components["schemas"]["FileAccessEvent"];
 type ProcessChainRow = FileAccessEvent["process_chain"][number] & { id: string; step: number };
 
 const ProcessChainField = (): ReactElement | undefined => {
@@ -66,15 +57,8 @@ const ProcessChainField = (): ReactElement | undefined => {
   );
 };
 
-const FileAccessEventShowActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-    <DeleteButton redirect="list" mutationMode="pessimistic" />
-  </TopToolbar>
-);
-
 export const FileAccessEventShow = (): ReactElement => (
-  <Show actions={<FileAccessEventShowActions />}>
+  <Show actions={<EditableShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <ReferenceField source="machine_id" reference="machines" label="Machine">

@@ -1,5 +1,6 @@
 import { CLIENT_MODE_CHOICES, RULE_SYNC_STATUS_CHOICES } from "@/resources/machines/choices";
-import { RULE_POLICY_CHOICES } from "@/resources/rules/fields";
+import { RULE_POLICY_CHOICES } from "@/resources/rules/choices";
+import { EditableShowActions } from "@/resources/shared/actions";
 import { EventDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
 import {
   GroupMembershipGroupLinkField,
@@ -10,8 +11,7 @@ import {
   BooleanField,
   DataTable,
   DateField,
-  DeleteButton,
-  ListButton,
+  NumberField,
   Pagination,
   ReferenceField,
   ReferenceManyField,
@@ -19,18 +19,10 @@ import {
   Show,
   TabbedShowLayout,
   TextField,
-  TopToolbar,
 } from "react-admin";
 
-const MachineShowActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-    <DeleteButton redirect="list" mutationMode="pessimistic" />
-  </TopToolbar>
-);
-
 export const MachineShow = (): ReactElement => (
-  <Show actions={<MachineShowActions />}>
+  <Show actions={<EditableShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <TextField source="hostname" label="Hostname" />
@@ -45,13 +37,13 @@ export const MachineShow = (): ReactElement => (
         <TextField source="primary_user" label="Primary User UPN" />
         <SelectField source="rule_sync_status" label="Rule Sync Status" choices={RULE_SYNC_STATUS_CHOICES} />
         <SelectField source="client_mode" label="Client Mode" choices={CLIENT_MODE_CHOICES} />
-        <TextField source="binary_rule_count" label="Binary Rules" />
-        <TextField source="certificate_rule_count" label="Certificate Rules" />
-        <TextField source="compiler_rule_count" label="Compiler Rules" />
-        <TextField source="transitive_rule_count" label="Transitive Rules" />
-        <TextField source="teamid_rule_count" label="Team ID Rules" />
-        <TextField source="signingid_rule_count" label="Signing ID Rules" />
-        <TextField source="cdhash_rule_count" label="CD Hash Rules" />
+        <NumberField source="binary_rule_count" label="Binary Rules" />
+        <NumberField source="certificate_rule_count" label="Certificate Rules" />
+        <NumberField source="compiler_rule_count" label="Compiler Rules" />
+        <NumberField source="transitive_rule_count" label="Transitive Rules" />
+        <NumberField source="teamid_rule_count" label="Team ID Rules" />
+        <NumberField source="signingid_rule_count" label="Signing ID Rules" />
+        <NumberField source="cdhash_rule_count" label="CD Hash Rules" />
         <DateField source="last_seen_at" label="Last Seen" showTime />
         <DateField source="created_at" label="Created" showTime />
         <DateField source="updated_at" label="Updated" showTime />

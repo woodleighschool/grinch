@@ -1,4 +1,6 @@
-import type { MemberKind } from "@/api/types";
+import type { components } from "@/api/openapi";
+
+type MemberKind = components["schemas"]["MemberKind"];
 
 export const MEMBER_KIND_CHOICES = [
   { id: "user", name: "User" },

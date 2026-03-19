@@ -1,4 +1,7 @@
-import type { MachineClientMode, MachineRuleSyncStatus } from "@/api/types";
+import type { components } from "@/api/openapi";
+
+type MachineClientMode = components["schemas"]["MachineClientMode"];
+type MachineRuleSyncStatus = components["schemas"]["MachineRuleSyncStatus"];
 
 export const RULE_SYNC_STATUS_CHOICES = [
   { id: "synced", name: "Synced" },

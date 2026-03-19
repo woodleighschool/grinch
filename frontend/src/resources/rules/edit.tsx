@@ -1,27 +1,21 @@
-import { RULE_POLICY_CHOICES, RuleDetailsFields, RuleTargetsFields } from "@/resources/rules/fields";
+import { RULE_POLICY_CHOICES } from "@/resources/rules/choices";
+import { RuleDetailsFields, RuleTargetsFields } from "@/resources/rules/fields";
+import { ShowActions } from "@/resources/shared/actions";
 import type { ReactElement } from "react";
 import {
   BooleanField,
   DataTable,
   Edit,
-  ListButton,
   Pagination,
   ReferenceField,
   ReferenceManyField,
   SelectField,
   TabbedForm,
   TextField,
-  TopToolbar,
 } from "react-admin";
 
-const RuleEditActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-  </TopToolbar>
-);
-
 export const RuleEdit = (): ReactElement => (
-  <Edit mutationMode="pessimistic" redirect="edit" actions={<RuleEditActions />}>
+  <Edit mutationMode="pessimistic" redirect="edit" actions={<ShowActions />}>
     <TabbedForm>
       <TabbedForm.Tab label="Details">
         <RuleDetailsFields />
@@ -32,14 +26,9 @@ export const RuleEdit = (): ReactElement => (
       <TabbedForm.Tab label="Machines">
         <ReferenceManyField reference="rule-machines" target="rule_id" pagination={<Pagination />}>
           <DataTable bulkActionButtons={false}>
-            <DataTable.Col source="machine_id" label="Hostname">
-              <ReferenceField source="machine_id" reference="machines" label="Hostname">
+            <DataTable.Col source="machine_id" label="Machine">
+              <ReferenceField source="machine_id" reference="machines" label="Machine">
                 <TextField source="hostname" />
-              </ReferenceField>
-            </DataTable.Col>
-            <DataTable.Col source="machine_id" label="Serial Number">
-              <ReferenceField source="machine_id" reference="machines" label="Serial Number">
-                <TextField source="serial_number" />
               </ReferenceField>
             </DataTable.Col>
             <DataTable.Col source="policy" label="Policy">

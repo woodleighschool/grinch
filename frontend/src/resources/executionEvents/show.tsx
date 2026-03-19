@@ -1,28 +1,11 @@
+import { EditableShowActions } from "@/resources/shared/actions";
 import { EventDecisionField } from "@/resources/shared/decisionField";
 import { ExecutableEntitlementsArrayField, SigningChainArrayField } from "@/resources/shared/executableFields";
 import type { ReactElement } from "react";
-import {
-  DateField,
-  DeleteButton,
-  Labeled,
-  ListButton,
-  ReferenceField,
-  Show,
-  TabbedShowLayout,
-  TextArrayField,
-  TextField,
-  TopToolbar,
-} from "react-admin";
-
-const ExecutionEventShowActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-    <DeleteButton redirect="list" mutationMode="pessimistic" />
-  </TopToolbar>
-);
+import { DateField, Labeled, ReferenceField, Show, TabbedShowLayout, TextArrayField, TextField } from "react-admin";
 
 export const ExecutionEventShow = (): ReactElement => (
-  <Show actions={<ExecutionEventShowActions />}>
+  <Show actions={<EditableShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <ReferenceField source="machine_id" reference="machines" label="Machine">

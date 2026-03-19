@@ -1,3 +1,4 @@
+import { ShowActions } from "@/resources/shared/actions";
 import { EventDecisionField } from "@/resources/shared/decisionField";
 import {
   GroupMembershipGroupLinkField,
@@ -7,24 +8,16 @@ import type { ReactElement } from "react";
 import {
   DataTable,
   DateField,
-  ListButton,
   Pagination,
   ReferenceField,
   ReferenceManyField,
   Show,
   TabbedShowLayout,
   TextField,
-  TopToolbar,
 } from "react-admin";
 
-const UserShowActions = (): ReactElement => (
-  <TopToolbar>
-    <ListButton />
-  </TopToolbar>
-);
-
 export const UserShow = (): ReactElement => (
-  <Show actions={<UserShowActions />}>
+  <Show actions={<ShowActions />}>
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <TextField source="display_name" label="Name" />
