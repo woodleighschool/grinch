@@ -66,19 +66,13 @@ func MarshalEntitlements(info *syncv1.EntitlementInfo) ([]byte, error) {
 	return encoded, nil
 }
 
-func UnmarshalEntitlements(raw []byte) (map[string]domain.Entitlement, error) {
-	records := make(map[string]any)
+func UnmarshalEntitlements(raw []byte) (map[string]any, error) {
+	entitlements := make(map[string]any)
 	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &records); err != nil {
+		if err := json.Unmarshal(raw, &entitlements); err != nil {
 			return nil, fmt.Errorf("decode entitlements: %w", err)
 		}
 	}
-
-	entitlements := make(map[string]domain.Entitlement, len(records))
-	for key, value := range records {
-		entitlements[key] = domain.Entitlement{Value: value}
-	}
-
 	return entitlements, nil
 }
 

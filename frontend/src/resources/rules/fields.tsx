@@ -197,7 +197,9 @@ const IncludeTargetCelField = (): ReactElement | null => {
   const policy = useWatch({ name: `targets.include.${index}.policy` }) as RulePolicy | undefined;
   const celExpression = useWatch({ name: `targets.include.${index}.cel_expression` }) as string | undefined;
   if (policy !== "cel") return null;
-  return <CelExpressionInput source="cel_expression" showRequired={celExpression?.trim() === "" || celExpression == null} />;
+  return (
+    <CelExpressionInput source="cel_expression" showRequired={celExpression?.trim() === "" || celExpression == undefined} />
+  );
 };
 
 const SubjectField = (): ReactElement => (

@@ -62,37 +62,33 @@ const (
 )
 
 type Machine struct {
-	ID               uuid.UUID
-	SerialNumber     string
-	Hostname         string
-	ModelIdentifier  string
-	OSVersion        string
-	OSBuild          string
-	SantaVersion     string
-	PrimaryUser      string
-	PrimaryUserID    *uuid.UUID
-	RequestCleanSync bool
-	LastSeenAt       time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID               uuid.UUID  `json:"id"`
+	SerialNumber     string     `json:"serial_number"`
+	Hostname         string     `json:"hostname"`
+	ModelIdentifier  string     `json:"model_identifier"`
+	OSVersion        string     `json:"os_version"`
+	OSBuild          string     `json:"os_build"`
+	SantaVersion     string     `json:"santa_version"`
+	PrimaryUser      string     `json:"primary_user"`
+	PrimaryUserID    *uuid.UUID `json:"primary_user_id,omitempty"`
+	RequestCleanSync bool       `json:"request_clean_sync"`
+	LastSeenAt       time.Time  `json:"last_seen_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type MachineSummary struct {
-	ID              uuid.UUID
-	SerialNumber    string
-	Hostname        string
-	ModelIdentifier string
-	OSVersion       string
-	SantaVersion    string
-	PrimaryUser     string
-	PrimaryUserID   *uuid.UUID
-	LastSeenAt      time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-type Entitlement struct {
-	Value any
+	ID              uuid.UUID  `json:"id"`
+	SerialNumber    string     `json:"serial_number"`
+	Hostname        string     `json:"hostname"`
+	ModelIdentifier string     `json:"model_identifier"`
+	OSVersion       string     `json:"os_version"`
+	SantaVersion    string     `json:"santa_version"`
+	PrimaryUser     string     `json:"primary_user"`
+	PrimaryUserID   *uuid.UUID `json:"primary_user_id,omitempty"`
+	LastSeenAt      time.Time  `json:"last_seen_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type ExecutableSource string
@@ -103,142 +99,142 @@ const (
 )
 
 type Executable struct {
-	ID             uuid.UUID
-	Source         ExecutableSource
-	FileSHA256     string
-	FileName       string
-	FilePath       string
-	FileBundleID   string
-	FileBundlePath string
-	SigningID      string
-	TeamID         string
-	CDHash         string
-	Entitlements   map[string]Entitlement
-	SigningChain   []SigningChainEntry
-	CreatedAt      time.Time
+	ID             uuid.UUID           `json:"id"`
+	Source         ExecutableSource    `json:"source"`
+	FileSHA256     string              `json:"file_sha256"`
+	FileName       string              `json:"file_name"`
+	FilePath       string              `json:"file_path"`
+	FileBundleID   string              `json:"file_bundle_id"`
+	FileBundlePath string              `json:"file_bundle_path"`
+	SigningID      string              `json:"signing_id"`
+	TeamID         string              `json:"team_id"`
+	CDHash         string              `json:"cdhash"`
+	Entitlements   map[string]any      `json:"entitlements"`
+	SigningChain   []SigningChainEntry `json:"signing_chain"`
+	CreatedAt      time.Time           `json:"created_at"`
 }
 
 type SigningChainEntry struct {
-	CommonName         string
-	Organization       string
-	OrganizationalUnit string
-	SHA256             string
-	ValidFrom          time.Time
-	ValidUntil         time.Time
+	CommonName         string    `json:"common_name"`
+	Organization       string    `json:"organization"`
+	OrganizationalUnit string    `json:"organizational_unit"`
+	SHA256             string    `json:"sha256"`
+	ValidFrom          time.Time `json:"valid_from"`
+	ValidUntil         time.Time `json:"valid_until"`
 }
 
 type ExecutableSummary struct {
-	ID             uuid.UUID
-	Source         ExecutableSource
-	FileSHA256     string
-	FileName       string
-	FilePath       string
-	FileBundleID   string
-	FileBundlePath string
-	SigningID      string
-	TeamID         string
-	CDHash         string
-	CreatedAt      time.Time
+	ID             uuid.UUID        `json:"id"`
+	Source         ExecutableSource `json:"source"`
+	FileSHA256     string           `json:"file_sha256"`
+	FileName       string           `json:"file_name"`
+	FilePath       string           `json:"file_path"`
+	FileBundleID   string           `json:"file_bundle_id"`
+	FileBundlePath string           `json:"file_bundle_path"`
+	SigningID      string           `json:"signing_id"`
+	TeamID         string           `json:"team_id"`
+	CDHash         string           `json:"cdhash"`
+	CreatedAt      time.Time        `json:"created_at"`
 }
 
 type ExecutionEvent struct {
-	ID              uuid.UUID
-	MachineID       uuid.UUID
-	ExecutableID    uuid.UUID
-	Decision        EventDecision
-	FilePath        string
-	FileName        string
-	FileSHA256      string
-	FileBundleID    string
-	FileBundlePath  string
-	SigningID       string
-	TeamID          string
-	CDHash          string
-	ExecutingUser   string
-	LoggedInUsers   []string
-	CurrentSessions []string
-	SigningChain    []SigningChainEntry
-	Entitlements    map[string]Entitlement
-	OccurredAt      *time.Time
-	CreatedAt       time.Time
+	ID              uuid.UUID           `json:"id"`
+	MachineID       uuid.UUID           `json:"machine_id"`
+	ExecutableID    uuid.UUID           `json:"executable_id"`
+	Decision        EventDecision       `json:"decision"`
+	FilePath        string              `json:"file_path"`
+	FileName        string              `json:"file_name"`
+	FileSHA256      string              `json:"file_sha256"`
+	FileBundleID    string              `json:"file_bundle_id"`
+	FileBundlePath  string              `json:"file_bundle_path"`
+	SigningID       string              `json:"signing_id"`
+	TeamID          string              `json:"team_id"`
+	CDHash          string              `json:"cdhash"`
+	ExecutingUser   string              `json:"executing_user"`
+	LoggedInUsers   []string            `json:"logged_in_users"`
+	CurrentSessions []string            `json:"current_sessions"`
+	SigningChain    []SigningChainEntry `json:"signing_chain"`
+	Entitlements    map[string]any      `json:"entitlements"`
+	OccurredAt      *time.Time          `json:"occurred_at,omitempty"`
+	CreatedAt       time.Time           `json:"created_at"`
 }
 
 type ExecutionEventSummary struct {
-	ID           uuid.UUID
-	MachineID    uuid.UUID
-	ExecutableID uuid.UUID
-	Decision     EventDecision
-	FilePath     string
-	FileName     string
-	SigningID    string
-	OccurredAt   *time.Time
-	CreatedAt    time.Time
+	ID           uuid.UUID     `json:"id"`
+	MachineID    uuid.UUID     `json:"machine_id"`
+	ExecutableID uuid.UUID     `json:"executable_id"`
+	Decision     EventDecision `json:"decision"`
+	FilePath     string        `json:"file_path"`
+	FileName     string        `json:"file_name"`
+	SigningID    string        `json:"signing_id"`
+	OccurredAt   *time.Time    `json:"occurred_at,omitempty"`
+	CreatedAt    time.Time     `json:"created_at"`
 }
 
 type FileAccessEventProcess struct {
-	Pid          int32
-	FilePath     string
-	ExecutableID uuid.UUID
-	FileName     string
+	Pid          int32     `json:"pid"`
+	FilePath     string    `json:"file_path"`
+	ExecutableID uuid.UUID `json:"executable_id"`
+	FileName     string    `json:"file_name"`
 }
 
 type FileAccessEvent struct {
-	ID           uuid.UUID
-	MachineID    uuid.UUID
-	ExecutableID *uuid.UUID
-	RuleVersion  string
-	RuleName     string
-	Target       string
-	Decision     FileAccessDecision
-	FileName     string
-	FileSHA256   string
-	SigningID    string
-	TeamID       string
-	CDHash       string
-	ProcessChain []FileAccessEventProcess
-	OccurredAt   *time.Time
-	CreatedAt    time.Time
+	ID           uuid.UUID                `json:"id"`
+	MachineID    uuid.UUID                `json:"machine_id"`
+	ExecutableID *uuid.UUID               `json:"executable_id,omitempty"`
+	RuleVersion  string                   `json:"rule_version"`
+	RuleName     string                   `json:"rule_name"`
+	Target       string                   `json:"target"`
+	Decision     FileAccessDecision       `json:"decision"`
+	FileName     string                   `json:"file_name"`
+	FileSHA256   string                   `json:"file_sha256"`
+	SigningID    string                   `json:"signing_id"`
+	TeamID       string                   `json:"team_id"`
+	CDHash       string                   `json:"cdhash"`
+	ProcessChain []FileAccessEventProcess `json:"process_chain"`
+	OccurredAt   *time.Time               `json:"occurred_at,omitempty"`
+	CreatedAt    time.Time                `json:"created_at"`
 }
 
 type FileAccessEventSummary struct {
-	ID           uuid.UUID
-	MachineID    uuid.UUID
-	ExecutableID *uuid.UUID
-	Decision     FileAccessDecision
-	RuleName     string
-	Target       string
-	FileName     string
-	FileSHA256   string
-	SigningID    string
-	TeamID       string
-	CDHash       string
-	OccurredAt   *time.Time
-	CreatedAt    time.Time
+	ID           uuid.UUID          `json:"id"`
+	MachineID    uuid.UUID          `json:"machine_id"`
+	ExecutableID *uuid.UUID         `json:"executable_id,omitempty"`
+	Decision     FileAccessDecision `json:"decision"`
+	RuleName     string             `json:"rule_name"`
+	Target       string             `json:"target"`
+	FileName     string             `json:"file_name"`
+	FileSHA256   string             `json:"file_sha256"`
+	SigningID    string             `json:"signing_id"`
+	TeamID       string             `json:"team_id"`
+	CDHash       string             `json:"cdhash"`
+	OccurredAt   *time.Time         `json:"occurred_at,omitempty"`
+	CreatedAt    time.Time          `json:"created_at"`
 }
 
 type Rule struct {
-	ID            uuid.UUID
-	Name          string
-	Description   string
-	RuleType      RuleType
-	Identifier    string
-	CustomMessage string
-	CustomURL     string
-	Enabled       bool
-	Targets       RuleTargets
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            uuid.UUID   `json:"id"`
+	Name          string      `json:"name"`
+	Description   string      `json:"description"`
+	RuleType      RuleType    `json:"rule_type"`
+	Identifier    string      `json:"identifier"`
+	CustomMessage string      `json:"custom_message"`
+	CustomURL     string      `json:"custom_url"`
+	Enabled       bool        `json:"enabled"`
+	Targets       RuleTargets `json:"targets"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 type RuleSummary struct {
-	ID          uuid.UUID
-	Name        string
-	Description string
-	RuleType    RuleType
-	Identifier  string
-	Enabled     bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	RuleType    RuleType  `json:"rule_type"`
+	Identifier  string    `json:"identifier"`
+	Enabled     bool      `json:"enabled"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type GroupTarget struct {
@@ -248,21 +244,21 @@ type GroupTarget struct {
 }
 
 type RuleTargets struct {
-	Include []IncludeRuleTarget
-	Exclude []ExcludedGroup
+	Include []IncludeRuleTarget `json:"include"`
+	Exclude []ExcludedGroup     `json:"exclude"`
 }
 
 type IncludeRuleTarget struct {
-	SubjectKind   RuleTargetSubjectKind
-	SubjectID     *uuid.UUID
-	SubjectName   string
-	Policy        RulePolicy
-	CELExpression string
+	SubjectKind   RuleTargetSubjectKind `json:"subject_kind"`
+	SubjectID     *uuid.UUID            `json:"subject_id,omitempty"`
+	SubjectName   string                `json:"subject_name,omitempty"`
+	Policy        RulePolicy            `json:"policy"`
+	CELExpression string                `json:"cel_expression,omitempty"`
 }
 
 type ExcludedGroup struct {
-	GroupID   uuid.UUID
-	GroupName string
+	GroupID   uuid.UUID `json:"group_id"`
+	GroupName string    `json:"group_name,omitempty"`
 }
 
 type MachineRuleTarget struct {
@@ -276,22 +272,22 @@ type MachineRuleTarget struct {
 }
 
 type User struct {
-	ID          uuid.UUID
-	UPN         string
-	DisplayName string
-	Source      PrincipalSource
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID       `json:"id"`
+	UPN         string          `json:"upn"`
+	DisplayName string          `json:"display_name"`
+	Source      PrincipalSource `json:"source"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type Group struct {
-	ID          uuid.UUID
-	Name        string
-	Description string
-	Source      PrincipalSource
-	MemberCount int32
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID       `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Source      PrincipalSource `json:"source"`
+	MemberCount int32           `json:"member_count"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type GroupMembershipKind string
@@ -302,24 +298,24 @@ const (
 )
 
 type GroupMembershipGroup struct {
-	ID     uuid.UUID
-	Name   string
-	Source PrincipalSource
+	ID     uuid.UUID       `json:"id"`
+	Name   string          `json:"name"`
+	Source PrincipalSource `json:"source"`
 }
 
 type GroupMembershipMember struct {
-	Kind MemberKind
-	ID   uuid.UUID
-	Name string
+	Kind MemberKind `json:"kind"`
+	ID   uuid.UUID  `json:"id"`
+	Name string     `json:"name,omitempty"`
 }
 
 type GroupMembership struct {
-	ID        string
-	Kind      GroupMembershipKind
-	Group     GroupMembershipGroup
-	Member    GroupMembershipMember
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        string                `json:"id"`
+	Kind      GroupMembershipKind   `json:"kind"`
+	Group     GroupMembershipGroup  `json:"group"`
+	Member    GroupMembershipMember `json:"member"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
 }
 
 type MachineResolvedRule struct {

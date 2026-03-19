@@ -8,17 +8,17 @@ import (
 )
 
 type ruleWriteRequestBody struct {
-	ID            *string     `json:"id,omitempty"`
-	Name          string      `json:"name"`
-	Description   *string     `json:"description,omitempty"`
-	RuleType      RuleType    `json:"rule_type"`
-	Identifier    string      `json:"identifier"`
-	CustomMessage *string     `json:"custom_message,omitempty"`
-	CustomURL     *string     `json:"custom_url,omitempty"`
-	Enabled       *bool       `json:"enabled,omitempty"`
-	Targets       RuleTargets `json:"targets"`
-	CreatedAt     *string     `json:"created_at,omitempty"`
-	UpdatedAt     *string     `json:"updated_at,omitempty"`
+	ID            *string            `json:"id,omitempty"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description,omitempty"`
+	RuleType      domain.RuleType    `json:"rule_type"`
+	Identifier    string             `json:"identifier"`
+	CustomMessage *string            `json:"custom_message,omitempty"`
+	CustomURL     *string            `json:"custom_url,omitempty"`
+	Enabled       *bool              `json:"enabled,omitempty"`
+	Targets       domain.RuleTargets `json:"targets"`
+	CreatedAt     *string            `json:"created_at,omitempty"`
+	UpdatedAt     *string            `json:"updated_at,omitempty"`
 }
 
 func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Request, params ListRulesParams) {
@@ -34,14 +34,8 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	mapped, err := mapSlice(items, mapRuleSummary)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
 	writeJSON(writer, http.StatusOK, RuleListResponse{
-		Rows:  mapped,
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -53,11 +47,7 @@ func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	input, err := decodeRuleWriteRequest(body)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
+	input := decodeRuleWriteRequest(body)
 
 	rule, err := handler.rules.CreateRule(request.Context(), input)
 	if err != nil {
@@ -65,13 +55,7 @@ func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	mapped, err := mapRule(rule)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusCreated, mapped)
+	writeJSON(writer, http.StatusCreated, rule)
 }
 
 func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request, id Id) {
@@ -81,13 +65,7 @@ func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request
 		return
 	}
 
-	mapped, err := mapRule(rule)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, rule)
 }
 
 func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Request, id Id) {
@@ -97,11 +75,7 @@ func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	input, err := decodeRuleWriteRequest(body)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
+	input := decodeRuleWriteRequest(body)
 
 	updated, err := handler.rules.UpdateRule(request.Context(), id, input)
 	if err != nil {
@@ -111,13 +85,7 @@ func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	mapped, err := mapRule(updated)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, updated)
 }
 
 func (handler *Server) DeleteRule(writer http.ResponseWriter, request *http.Request, id Id) {
@@ -129,20 +97,10 @@ func (handler *Server) DeleteRule(writer http.ResponseWriter, request *http.Requ
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func decodeRuleWriteRequest(body ruleWriteRequestBody) (rules.WriteInput, error) {
-	ruleType, err := toDomainRuleType(body.RuleType)
-	if err != nil {
-		return rules.WriteInput{}, badRequestError("invalid rule_type")
-	}
-
+func decodeRuleWriteRequest(body ruleWriteRequestBody) rules.WriteInput {
 	enabled := true
 	if body.Enabled != nil {
 		enabled = *body.Enabled
-	}
-
-	targets, err := decodeRuleTargets(body.Targets)
-	if err != nil {
-		return rules.WriteInput{}, err
 	}
 
 	return rules.WriteInput{
@@ -152,43 +110,26 @@ func decodeRuleWriteRequest(body ruleWriteRequestBody) (rules.WriteInput, error)
 		Enabled:       enabled,
 		Identifier:    body.Identifier,
 		Name:          body.Name,
-		RuleType:      ruleType,
-		Targets:       targets,
-	}, nil
+		RuleType:      body.RuleType,
+		Targets:       decodeRuleTargets(body.Targets),
+	}
 }
 
-func decodeRuleTargets(targets RuleTargets) (rules.TargetsWriteInput, error) {
+func decodeRuleTargets(targets domain.RuleTargets) rules.TargetsWriteInput {
 	include := make([]rules.IncludeTargetWriteInput, 0, len(targets.Include))
 	for _, target := range targets.Include {
-		subjectKind, err := toDomainRuleTargetSubjectKind(target.SubjectKind)
-		if err != nil {
-			return rules.TargetsWriteInput{}, badRequestError("invalid subject_kind")
-		}
-		policy, policyErr := toDomainRulePolicy(target.Policy)
-		if policyErr != nil {
-			return rules.TargetsWriteInput{}, badRequestError("invalid policy")
-		}
-
-		item := rules.IncludeTargetWriteInput{
-			SubjectKind: subjectKind,
-			SubjectID:   target.SubjectId,
-			Policy:      policy,
-		}
-		if target.CelExpression != nil {
-			item.CELExpression = *target.CelExpression
-		}
-		include = append(include, item)
+		include = append(include, rules.IncludeTargetWriteInput{
+			SubjectKind:   target.SubjectKind,
+			SubjectID:     target.SubjectID,
+			Policy:        target.Policy,
+			CELExpression: target.CELExpression,
+		})
 	}
 
 	exclude := make([]rules.ExcludedGroupWriteInput, 0, len(targets.Exclude))
 	for _, target := range targets.Exclude {
-		exclude = append(exclude, rules.ExcludedGroupWriteInput{
-			GroupID: target.GroupId,
-		})
+		exclude = append(exclude, rules.ExcludedGroupWriteInput{GroupID: target.GroupID})
 	}
 
-	return rules.TargetsWriteInput{
-		Include: include,
-		Exclude: exclude,
-	}, nil
+	return rules.TargetsWriteInput{Include: include, Exclude: exclude}
 }

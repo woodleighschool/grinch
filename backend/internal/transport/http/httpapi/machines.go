@@ -23,7 +23,7 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 	}
 
 	writeJSON(writer, http.StatusOK, MachineListResponse{
-		Rows:  mapSliceValue(items, mapMachineSummary),
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -35,7 +35,7 @@ func (handler *Server) GetMachine(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, mapMachine(machine))
+	writeJSON(writer, http.StatusOK, machine)
 }
 
 func (handler *Server) DeleteMachine(writer http.ResponseWriter, request *http.Request, id Id) {

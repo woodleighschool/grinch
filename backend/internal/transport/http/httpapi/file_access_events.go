@@ -28,7 +28,7 @@ func (handler *Server) ListFileAccessEvents(
 	}
 
 	writeJSON(writer, http.StatusOK, FileAccessEventListResponse{
-		Rows:  mapSliceValue(items, mapFileAccessEventSummary),
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -40,7 +40,7 @@ func (handler *Server) GetFileAccessEvent(writer http.ResponseWriter, request *h
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, mapFileAccessEvent(event))
+	writeJSON(writer, http.StatusOK, event)
 }
 
 func (handler *Server) DeleteFileAccessEvent(writer http.ResponseWriter, request *http.Request, id Id) {

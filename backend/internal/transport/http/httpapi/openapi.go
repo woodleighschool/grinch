@@ -7,244 +7,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	domain "github.com/woodleighschool/grinch/internal/domain"
 )
 
 const (
 	SessionAuthScopes = "sessionAuth.Scopes"
 )
-
-// Defines values for EventDecision.
-const (
-	EventDecisionAllowBinary      EventDecision = "allow_binary"
-	EventDecisionAllowCdHash      EventDecision = "allow_cd_hash"
-	EventDecisionAllowCertificate EventDecision = "allow_certificate"
-	EventDecisionAllowScope       EventDecision = "allow_scope"
-	EventDecisionAllowSigningId   EventDecision = "allow_signing_id"
-	EventDecisionAllowTeamId      EventDecision = "allow_team_id"
-	EventDecisionAllowUnknown     EventDecision = "allow_unknown"
-	EventDecisionBlockBinary      EventDecision = "block_binary"
-	EventDecisionBlockCdHash      EventDecision = "block_cd_hash"
-	EventDecisionBlockCertificate EventDecision = "block_certificate"
-	EventDecisionBlockScope       EventDecision = "block_scope"
-	EventDecisionBlockSigningId   EventDecision = "block_signing_id"
-	EventDecisionBlockTeamId      EventDecision = "block_team_id"
-	EventDecisionBlockUnknown     EventDecision = "block_unknown"
-	EventDecisionBundleBinary     EventDecision = "bundle_binary"
-	EventDecisionUnknown          EventDecision = "unknown"
-)
-
-// Valid indicates whether the value is a known member of the EventDecision enum.
-func (e EventDecision) Valid() bool {
-	switch e {
-	case EventDecisionAllowBinary:
-		return true
-	case EventDecisionAllowCdHash:
-		return true
-	case EventDecisionAllowCertificate:
-		return true
-	case EventDecisionAllowScope:
-		return true
-	case EventDecisionAllowSigningId:
-		return true
-	case EventDecisionAllowTeamId:
-		return true
-	case EventDecisionAllowUnknown:
-		return true
-	case EventDecisionBlockBinary:
-		return true
-	case EventDecisionBlockCdHash:
-		return true
-	case EventDecisionBlockCertificate:
-		return true
-	case EventDecisionBlockScope:
-		return true
-	case EventDecisionBlockSigningId:
-		return true
-	case EventDecisionBlockTeamId:
-		return true
-	case EventDecisionBlockUnknown:
-		return true
-	case EventDecisionBundleBinary:
-		return true
-	case EventDecisionUnknown:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ExecutableSource.
-const (
-	Event   ExecutableSource = "event"
-	Process ExecutableSource = "process"
-)
-
-// Valid indicates whether the value is a known member of the ExecutableSource enum.
-func (e ExecutableSource) Valid() bool {
-	switch e {
-	case Event:
-		return true
-	case Process:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for FileAccessDecision.
-const (
-	FileAccessDecisionAuditOnly              FileAccessDecision = "audit_only"
-	FileAccessDecisionDenied                 FileAccessDecision = "denied"
-	FileAccessDecisionDeniedInvalidSignature FileAccessDecision = "denied_invalid_signature"
-	FileAccessDecisionUnknown                FileAccessDecision = "unknown"
-)
-
-// Valid indicates whether the value is a known member of the FileAccessDecision enum.
-func (e FileAccessDecision) Valid() bool {
-	switch e {
-	case FileAccessDecisionAuditOnly:
-		return true
-	case FileAccessDecisionDenied:
-		return true
-	case FileAccessDecisionDeniedInvalidSignature:
-		return true
-	case FileAccessDecisionUnknown:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GroupMembershipKind.
-const (
-	Actual    GroupMembershipKind = "actual"
-	Effective GroupMembershipKind = "effective"
-)
-
-// Valid indicates whether the value is a known member of the GroupMembershipKind enum.
-func (e GroupMembershipKind) Valid() bool {
-	switch e {
-	case Actual:
-		return true
-	case Effective:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for MemberKind.
-const (
-	MemberKindMachine MemberKind = "machine"
-	MemberKindUser    MemberKind = "user"
-)
-
-// Valid indicates whether the value is a known member of the MemberKind enum.
-func (e MemberKind) Valid() bool {
-	switch e {
-	case MemberKindMachine:
-		return true
-	case MemberKindUser:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for RulePolicy.
-const (
-	Allowlist       RulePolicy = "allowlist"
-	Blocklist       RulePolicy = "blocklist"
-	Cel             RulePolicy = "cel"
-	SilentBlocklist RulePolicy = "silent_blocklist"
-)
-
-// Valid indicates whether the value is a known member of the RulePolicy enum.
-func (e RulePolicy) Valid() bool {
-	switch e {
-	case Allowlist:
-		return true
-	case Blocklist:
-		return true
-	case Cel:
-		return true
-	case SilentBlocklist:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for RuleTargetSubjectKind.
-const (
-	RuleTargetSubjectKindAllDevices RuleTargetSubjectKind = "all_devices"
-	RuleTargetSubjectKindAllUsers   RuleTargetSubjectKind = "all_users"
-	RuleTargetSubjectKindGroup      RuleTargetSubjectKind = "group"
-)
-
-// Valid indicates whether the value is a known member of the RuleTargetSubjectKind enum.
-func (e RuleTargetSubjectKind) Valid() bool {
-	switch e {
-	case RuleTargetSubjectKindAllDevices:
-		return true
-	case RuleTargetSubjectKindAllUsers:
-		return true
-	case RuleTargetSubjectKindGroup:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for RuleType.
-const (
-	Binary      RuleType = "binary"
-	CdHash      RuleType = "cd_hash"
-	Certificate RuleType = "certificate"
-	SigningId   RuleType = "signing_id"
-	TeamId      RuleType = "team_id"
-)
-
-// Valid indicates whether the value is a known member of the RuleType enum.
-func (e RuleType) Valid() bool {
-	switch e {
-	case Binary:
-		return true
-	case CdHash:
-		return true
-	case Certificate:
-		return true
-	case SigningId:
-		return true
-	case TeamId:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for Source.
-const (
-	Entra Source = "entra"
-	Local Source = "local"
-)
-
-// Valid indicates whether the value is a known member of the Source enum.
-func (e Source) Valid() bool {
-	switch e {
-	case Entra:
-		return true
-	case Local:
-		return true
-	default:
-		return false
-	}
-}
 
 // Defines values for Order.
 const (
@@ -409,30 +181,13 @@ func (e ListUsersParamsOrder) Valid() bool {
 }
 
 // EventDecision defines model for EventDecision.
-type EventDecision string
+type EventDecision = domain.EventDecision
 
 // ExcludedGroup defines model for ExcludedGroup.
-type ExcludedGroup struct {
-	GroupId   openapi_types.UUID `json:"group_id"`
-	GroupName *string            `json:"group_name,omitempty"`
-}
+type ExcludedGroup = domain.ExcludedGroup
 
 // Executable defines model for Executable.
-type Executable struct {
-	Cdhash         string                 `json:"cdhash"`
-	CreatedAt      time.Time              `json:"created_at"`
-	Entitlements   map[string]interface{} `json:"entitlements"`
-	FileBundleId   string                 `json:"file_bundle_id"`
-	FileBundlePath string                 `json:"file_bundle_path"`
-	FileName       string                 `json:"file_name"`
-	FilePath       string                 `json:"file_path"`
-	FileSha256     string                 `json:"file_sha256"`
-	Id             openapi_types.UUID     `json:"id"`
-	SigningChain   []SigningChainEntry    `json:"signing_chain"`
-	SigningId      string                 `json:"signing_id"`
-	Source         ExecutableSource       `json:"source"`
-	TeamId         string                 `json:"team_id"`
-}
+type Executable = domain.ExecutableSummary
 
 // ExecutableListResponse defines model for ExecutableListResponse.
 type ExecutableListResponse struct {
@@ -441,45 +196,13 @@ type ExecutableListResponse struct {
 }
 
 // ExecutableSource defines model for ExecutableSource.
-type ExecutableSource string
+type ExecutableSource = domain.ExecutableSource
 
 // ExecutableSummary defines model for ExecutableSummary.
-type ExecutableSummary struct {
-	Cdhash         string             `json:"cdhash"`
-	CreatedAt      time.Time          `json:"created_at"`
-	FileBundleId   string             `json:"file_bundle_id"`
-	FileBundlePath string             `json:"file_bundle_path"`
-	FileName       string             `json:"file_name"`
-	FilePath       string             `json:"file_path"`
-	FileSha256     string             `json:"file_sha256"`
-	Id             openapi_types.UUID `json:"id"`
-	SigningId      string             `json:"signing_id"`
-	Source         ExecutableSource   `json:"source"`
-	TeamId         string             `json:"team_id"`
-}
+type ExecutableSummary = domain.ExecutableSummary
 
 // ExecutionEvent defines model for ExecutionEvent.
-type ExecutionEvent struct {
-	Cdhash          string                 `json:"cdhash"`
-	CreatedAt       time.Time              `json:"created_at"`
-	CurrentSessions []string               `json:"current_sessions"`
-	Decision        EventDecision          `json:"decision"`
-	Entitlements    map[string]interface{} `json:"entitlements"`
-	ExecutableId    openapi_types.UUID     `json:"executable_id"`
-	ExecutingUser   string                 `json:"executing_user"`
-	FileBundleId    string                 `json:"file_bundle_id"`
-	FileBundlePath  string                 `json:"file_bundle_path"`
-	FileName        string                 `json:"file_name"`
-	FilePath        string                 `json:"file_path"`
-	FileSha256      string                 `json:"file_sha256"`
-	Id              openapi_types.UUID     `json:"id"`
-	LoggedInUsers   []string               `json:"logged_in_users"`
-	MachineId       openapi_types.UUID     `json:"machine_id"`
-	OccurredAt      *time.Time             `json:"occurred_at,omitempty"`
-	SigningChain    []SigningChainEntry    `json:"signing_chain"`
-	SigningId       string                 `json:"signing_id"`
-	TeamId          string                 `json:"team_id"`
-}
+type ExecutionEvent = domain.ExecutionEvent
 
 // ExecutionEventListResponse defines model for ExecutionEventListResponse.
 type ExecutionEventListResponse struct {
@@ -488,17 +211,7 @@ type ExecutionEventListResponse struct {
 }
 
 // ExecutionEventSummary defines model for ExecutionEventSummary.
-type ExecutionEventSummary struct {
-	CreatedAt    time.Time          `json:"created_at"`
-	Decision     EventDecision      `json:"decision"`
-	ExecutableId openapi_types.UUID `json:"executable_id"`
-	FileName     string             `json:"file_name"`
-	FilePath     string             `json:"file_path"`
-	Id           openapi_types.UUID `json:"id"`
-	MachineId    openapi_types.UUID `json:"machine_id"`
-	OccurredAt   *time.Time         `json:"occurred_at,omitempty"`
-	SigningId    string             `json:"signing_id"`
-}
+type ExecutionEventSummary = domain.ExecutionEventSummary
 
 // FieldError defines model for FieldError.
 type FieldError struct {
@@ -508,26 +221,10 @@ type FieldError struct {
 }
 
 // FileAccessDecision defines model for FileAccessDecision.
-type FileAccessDecision string
+type FileAccessDecision = domain.FileAccessDecision
 
 // FileAccessEvent defines model for FileAccessEvent.
-type FileAccessEvent struct {
-	Cdhash       string                   `json:"cdhash"`
-	CreatedAt    time.Time                `json:"created_at"`
-	Decision     FileAccessDecision       `json:"decision"`
-	ExecutableId *openapi_types.UUID      `json:"executable_id,omitempty"`
-	FileName     string                   `json:"file_name"`
-	FileSha256   string                   `json:"file_sha256"`
-	Id           openapi_types.UUID       `json:"id"`
-	MachineId    openapi_types.UUID       `json:"machine_id"`
-	OccurredAt   *time.Time               `json:"occurred_at,omitempty"`
-	ProcessChain []FileAccessEventProcess `json:"process_chain"`
-	RuleName     string                   `json:"rule_name"`
-	RuleVersion  string                   `json:"rule_version"`
-	SigningId    string                   `json:"signing_id"`
-	Target       string                   `json:"target"`
-	TeamId       string                   `json:"team_id"`
-}
+type FileAccessEvent = domain.FileAccessEvent
 
 // FileAccessEventListResponse defines model for FileAccessEventListResponse.
 type FileAccessEventListResponse struct {
@@ -536,40 +233,13 @@ type FileAccessEventListResponse struct {
 }
 
 // FileAccessEventProcess defines model for FileAccessEventProcess.
-type FileAccessEventProcess struct {
-	ExecutableId openapi_types.UUID `json:"executable_id"`
-	FileName     string             `json:"file_name"`
-	FilePath     string             `json:"file_path"`
-	Pid          int32              `json:"pid"`
-}
+type FileAccessEventProcess = domain.FileAccessEventProcess
 
 // FileAccessEventSummary defines model for FileAccessEventSummary.
-type FileAccessEventSummary struct {
-	Cdhash       string              `json:"cdhash"`
-	CreatedAt    time.Time           `json:"created_at"`
-	Decision     FileAccessDecision  `json:"decision"`
-	ExecutableId *openapi_types.UUID `json:"executable_id"`
-	FileName     string              `json:"file_name"`
-	FileSha256   string              `json:"file_sha256"`
-	Id           openapi_types.UUID  `json:"id"`
-	MachineId    openapi_types.UUID  `json:"machine_id"`
-	OccurredAt   *time.Time          `json:"occurred_at,omitempty"`
-	RuleName     string              `json:"rule_name"`
-	SigningId    string              `json:"signing_id"`
-	Target       string              `json:"target"`
-	TeamId       string              `json:"team_id"`
-}
+type FileAccessEventSummary = domain.FileAccessEventSummary
 
 // Group defines model for Group.
-type Group struct {
-	CreatedAt   time.Time          `json:"created_at"`
-	Description string             `json:"description"`
-	Id          openapi_types.UUID `json:"id"`
-	MemberCount int32              `json:"member_count"`
-	Name        string             `json:"name"`
-	Source      Source             `json:"source"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-}
+type Group = domain.Group
 
 // GroupCreateRequest defines model for GroupCreateRequest.
 type GroupCreateRequest struct {
@@ -584,14 +254,7 @@ type GroupListResponse struct {
 }
 
 // GroupMembership defines model for GroupMembership.
-type GroupMembership struct {
-	CreatedAt time.Time             `json:"created_at"`
-	Group     GroupMembershipGroup  `json:"group"`
-	Id        string                `json:"id"`
-	Kind      GroupMembershipKind   `json:"kind"`
-	Member    GroupMembershipMember `json:"member"`
-	UpdatedAt time.Time             `json:"updated_at"`
-}
+type GroupMembership = domain.GroupMembership
 
 // GroupMembershipCreateRequest defines model for GroupMembershipCreateRequest.
 type GroupMembershipCreateRequest struct {
@@ -601,14 +264,10 @@ type GroupMembershipCreateRequest struct {
 }
 
 // GroupMembershipGroup defines model for GroupMembershipGroup.
-type GroupMembershipGroup struct {
-	Id     openapi_types.UUID `json:"id"`
-	Name   string             `json:"name"`
-	Source Source             `json:"source"`
-}
+type GroupMembershipGroup = domain.GroupMembershipGroup
 
 // GroupMembershipKind defines model for GroupMembershipKind.
-type GroupMembershipKind string
+type GroupMembershipKind = domain.GroupMembershipKind
 
 // GroupMembershipListResponse defines model for GroupMembershipListResponse.
 type GroupMembershipListResponse struct {
@@ -617,37 +276,13 @@ type GroupMembershipListResponse struct {
 }
 
 // GroupMembershipMember defines model for GroupMembershipMember.
-type GroupMembershipMember struct {
-	Id   openapi_types.UUID `json:"id"`
-	Kind MemberKind         `json:"kind"`
-	Name *string            `json:"name,omitempty"`
-}
+type GroupMembershipMember = domain.GroupMembershipMember
 
 // IncludeRuleTarget defines model for IncludeRuleTarget.
-type IncludeRuleTarget struct {
-	CelExpression *string               `json:"cel_expression,omitempty"`
-	Policy        RulePolicy            `json:"policy"`
-	SubjectId     *openapi_types.UUID   `json:"subject_id,omitempty"`
-	SubjectKind   RuleTargetSubjectKind `json:"subject_kind"`
-	SubjectName   *string               `json:"subject_name,omitempty"`
-}
+type IncludeRuleTarget = domain.IncludeRuleTarget
 
 // Machine defines model for Machine.
-type Machine struct {
-	CreatedAt        time.Time           `json:"created_at"`
-	Hostname         string              `json:"hostname"`
-	Id               openapi_types.UUID  `json:"id"`
-	LastSeenAt       time.Time           `json:"last_seen_at"`
-	ModelIdentifier  string              `json:"model_identifier"`
-	OsBuild          string              `json:"os_build"`
-	OsVersion        string              `json:"os_version"`
-	PrimaryUser      string              `json:"primary_user"`
-	PrimaryUserId    *openapi_types.UUID `json:"primary_user_id,omitempty"`
-	RequestCleanSync bool                `json:"request_clean_sync"`
-	SantaVersion     string              `json:"santa_version"`
-	SerialNumber     string              `json:"serial_number"`
-	UpdatedAt        time.Time           `json:"updated_at"`
-}
+type Machine = domain.Machine
 
 // MachineListResponse defines model for MachineListResponse.
 type MachineListResponse struct {
@@ -656,22 +291,10 @@ type MachineListResponse struct {
 }
 
 // MachineSummary defines model for MachineSummary.
-type MachineSummary struct {
-	CreatedAt       time.Time           `json:"created_at"`
-	Hostname        string              `json:"hostname"`
-	Id              openapi_types.UUID  `json:"id"`
-	LastSeenAt      time.Time           `json:"last_seen_at"`
-	ModelIdentifier string              `json:"model_identifier"`
-	OsVersion       string              `json:"os_version"`
-	PrimaryUser     string              `json:"primary_user"`
-	PrimaryUserId   *openapi_types.UUID `json:"primary_user_id,omitempty"`
-	SantaVersion    string              `json:"santa_version"`
-	SerialNumber    string              `json:"serial_number"`
-	UpdatedAt       time.Time           `json:"updated_at"`
-}
+type MachineSummary = domain.MachineSummary
 
 // MemberKind defines model for MemberKind.
-type MemberKind string
+type MemberKind = domain.MemberKind
 
 // Problem defines model for Problem.
 type Problem struct {
@@ -684,19 +307,7 @@ type Problem struct {
 }
 
 // Rule defines model for Rule.
-type Rule struct {
-	CreatedAt     time.Time          `json:"created_at"`
-	CustomMessage string             `json:"custom_message"`
-	CustomUrl     string             `json:"custom_url"`
-	Description   string             `json:"description"`
-	Enabled       bool               `json:"enabled"`
-	Id            openapi_types.UUID `json:"id"`
-	Identifier    string             `json:"identifier"`
-	Name          string             `json:"name"`
-	RuleType      RuleType           `json:"rule_type"`
-	Targets       RuleTargets        `json:"targets"`
-	UpdatedAt     time.Time          `json:"updated_at"`
-}
+type Rule = domain.RuleSummary
 
 // RuleCreateRequest defines model for RuleCreateRequest.
 type RuleCreateRequest struct {
@@ -719,57 +330,31 @@ type RuleListResponse struct {
 }
 
 // RulePolicy defines model for RulePolicy.
-type RulePolicy string
+type RulePolicy = domain.RulePolicy
 
 // RuleSummary defines model for RuleSummary.
-type RuleSummary struct {
-	CreatedAt   time.Time          `json:"created_at"`
-	Description string             `json:"description"`
-	Enabled     bool               `json:"enabled"`
-	Id          openapi_types.UUID `json:"id"`
-	Identifier  string             `json:"identifier"`
-	Name        string             `json:"name"`
-	RuleType    RuleType           `json:"rule_type"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-}
+type RuleSummary = domain.RuleSummary
 
 // RuleTargetSubjectKind defines model for RuleTargetSubjectKind.
-type RuleTargetSubjectKind string
+type RuleTargetSubjectKind = domain.RuleTargetSubjectKind
 
 // RuleTargets defines model for RuleTargets.
-type RuleTargets struct {
-	Exclude []ExcludedGroup     `json:"exclude"`
-	Include []IncludeRuleTarget `json:"include"`
-}
+type RuleTargets = domain.RuleTargets
 
 // RuleType defines model for RuleType.
-type RuleType string
+type RuleType = domain.RuleType
 
 // RuleUpdateRequest defines model for RuleUpdateRequest.
 type RuleUpdateRequest = RuleCreateRequest
 
 // SigningChainEntry defines model for SigningChainEntry.
-type SigningChainEntry struct {
-	CommonName         string    `json:"common_name"`
-	Organization       string    `json:"organization"`
-	OrganizationalUnit string    `json:"organizational_unit"`
-	Sha256             string    `json:"sha256"`
-	ValidFrom          time.Time `json:"valid_from"`
-	ValidUntil         time.Time `json:"valid_until"`
-}
+type SigningChainEntry = domain.SigningChainEntry
 
 // Source defines model for Source.
-type Source string
+type Source = domain.PrincipalSource
 
 // User defines model for User.
-type User struct {
-	CreatedAt   time.Time          `json:"created_at"`
-	DisplayName string             `json:"display_name"`
-	Id          openapi_types.UUID `json:"id"`
-	Source      Source             `json:"source"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	Upn         string             `json:"upn"`
-}
+type User = domain.User
 
 // UserListResponse defines model for UserListResponse.
 type UserListResponse struct {

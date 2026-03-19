@@ -611,6 +611,10 @@ components:
             $ref: '#/components/schemas/Problem'
   schemas:
     EventDecision:
+      x-go-type: domain.EventDecision
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - unknown
@@ -630,6 +634,10 @@ components:
         - block_cd_hash
         - bundle_binary
     ExcludedGroup:
+      x-go-type: domain.ExcludedGroup
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - group_id
@@ -640,6 +648,10 @@ components:
         group_name:
           type: string
     Executable:
+      x-go-type: domain.Executable
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       allOf:
         - $ref: '#/components/schemas/ExecutableSummary'
         - type: object
@@ -668,11 +680,19 @@ components:
           items:
             $ref: '#/components/schemas/ExecutableSummary'
     ExecutableSource:
+      x-go-type: domain.ExecutableSource
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - event
         - process
     ExecutableSummary:
+      x-go-type: domain.ExecutableSummary
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -712,6 +732,10 @@ components:
           type: string
           format: date-time
     ExecutionEvent:
+      x-go-type: domain.ExecutionEvent
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -798,6 +822,10 @@ components:
           items:
             $ref: '#/components/schemas/ExecutionEventSummary'
     ExecutionEventSummary:
+      x-go-type: domain.ExecutionEventSummary
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -846,6 +874,10 @@ components:
         code:
           type: string
     FileAccessDecision:
+      x-go-type: domain.FileAccessDecision
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - unknown
@@ -853,6 +885,10 @@ components:
         - denied_invalid_signature
         - audit_only
     FileAccessEvent:
+      x-go-type: domain.FileAccessEvent
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -922,6 +958,10 @@ components:
           items:
             $ref: '#/components/schemas/FileAccessEventSummary'
     FileAccessEventProcess:
+      x-go-type: domain.FileAccessEventProcess
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - pid
@@ -940,6 +980,10 @@ components:
         file_name:
           type: string
     FileAccessEventSummary:
+      x-go-type: domain.FileAccessEventSummary
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -989,6 +1033,10 @@ components:
           type: string
           format: date-time
     Group:
+      x-go-type: domain.Group
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1040,6 +1088,10 @@ components:
           items:
             $ref: '#/components/schemas/Group'
     GroupMembership:
+      x-go-type: domain.GroupMembership
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1079,6 +1131,10 @@ components:
           type: string
           format: uuid
     GroupMembershipGroup:
+      x-go-type: domain.GroupMembershipGroup
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1093,6 +1149,10 @@ components:
         source:
           $ref: '#/components/schemas/Source'
     GroupMembershipKind:
+      x-go-type: domain.GroupMembershipKind
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - actual
@@ -1111,6 +1171,10 @@ components:
           items:
             $ref: '#/components/schemas/GroupMembership'
     GroupMembershipMember:
+      x-go-type: domain.GroupMembershipMember
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - kind
@@ -1124,6 +1188,10 @@ components:
         name:
           type: string
     IncludeRuleTarget:
+      x-go-type: domain.IncludeRuleTarget
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - subject_kind
@@ -1142,6 +1210,10 @@ components:
         cel_expression:
           type: string
     Machine:
+      x-go-type: domain.Machine
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1203,6 +1275,10 @@ components:
           items:
             $ref: '#/components/schemas/MachineSummary'
     MachineSummary:
+      x-go-type: domain.MachineSummary
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1245,6 +1321,10 @@ components:
           type: string
           format: date-time
     MemberKind:
+      x-go-type: domain.MemberKind
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - user
@@ -1274,6 +1354,10 @@ components:
           items:
             $ref: '#/components/schemas/FieldError'
     Rule:
+      x-go-type: domain.Rule
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       allOf:
         - $ref: '#/components/schemas/RuleSummary'
         - type: object
@@ -1330,6 +1414,10 @@ components:
           items:
             $ref: '#/components/schemas/RuleSummary'
     RulePolicy:
+      x-go-type: domain.RulePolicy
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - allowlist
@@ -1337,6 +1425,10 @@ components:
         - silent_blocklist
         - cel
     RuleSummary:
+      x-go-type: domain.RuleSummary
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id
@@ -1368,12 +1460,20 @@ components:
           type: string
           format: date-time
     RuleTargetSubjectKind:
+      x-go-type: domain.RuleTargetSubjectKind
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - group
         - all_devices
         - all_users
     RuleTargets:
+      x-go-type: domain.RuleTargets
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - include
@@ -1388,6 +1488,10 @@ components:
           items:
             $ref: '#/components/schemas/ExcludedGroup'
     RuleType:
+      x-go-type: domain.RuleType
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - binary
@@ -1399,6 +1503,10 @@ components:
       allOf:
         - $ref: '#/components/schemas/RuleCreateRequest'
     SigningChainEntry:
+      x-go-type: domain.SigningChainEntry
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - common_name
@@ -1423,11 +1531,19 @@ components:
           type: string
           format: date-time
     Source:
+      x-go-type: domain.PrincipalSource
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: string
       enum:
         - local
         - entra
     User:
+      x-go-type: domain.User
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
         - id

@@ -19,14 +19,8 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	mapped, err := mapSlice(items, mapUser)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
 	writeJSON(writer, http.StatusOK, UserListResponse{
-		Rows:  mapped,
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -38,11 +32,5 @@ func (handler *Server) GetUser(writer http.ResponseWriter, request *http.Request
 		return
 	}
 
-	mapped, mapErr := mapUser(user)
-	if mapErr != nil {
-		writeClassifiedError(writer, mapErr, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, user)
 }

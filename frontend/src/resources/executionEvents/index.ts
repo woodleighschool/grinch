@@ -5,6 +5,8 @@ import type { ResourceProps } from "react-admin";
 
 const executionEvents: Partial<ResourceProps> = {
   icon: EventIcon,
+  options: { label: "Execution Events" },
+  recordRepresentation: "name",
   list: ExecutionEventList,
   show: ExecutionEventShow,
 };

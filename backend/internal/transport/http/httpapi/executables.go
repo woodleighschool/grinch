@@ -26,7 +26,7 @@ func (handler *Server) ListExecutables(
 	}
 
 	writeJSON(writer, http.StatusOK, ExecutableListResponse{
-		Rows:  mapSliceValue(items, mapExecutableSummary),
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -38,5 +38,5 @@ func (handler *Server) GetExecutable(writer http.ResponseWriter, request *http.R
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, mapExecutable(executable))
+	writeJSON(writer, http.StatusOK, executable)
 }

@@ -37,14 +37,8 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	mapped, err := mapSlice(items, mapGroup)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
 	writeJSON(writer, http.StatusOK, GroupListResponse{
-		Rows:  mapped,
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -79,13 +73,7 @@ func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	mapped, mapErr := mapGroup(group)
-	if mapErr != nil {
-		writeClassifiedError(writer, mapErr, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusCreated, mapped)
+	writeJSON(writer, http.StatusCreated, group)
 }
 
 func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Request, id Id) {
@@ -95,13 +83,7 @@ func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	mapped, mapErr := mapGroup(group)
-	if mapErr != nil {
-		writeClassifiedError(writer, mapErr, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, group)
 }
 
 func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Request, id Id) {
@@ -137,13 +119,7 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	mapped, mapErr := mapGroup(updated)
-	if mapErr != nil {
-		writeClassifiedError(writer, mapErr, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, updated)
 }
 
 func (handler *Server) DeleteGroup(writer http.ResponseWriter, request *http.Request, id Id) {

@@ -29,7 +29,7 @@ func (handler *Server) ListExecutionEvents(
 	}
 
 	writeJSON(writer, http.StatusOK, ExecutionEventListResponse{
-		Rows:  mapSliceValue(items, mapExecutionEventSummary),
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -41,7 +41,7 @@ func (handler *Server) GetExecutionEvent(writer http.ResponseWriter, request *ht
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, mapExecutionEvent(event))
+	writeJSON(writer, http.StatusOK, event)
 }
 
 func (handler *Server) DeleteExecutionEvent(writer http.ResponseWriter, request *http.Request, id Id) {

@@ -32,14 +32,8 @@ func (handler *Server) ListGroupMemberships(
 		return
 	}
 
-	mapped, err := mapSlice(items, mapGroupMembership)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
 	writeJSON(writer, http.StatusOK, GroupMembershipListResponse{
-		Rows:  mapped,
+		Rows:  items,
 		Total: total,
 	})
 }
@@ -51,17 +45,11 @@ func (handler *Server) CreateGroupMembership(writer http.ResponseWriter, request
 		return
 	}
 
-	memberKind, err := toDomainMemberKind(body.MemberKind)
-	if err != nil {
-		writeClassifiedError(writer, badRequestError("invalid member_kind"), apiErrorOptions{})
-		return
-	}
-
 	membership, err := handler.groupMemberships.CreateGroupMembership(
 		request.Context(),
 		appgroupmemberships.CreateInput{
 			GroupID:    body.GroupId,
-			MemberKind: memberKind,
+			MemberKind: body.MemberKind,
 			MemberID:   body.MemberId,
 		},
 	)
@@ -70,13 +58,7 @@ func (handler *Server) CreateGroupMembership(writer http.ResponseWriter, request
 		return
 	}
 
-	mapped, err := mapGroupMembership(membership)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusCreated, mapped)
+	writeJSON(writer, http.StatusCreated, membership)
 }
 
 func (handler *Server) GetGroupMembership(writer http.ResponseWriter, request *http.Request, id GroupMembershipId) {
@@ -86,13 +68,7 @@ func (handler *Server) GetGroupMembership(writer http.ResponseWriter, request *h
 		return
 	}
 
-	mapped, err := mapGroupMembership(membership)
-	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, mapped)
+	writeJSON(writer, http.StatusOK, membership)
 }
 
 func (handler *Server) DeleteGroupMembership(writer http.ResponseWriter, request *http.Request, id GroupMembershipId) {

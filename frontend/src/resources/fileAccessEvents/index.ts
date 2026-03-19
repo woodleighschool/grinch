@@ -5,6 +5,8 @@ import type { ResourceProps } from "react-admin";
 
 const fileAccessEvents: Partial<ResourceProps> = {
   icon: FolderOpenIcon,
+  options: { label: "File Access Events" },
+  recordRepresentation: "name",
   list: FileAccessEventList,
   show: FileAccessEventShow,
 };

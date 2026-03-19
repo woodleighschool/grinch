@@ -136,26 +136,6 @@ func optionalStringValue(value *string) string {
 	return *value
 }
 
-func mapSlice[T any, U any](items []T, mapper func(T) (U, error)) ([]U, error) {
-	mapped := make([]U, 0, len(items))
-	for _, item := range items {
-		output, err := mapper(item)
-		if err != nil {
-			return nil, err
-		}
-		mapped = append(mapped, output)
-	}
-	return mapped, nil
-}
-
-func mapSliceValue[T any, U any](items []T, mapper func(T) U) []U {
-	mapped := make([]U, 0, len(items))
-	for _, item := range items {
-		mapped = append(mapped, mapper(item))
-	}
-	return mapped
-}
-
 func parseListOptions[T ~string, O ~string](
 	limit *int32,
 	offset *int32,
@@ -331,11 +311,4 @@ type badRequestError string
 
 func (err badRequestError) Error() string {
 	return string(err)
-}
-
-func toStringPointer(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
 }
