@@ -8,6 +8,7 @@ export type FileAccessDecision = components["schemas"]["FileAccessDecision"];
 export type RuleType = components["schemas"]["RuleType"];
 export type RulePolicy = components["schemas"]["RulePolicy"];
 export type RuleTargetSubjectKind = components["schemas"]["RuleTargetSubjectKind"];
+export type ExecutableSource = components["schemas"]["ExecutableSource"];
 
 export type User = components["schemas"]["User"];
 export type UserListResponse = components["schemas"]["UserListResponse"];
@@ -17,6 +18,7 @@ export type GroupListResponse = components["schemas"]["GroupListResponse"];
 export type GroupCreateRequest = components["schemas"]["GroupCreateRequest"];
 
 export type GroupMembership = components["schemas"]["GroupMembership"];
+export type GroupMembershipListItem = components["schemas"]["GroupMembershipListItem"];
 export type GroupMembershipListResponse = components["schemas"]["GroupMembershipListResponse"];
 export type GroupMembershipCreateRequest = components["schemas"]["GroupMembershipCreateRequest"];
 

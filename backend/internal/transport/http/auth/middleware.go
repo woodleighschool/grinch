@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-pkgz/auth/v2/token"
 
-	"github.com/woodleighschool/grinch/internal/transport/http/apierrors"
+	httpapi "github.com/woodleighschool/grinch/internal/transport/http/httpapi"
 )
 
 func NewAPIMiddleware(
@@ -16,28 +16,18 @@ func NewAPIMiddleware(
 	}
 
 	return func(next http.Handler) http.Handler {
-		return makeSessionProtected(next, sessionAuth)
+		return sessionAuth(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			user, err := token.GetUserInfo(request)
+			if err != nil || user.ID == "" {
+				httpapi.WriteProblem(writer, http.StatusUnauthorized, httpapi.ProblemSpec{
+					Type:   "urn:grinch:problem:unauthorized",
+					Title:  "Unauthorized",
+					Code:   "unauthorized",
+					Detail: "Authentication is required.",
+				})
+				return
+			}
+			next.ServeHTTP(writer, request)
+		}))
 	}
-}
-
-func makeSessionProtected(
-	next http.Handler,
-	sessionAuth func(http.Handler) http.Handler,
-) http.Handler {
-	return sessionAuth(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		user, err := token.GetUserInfo(request)
-		if err != nil {
-			writeError(writer, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		if user.ID == "" {
-			writeError(writer, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		next.ServeHTTP(writer, request)
-	}))
-}
-
-func writeError(writer http.ResponseWriter, statusCode int, message string) {
-	apierrors.Write(writer, statusCode, message)
 }

@@ -14,26 +14,22 @@ import (
 )
 
 type Store struct {
-	store   *postgres.Store
-	queries *db.Queries
+	store *postgres.Store
 }
 
 func New(store *postgres.Store) *Store {
-	return &Store{
-		store:   store,
-		queries: store.Queries(),
-	}
+	return &Store{store: store}
 }
 
 func (store *Store) ListGroupMemberships(
 	ctx context.Context,
 	options domain.GroupMembershipListOptions,
-) ([]domain.GroupMembership, int32, error) {
+) ([]domain.GroupMembershipListItem, int32, error) {
 	orderBy, err := pgutil.OrderBy(
 		options.Sort,
 		options.Order,
 		groupMembershipSortColumns(),
-		[]string{"group_name ASC", "member_name ASC", "membership_id ASC"},
+		[]string{"group_name ASC", "member_name ASC", "membership_sort_id ASC"},
 	)
 	if err != nil {
 		return nil, 0, err
@@ -53,8 +49,10 @@ func groupMembershipListQuery(orderBy string) string {
 	return fmt.Sprintf(`
 WITH actual_memberships AS (
   SELECT
-    gm.id::text AS membership_id,
+    gm.id::text AS membership_sort_id,
     'actual'::text AS membership_kind,
+    gm.id AS actual_membership_id,
+    ''::text AS effective_membership_id,
     g.id AS group_id,
     g.name AS group_name,
     g.source AS group_source,
@@ -80,8 +78,10 @@ WITH actual_memberships AS (
 ),
 effective_machine_memberships AS (
   SELECT
-    CONCAT('effective-machine:', $3::text, ':', g.id::text) AS membership_id,
+    CONCAT('effective-machine:', $3::text, ':', g.id::text) AS membership_sort_id,
     'effective'::text AS membership_kind,
+    NULL::uuid AS actual_membership_id,
+    CONCAT('effective-machine:', $3::text, ':', g.id::text) AS effective_membership_id,
     g.id AS group_id,
     g.name AS group_name,
     g.source AS group_source,
@@ -109,7 +109,8 @@ membership_rows AS (
   SELECT * FROM effective_machine_memberships
 )
 SELECT
-  membership_id,
+  actual_membership_id,
+  effective_membership_id,
   membership_kind,
   group_id,
   group_name,
@@ -132,7 +133,7 @@ OFFSET $6
 
 func groupMembershipSortColumns() map[string]string {
 	return map[string]string{
-		"id":          "membership_id",
+		"id":          "membership_sort_id",
 		"group_name":  "group_name",
 		"kind":        "membership_kind",
 		"member_name": "member_name",
@@ -152,9 +153,9 @@ func groupMembershipListArguments(options domain.GroupMembershipListOptions) []a
 	}
 }
 
-func scanGroupMembership(rows pgx.Rows) (domain.GroupMembership, int32, error) {
+func scanGroupMembership(rows pgx.Rows) (domain.GroupMembershipListItem, int32, error) {
 	var (
-		item               domain.GroupMembership
+		item               domain.GroupMembershipListItem
 		membershipKindText string
 		groupSourceText    string
 		memberKindText     string
@@ -162,7 +163,8 @@ func scanGroupMembership(rows pgx.Rows) (domain.GroupMembership, int32, error) {
 	)
 
 	if scanErr := rows.Scan(
-		&item.ID,
+		&item.ActualMembershipID,
+		&item.EffectiveMembershipID,
 		&membershipKindText,
 		&item.Group.ID,
 		&item.Group.Name,
@@ -174,16 +176,16 @@ func scanGroupMembership(rows pgx.Rows) (domain.GroupMembership, int32, error) {
 		&item.UpdatedAt,
 		&total,
 	); scanErr != nil {
-		return domain.GroupMembership{}, 0, scanErr
+		return domain.GroupMembershipListItem{}, 0, scanErr
 	}
 
-	groupSourceValue, sourceErr := pgutil.ToSource(groupSourceText)
+	groupSourceValue, sourceErr := domain.ParsePrincipalSource(groupSourceText)
 	if sourceErr != nil {
-		return domain.GroupMembership{}, 0, sourceErr
+		return domain.GroupMembershipListItem{}, 0, sourceErr
 	}
-	memberKindValue, kindErr := pgutil.ToMemberKind(memberKindText)
+	memberKindValue, kindErr := domain.ParseMemberKind(memberKindText)
 	if kindErr != nil {
-		return domain.GroupMembership{}, 0, kindErr
+		return domain.GroupMembershipListItem{}, 0, kindErr
 	}
 
 	item.Group.Source = groupSourceValue
@@ -193,7 +195,7 @@ func scanGroupMembership(rows pgx.Rows) (domain.GroupMembership, int32, error) {
 }
 
 func (store *Store) GetGroupMembership(ctx context.Context, id uuid.UUID) (domain.GroupMembership, error) {
-	row, err := store.queries.GetPersistedGroupMembershipView(ctx, id)
+	row, err := store.store.Queries().GetPersistedGroupMembershipView(ctx, id)
 	if err != nil {
 		return domain.GroupMembership{}, err
 	}
@@ -212,7 +214,7 @@ func (store *Store) CreateGroupMembership(
 		return domain.GroupMembership{}, err
 	}
 
-	row, err := store.queries.CreateGroupMembership(ctx, db.CreateGroupMembershipParams{
+	row, err := store.store.Queries().CreateGroupMembership(ctx, db.CreateGroupMembershipParams{
 		ID:         id,
 		GroupID:    groupID,
 		MemberKind: string(memberKind),
@@ -226,20 +228,20 @@ func (store *Store) CreateGroupMembership(
 }
 
 func (store *Store) DeleteGroupMembership(ctx context.Context, id uuid.UUID) error {
-	_, err := store.queries.DeleteGroupMembership(ctx, id)
+	_, err := store.store.Queries().DeleteGroupMembership(ctx, id)
 	return err
 }
 
 func (store *Store) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error) {
-	return pgutil.GetGroup(ctx, store.queries, id)
+	return pgutil.GetGroup(ctx, store.store.Queries(), id)
 }
 
 func mapPersistedGroupMembership(row db.GetPersistedGroupMembershipViewRow) (domain.GroupMembership, error) {
-	groupSource, err := pgutil.ToSource(row.GroupSource)
+	groupSource, err := domain.ParsePrincipalSource(row.GroupSource)
 	if err != nil {
 		return domain.GroupMembership{}, err
 	}
-	memberKind, err := pgutil.ToMemberKind(row.MemberKind)
+	memberKind, err := domain.ParseMemberKind(row.MemberKind)
 	if err != nil {
 		return domain.GroupMembership{}, err
 	}
@@ -249,7 +251,7 @@ func mapPersistedGroupMembership(row db.GetPersistedGroupMembershipViewRow) (dom
 	}
 
 	return domain.GroupMembership{
-		ID:   row.ID.String(),
+		ID:   row.ID,
 		Kind: domain.GroupMembershipKindActual,
 		Group: domain.GroupMembershipGroup{
 			ID:     row.GroupID,
@@ -272,8 +274,6 @@ func membershipMemberName(value any) (string, error) {
 		return "", nil
 	case string:
 		return typed, nil
-	case []byte:
-		return string(typed), nil
 	default:
 		return "", fmt.Errorf("unsupported membership member_name type %T", value)
 	}

@@ -7,13 +7,22 @@ import (
 )
 
 func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Request, params ListUsersParams) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	items, total, err := handler.admin.ListUsers(request.Context(), domain.UserListOptions{ListOptions: listOptions})
+	items, total, err := handler.admin.ListUsers(request.Context(), domain.UserListOptions{
+		ListOptions: listOptions,
+	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

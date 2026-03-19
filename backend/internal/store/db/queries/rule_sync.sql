@@ -114,3 +114,26 @@ RETURNING
   last_rule_sync_success_at,
   created_at,
   updated_at;
+
+-- name: RecordMachineSyncPostflight :execrows
+UPDATE machine_sync_states
+SET
+  rules_hash = $2,
+  rules_received = $3,
+  rules_processed = $4,
+  last_rule_sync_attempt_at = $5,
+  updated_at = NOW()
+WHERE machine_id = $1;
+
+-- name: PromoteMachineSyncPendingSnapshot :execrows
+UPDATE machine_sync_states
+SET
+  applied_targets = pending_targets,
+  pending_targets = '[]'::JSONB,
+  expected_rules_hash = '',
+  pending_payload_rule_count = 0,
+  pending_full_sync = FALSE,
+  pending_preflight_at = NULL,
+  last_rule_sync_success_at = $2,
+  updated_at = NOW()
+WHERE machine_id = $1;

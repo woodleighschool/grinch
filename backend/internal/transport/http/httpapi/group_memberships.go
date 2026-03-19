@@ -12,7 +12,7 @@ func (handler *Server) ListGroupMemberships(
 	request *http.Request,
 	params ListGroupMembershipsParams,
 ) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

@@ -91,6 +91,66 @@ func (q *Queries) GetMachineSyncState(ctx context.Context, machineID uuid.UUID) 
 	return i, err
 }
 
+const promoteMachineSyncPendingSnapshot = `-- name: PromoteMachineSyncPendingSnapshot :execrows
+UPDATE machine_sync_states
+SET
+  applied_targets = pending_targets,
+  pending_targets = '[]'::JSONB,
+  expected_rules_hash = '',
+  pending_payload_rule_count = 0,
+  pending_full_sync = FALSE,
+  pending_preflight_at = NULL,
+  last_rule_sync_success_at = $2,
+  updated_at = NOW()
+WHERE machine_id = $1
+`
+
+type PromoteMachineSyncPendingSnapshotParams struct {
+	MachineID             uuid.UUID
+	LastRuleSyncSuccessAt *time.Time
+}
+
+func (q *Queries) PromoteMachineSyncPendingSnapshot(ctx context.Context, arg PromoteMachineSyncPendingSnapshotParams) (int64, error) {
+	result, err := q.db.Exec(ctx, promoteMachineSyncPendingSnapshot, arg.MachineID, arg.LastRuleSyncSuccessAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const recordMachineSyncPostflight = `-- name: RecordMachineSyncPostflight :execrows
+UPDATE machine_sync_states
+SET
+  rules_hash = $2,
+  rules_received = $3,
+  rules_processed = $4,
+  last_rule_sync_attempt_at = $5,
+  updated_at = NOW()
+WHERE machine_id = $1
+`
+
+type RecordMachineSyncPostflightParams struct {
+	MachineID             uuid.UUID
+	RulesHash             string
+	RulesReceived         int32
+	RulesProcessed        int32
+	LastRuleSyncAttemptAt *time.Time
+}
+
+func (q *Queries) RecordMachineSyncPostflight(ctx context.Context, arg RecordMachineSyncPostflightParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordMachineSyncPostflight,
+		arg.MachineID,
+		arg.RulesHash,
+		arg.RulesReceived,
+		arg.RulesProcessed,
+		arg.LastRuleSyncAttemptAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const upsertMachineSyncState = `-- name: UpsertMachineSyncState :one
 INSERT INTO machine_sync_states (
   machine_id,

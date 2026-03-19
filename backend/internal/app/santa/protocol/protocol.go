@@ -4,6 +4,7 @@ package protocol
 
 import (
 	"fmt"
+	"math"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 
@@ -31,6 +32,28 @@ func MapPendingFullSync(value bool) syncv1.SyncType {
 		return syncv1.SyncType_CLEAN
 	}
 	return syncv1.SyncType_NORMAL
+}
+
+func MapClientMode(value syncv1.ClientMode) domain.MachineClientMode {
+	switch value {
+	case syncv1.ClientMode_UNKNOWN_CLIENT_MODE:
+		return domain.MachineClientModeUnknown
+	case syncv1.ClientMode_MONITOR:
+		return domain.MachineClientModeMonitor
+	case syncv1.ClientMode_LOCKDOWN:
+		return domain.MachineClientModeLockdown
+	case syncv1.ClientMode_STANDALONE:
+		return domain.MachineClientModeStandalone
+	default:
+		return domain.MachineClientModeUnknown
+	}
+}
+
+func SafeCount(value uint32) int32 {
+	if value > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(value)
 }
 
 func buildRule(rule model.SyncRule) (*syncv1.Rule, error) {

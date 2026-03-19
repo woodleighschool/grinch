@@ -19,9 +19,6 @@ import (
 )
 
 type fakeDataStore struct {
-	deletedEvents  int64
-	deleteCutoff   time.Time
-	deleteErr      error
 	ruleSyncStates map[uuid.UUID]santa.MachineSyncState
 	upsertErr      error
 	upsertMachine  santa.MachineUpsert
@@ -124,11 +121,6 @@ func (store *fakeDataStore) IngestEvents(
 	map[domain.EventDecision]struct{},
 ) (int, error) {
 	return 0, nil
-}
-
-func (store *fakeDataStore) DeleteEventsBefore(_ context.Context, cutoff time.Time) (int64, error) {
-	store.deleteCutoff = cutoff
-	return store.deletedEvents, store.deleteErr
 }
 
 func (resolver *fakeRuleResolver) ResolveMachineRuleTargets(

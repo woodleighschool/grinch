@@ -101,11 +101,8 @@ func (handler *Handler) authenticate(request *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(headerValue), []byte(handler.sharedSecret)) == 1
 }
 
-func (handler *Handler) fail(
-	writer http.ResponseWriter,
-	err error,
-	statusCode int,
-) {
+func (handler *Handler) fail(writer http.ResponseWriter, err error) {
+	statusCode := http.StatusInternalServerError
 	switch {
 	case errors.Is(err, errSyncUnauthorized):
 		statusCode = http.StatusUnauthorized

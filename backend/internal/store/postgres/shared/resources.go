@@ -15,7 +15,7 @@ func GetGroup(ctx context.Context, queries *db.Queries, id uuid.UUID) (domain.Gr
 		return domain.Group{}, err
 	}
 
-	source, err := ToSource(row.Source)
+	source, err := domain.ParsePrincipalSource(row.Source)
 	if err != nil {
 		return domain.Group{}, err
 	}
@@ -37,7 +37,7 @@ func GetUser(ctx context.Context, queries *db.Queries, id uuid.UUID) (domain.Use
 		return domain.User{}, err
 	}
 
-	source, err := ToSource(row.Source)
+	source, err := domain.ParsePrincipalSource(row.Source)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -58,6 +58,11 @@ func GetMachine(ctx context.Context, queries *db.Queries, id uuid.UUID) (domain.
 		return domain.Machine{}, err
 	}
 
+	clientMode, err := domain.ParseMachineClientMode(row.ClientMode)
+	if err != nil {
+		return domain.Machine{}, err
+	}
+
 	return domain.Machine{
 		ID:                   row.MachineID,
 		SerialNumber:         row.SerialNumber,
@@ -69,7 +74,7 @@ func GetMachine(ctx context.Context, queries *db.Queries, id uuid.UUID) (domain.
 		PrimaryUser:          row.PrimaryUser,
 		PrimaryUserID:        row.PrimaryUserID,
 		RuleSyncStatus:       domain.DeriveMachineRuleSyncStatus(row.PendingPreflightAt, row.LastRuleSyncAttemptAt),
-		ClientMode:           domain.ParseMachineClientMode(row.ClientMode),
+		ClientMode:           clientMode,
 		BinaryRuleCount:      row.BinaryRuleCount,
 		CertificateRuleCount: row.CertificateRuleCount,
 		CompilerRuleCount:    row.CompilerRuleCount,

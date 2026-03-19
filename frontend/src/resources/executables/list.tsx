@@ -1,7 +1,11 @@
+import { EXECUTABLE_SOURCE_CHOICES } from "@/resources/executables/choices";
 import type { ReactElement } from "react";
-import { DataTable, List, SearchInput } from "react-admin";
+import { DataTable, List, SearchInput, SelectArrayInput } from "react-admin";
 
-const executableFilters = [<SearchInput key="search" source="search" alwaysOn />];
+const executableFilters = [
+  <SearchInput key="search" source="search" alwaysOn />,
+  <SelectArrayInput key="source" source="source" label="Source" choices={EXECUTABLE_SOURCE_CHOICES} />,
+];
 
 export const ExecutableList = (): ReactElement => (
   <List sort={{ field: "file_name", order: "DESC" }} filters={executableFilters}>

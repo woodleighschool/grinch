@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,25 +19,53 @@ import (
 )
 
 type Store struct {
-	store   *postgres.Store
-	queries *db.Queries
+	store *postgres.Store
 }
 
 func New(store *postgres.Store) *Store {
-	return &Store{
-		store:   store,
-		queries: store.Queries(),
-	}
+	return &Store{store: store}
 }
 
 func (store *Store) ListRules(
 	ctx context.Context,
 	options domain.RuleListOptions,
 ) ([]domain.RuleSummary, int32, error) {
-	orderBy, err := pgutil.OrderBy(options.Sort, options.Order, ruleSortColumns(), []string{"r.name ASC", "r.id ASC"})
+	orderBy, err := pgutil.OrderBy(options.Sort, options.Order, map[string]string{
+		"id":          "r.id",
+		"name":        "r.name",
+		"description": "r.description",
+		"rule_type":   "r.rule_type",
+		"identifier":  "r.identifier",
+		"enabled":     "r.enabled",
+		"created_at":  "r.created_at",
+		"updated_at":  "r.updated_at",
+	}, []string{"r.name ASC", "r.id ASC"})
 	if err != nil {
 		return nil, 0, err
 	}
+
+	whereClauses := []string{
+		`($1 = '' OR
+  r.name ILIKE $1 OR
+  r.description ILIKE $1 OR
+  r.identifier ILIKE $1 OR
+  r.rule_type ILIKE $1)`,
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("r.id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	if len(options.Enabled) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("r.enabled = ANY($%d)", len(args)+1))
+		args = append(args, options.Enabled)
+	}
+	if len(options.RuleTypes) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("r.rule_type = ANY($%d)", len(args)+1))
+		args = append(args, pgutil.Strings(options.RuleTypes))
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
 
 	query := fmt.Sprintf(`
 SELECT
@@ -50,18 +79,15 @@ SELECT
   r.updated_at,
   COUNT(*) OVER()::INT4 AS total
 FROM rules AS r
-WHERE ($1 = '' OR
-  r.name ILIKE $1 OR
-  r.description ILIKE $1 OR
-  r.identifier ILIKE $1 OR
-  r.rule_type ILIKE $1)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($2::INT, 0)
-OFFSET $3
-`, orderBy)
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
 
-	rows, err := store.store.Pool().
-		Query(ctx, query, pgutil.SearchPattern(options.Search), options.Limit, options.Offset)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, err := store.store.Pool().Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -87,7 +113,7 @@ OFFSET $3
 			return domain.RuleSummary{}, 0, scanErr
 		}
 
-		parsedRuleType, parseErr := pgutil.ToRuleType(ruleType)
+		parsedRuleType, parseErr := domain.ParseRuleType(ruleType)
 		if parseErr != nil {
 			return domain.RuleSummary{}, 0, parseErr
 		}
@@ -97,21 +123,8 @@ OFFSET $3
 	})
 }
 
-func ruleSortColumns() map[string]string {
-	return map[string]string{
-		"id":          "r.id",
-		"name":        "r.name",
-		"description": "r.description",
-		"rule_type":   "r.rule_type",
-		"identifier":  "r.identifier",
-		"enabled":     "r.enabled",
-		"created_at":  "r.created_at",
-		"updated_at":  "r.updated_at",
-	}
-}
-
 func (store *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
-	queries := store.queries
+	queries := store.store.Queries()
 	row, err := queries.GetRule(ctx, id)
 	if err != nil {
 		return domain.Rule{}, err
@@ -193,7 +206,7 @@ func (store *Store) UpdateRule(ctx context.Context, id uuid.UUID, input apprules
 }
 
 func (store *Store) DeleteRule(ctx context.Context, id uuid.UUID) error {
-	_, err := store.queries.DeleteRule(ctx, id)
+	_, err := store.store.Queries().DeleteRule(ctx, id)
 	return err
 }
 
@@ -201,18 +214,18 @@ func (store *Store) ListResolvedMachineRules(
 	ctx context.Context,
 	machineID uuid.UUID,
 ) ([]domain.MachineResolvedRule, error) {
-	rows, err := store.queries.ListResolvedRulesForMachine(ctx, machineID)
+	rows, err := store.store.Queries().ListResolvedRulesForMachine(ctx, machineID)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]domain.MachineResolvedRule, 0, len(rows))
 	for _, row := range rows {
-		ruleType, ruleTypeErr := pgutil.ToRuleType(row.RuleType)
+		ruleType, ruleTypeErr := domain.ParseRuleType(row.RuleType)
 		if ruleTypeErr != nil {
 			return nil, ruleTypeErr
 		}
-		policy, policyErr := pgutil.ToRulePolicy(row.Policy.String)
+		policy, policyErr := domain.ParseRulePolicy(row.Policy.String)
 		if policyErr != nil {
 			return nil, policyErr
 		}
@@ -250,7 +263,7 @@ type ruleFieldsRow struct {
 }
 
 func mapRuleFields(row ruleFieldsRow) (domain.Rule, error) {
-	ruleType, err := pgutil.ToRuleType(row.RuleType)
+	ruleType, err := domain.ParseRuleType(row.RuleType)
 	if err != nil {
 		return domain.Rule{}, err
 	}
@@ -357,11 +370,11 @@ func (store *Store) replaceRuleTargets(
 }
 
 func appendRuleTargetRow(targets *domain.RuleTargets, row db.ListRuleTargetsByRuleRow) error {
-	subjectKind, err := pgutil.ToRuleTargetSubjectKind(row.SubjectKind)
+	subjectKind, err := domain.ParseRuleTargetSubjectKind(row.SubjectKind)
 	if err != nil {
 		return err
 	}
-	assignment, err := pgutil.ToRuleTargetAssignment(row.Assignment)
+	assignment, err := domain.ParseRuleTargetAssignment(row.Assignment)
 	if err != nil {
 		return err
 	}
@@ -371,7 +384,7 @@ func appendRuleTargetRow(targets *domain.RuleTargets, row db.ListRuleTargetsByRu
 		if !row.Policy.Valid {
 			return errors.New("include rule target missing policy")
 		}
-		policy, policyErr := pgutil.ToRulePolicy(row.Policy.String)
+		policy, policyErr := domain.ParseRulePolicy(row.Policy.String)
 		if policyErr != nil {
 			return policyErr
 		}

@@ -30,7 +30,8 @@ interface ApiResult<T> {
 }
 
 type Problem = components["schemas"]["Problem"];
-type QueryParameters = Record<string, string | number | boolean | undefined>;
+type QueryScalar = string | number | boolean;
+type QueryParameters = Record<string, QueryScalar | QueryScalar[] | undefined>;
 type Compacted<T extends QueryParameters> = { [K in keyof T]?: NonNullable<T[K]> };
 
 const withXsrfHeaders = (headers?: HeadersInit): Headers => {

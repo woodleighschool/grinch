@@ -3,7 +3,6 @@ package santa
 import (
 	"context"
 	"fmt"
-	"time"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/google/uuid"
@@ -15,7 +14,7 @@ import (
 )
 
 func (store *Store) UpsertMachine(ctx context.Context, machine appsanta.MachineUpsert) error {
-	_, err := store.queries.UpsertMachine(ctx, db.UpsertMachineParams{
+	_, err := store.store.Queries().UpsertMachine(ctx, db.UpsertMachineParams{
 		MachineID:            machine.MachineID,
 		SerialNumber:         machine.SerialNumber,
 		Hostname:             machine.Hostname,
@@ -59,20 +58,6 @@ func (store *Store) IngestEvents(
 	}
 
 	return ingested, nil
-}
-
-func (store *Store) DeleteEventsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
-	deletedExecution, executionErr := store.queries.DeleteExecutionEventsBefore(ctx, createdAt)
-	if executionErr != nil {
-		return 0, executionErr
-	}
-
-	deletedFileAccess, fileAccessErr := store.queries.DeleteFileAccessEventsBefore(ctx, createdAt)
-	if fileAccessErr != nil {
-		return 0, fileAccessErr
-	}
-
-	return deletedExecution + deletedFileAccess, nil
 }
 
 func ingestExecutionEvents(

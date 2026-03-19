@@ -10,7 +10,7 @@ import {
   rulesApi,
   usersApi,
 } from "@/api/adminClient";
-import type { GroupMembershipCreateRequest } from "@/api/types";
+import type { GroupMembershipCreateRequest, GroupMembershipListItem } from "@/api/types";
 import type {
   CreateParams,
   CreateResult,
@@ -36,6 +36,9 @@ import type {
 } from "react-admin";
 
 type RecordShape = Record<string, unknown>;
+type QueryScalar = string | number | boolean;
+type QueryValue = QueryScalar | QueryScalar[];
+type QueryParameters = Record<string, QueryValue | undefined>;
 interface ListResult {
   data: RaRecord[];
   total: number;
@@ -53,6 +56,41 @@ const getOptionalString = (value: unknown): string | undefined => {
   return trimmed === "" ? undefined : trimmed;
 };
 
+const getOptionalStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const result = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item): string => item.trim())
+    .filter((item): boolean => item !== "");
+
+  return result.length > 0 ? result : undefined;
+};
+
+const getOptionalBooleanArray = (value: unknown): boolean[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const result = value.filter((item): item is boolean => typeof item === "boolean");
+  return result.length > 0 ? result : undefined;
+};
+
+const getOptionalIdentifierArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const result = value
+    .filter((item): item is Identifier => typeof item === "string" || typeof item === "number")
+    .map((item): string => String(item).trim())
+    .filter((item): boolean => item !== "");
+
+  return result.length > 0 ? result : undefined;
+};
+
 const getSearch = (filter?: RecordShape): string | undefined => getOptionalString(filter?.search);
 
 const getSort = (parameters: GetListParams | GetManyReferenceParams): string | undefined => {
@@ -63,10 +101,7 @@ const getSort = (parameters: GetListParams | GetManyReferenceParams): string | u
 const getOrder = (parameters: GetListParams | GetManyReferenceParams): string | undefined =>
   typeof parameters.sort?.order === "string" ? parameters.sort.order.toLowerCase() : undefined;
 
-const asListQuery = (
-  parameters: GetListParams | GetManyReferenceParams,
-  extra?: Record<string, string | number | undefined>,
-): Record<string, string | number | undefined> => {
+const asListQuery = (parameters: GetListParams | GetManyReferenceParams, extra?: QueryParameters): QueryParameters => {
   const filter = asRecord(parameters.filter);
   const page = parameters.pagination?.page;
   const perPage = parameters.pagination?.perPage;
@@ -77,12 +112,30 @@ const asListQuery = (
     search: getSearch(filter),
     sort: getSort(parameters),
     order: getOrder(parameters),
+    "ids[]": getOptionalIdentifierArray(filter.ids),
     ...extra,
   };
 };
 
 const toListResult = (payload: { rows: unknown[]; total: number }): ListResult => ({
   data: payload.rows as RaRecord[],
+  total: payload.total,
+});
+
+const toGroupMembershipRecord = (item: GroupMembershipListItem): RaRecord => {
+  const id = item.actual_membership_id ?? item.effective_membership_id;
+  if (!id) {
+    throw new Error("group membership list item missing id");
+  }
+
+  return {
+    ...item,
+    id,
+  };
+};
+
+const toGroupMembershipListResult = (payload: { rows: GroupMembershipListItem[]; total: number }): ListResult => ({
+  data: payload.rows.map((item): RaRecord => toGroupMembershipRecord(item)),
   total: payload.total,
 });
 
@@ -119,7 +172,7 @@ const listHandlers: Record<ResourceName, ListHandler> = {
   "group-memberships": async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
 
-    return toListResult(
+    return toGroupMembershipListResult(
       await groupMembershipsApi.list(
         asListQuery(parameters, {
           group_id: getOptionalString(filter.group_id),
@@ -138,6 +191,8 @@ const listHandlers: Record<ResourceName, ListHandler> = {
       await machinesApi.list(
         asListQuery(parameters, {
           user_id: getOptionalString(filter.user_id),
+          "rule_sync_status[]": getOptionalStringArray(filter.rule_sync_status),
+          "client_mode[]": getOptionalStringArray(filter.client_mode),
         }),
         signal,
       ),
@@ -157,8 +212,18 @@ const listHandlers: Record<ResourceName, ListHandler> = {
     );
   },
 
-  executables: async (parameters, signal): Promise<ListResult> =>
-    toListResult(await executablesApi.list(asListQuery(parameters), signal)),
+  executables: async (parameters, signal): Promise<ListResult> => {
+    const filter = asRecord(parameters.filter);
+
+    return toListResult(
+      await executablesApi.list(
+        asListQuery(parameters, {
+          "source[]": getOptionalStringArray(filter.source),
+        }),
+        signal,
+      ),
+    );
+  },
 
   "execution-events": async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
@@ -169,6 +234,7 @@ const listHandlers: Record<ResourceName, ListHandler> = {
           machine_id: getOptionalString(filter.machine_id),
           user_id: getOptionalString(filter.user_id),
           executable_id: getOptionalString(filter.executable_id),
+          "decision[]": getOptionalStringArray(filter.decision),
         }),
         signal,
       ),
@@ -183,14 +249,26 @@ const listHandlers: Record<ResourceName, ListHandler> = {
         asListQuery(parameters, {
           machine_id: getOptionalString(filter.machine_id),
           executable_id: getOptionalString(filter.executable_id),
+          "decision[]": getOptionalStringArray(filter.decision),
         }),
         signal,
       ),
     );
   },
 
-  rules: async (parameters, signal): Promise<ListResult> =>
-    toListResult(await rulesApi.list(asListQuery(parameters), signal)),
+  rules: async (parameters, signal): Promise<ListResult> => {
+    const filter = asRecord(parameters.filter);
+
+    return toListResult(
+      await rulesApi.list(
+        asListQuery(parameters, {
+          "enabled[]": getOptionalBooleanArray(filter.enabled),
+          "rule_type[]": getOptionalStringArray(filter.rule_type),
+        }),
+        signal,
+      ),
+    );
+  },
 
   "rule-machines": async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
@@ -227,6 +305,23 @@ const getGetOneHandler = (resourceName: ResourceName): GetOneHandler => {
   }
 
   return handler;
+};
+
+const getGetManyListHandler = (resourceName: ResourceName): ListHandler | undefined => {
+  switch (resourceName) {
+    case "users":
+    case "groups":
+    case "machines":
+    case "executables":
+    case "execution-events":
+    case "file-access-events":
+    case "rules": {
+      return listHandlers[resourceName];
+    }
+    default: {
+      return undefined;
+    }
+  }
 };
 
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
@@ -317,10 +412,37 @@ export const dataProvider: DataProvider = {
     parameters: GetManyParams<RecordType>,
   ): Promise<GetManyResult<RecordType>> {
     const resourceName = assertResourceName("GetMany", resource);
-    const handler = getGetOneHandler(resourceName);
+    const listHandler = getGetManyListHandler(resourceName);
+    const requestedIds = [...new Set(parameters.ids.map(String))];
+    if (requestedIds.length === 0) {
+      return { data: [] };
+    }
 
-    const records = await Promise.all(parameters.ids.map((id): Promise<RaRecord> => handler(id, parameters.signal)));
-    return { data: records as RecordType[] };
+    if (!listHandler) {
+      const handler = getGetOneHandler(resourceName);
+      const records = await Promise.all(parameters.ids.map((id): Promise<RaRecord> => handler(id, parameters.signal)));
+      return { data: records as RecordType[] };
+    }
+
+    const result = await listHandler(
+      {
+        filter: {
+          ids: requestedIds,
+        },
+      } as GetListParams,
+      parameters.signal,
+    );
+    const recordsById = new Map<string, RaRecord>(
+      result.data.map((record): [string, RaRecord] => [String(record.id), record]),
+    );
+    const missingIds = requestedIds.filter((id): boolean => !recordsById.has(id));
+    if (missingIds.length > 0) {
+      throw new Error(`GetMany returned incomplete data for ${resourceName}: ${missingIds.join(", ")}`);
+    }
+
+    return {
+      data: parameters.ids.map((id): RecordType => recordsById.get(String(id)) as RecordType),
+    };
   },
 
   async getManyReference<RecordType extends RaRecord = RaRecord>(

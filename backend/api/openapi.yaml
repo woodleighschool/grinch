@@ -19,6 +19,8 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
+        - $ref: '#/components/parameters/ExecutableSourceFilter'
       responses:
         '200':
           description: Executable list.
@@ -57,9 +59,11 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
         - $ref: '#/components/parameters/MachineIdFilter'
         - $ref: '#/components/parameters/UserIdFilter'
         - $ref: '#/components/parameters/ExecutableIdFilter'
+        - $ref: '#/components/parameters/EventDecisionFilter'
       responses:
         '200':
           description: Execution event list.
@@ -109,8 +113,10 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
         - $ref: '#/components/parameters/MachineIdFilter'
         - $ref: '#/components/parameters/ExecutableIdFilter'
+        - $ref: '#/components/parameters/FileAccessDecisionFilter'
       responses:
         '200':
           description: File access event list.
@@ -233,6 +239,7 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
       responses:
         '200':
           description: Group list.
@@ -347,7 +354,10 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
         - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/MachineRuleSyncStatusFilter'
+        - $ref: '#/components/parameters/MachineClientModeFilter'
       responses:
         '200':
           description: Machine list.
@@ -418,6 +428,9 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
+        - $ref: '#/components/parameters/EnabledFilter'
+        - $ref: '#/components/parameters/RuleTypeFilter'
       responses:
         '200':
           description: Rule list.
@@ -511,6 +524,7 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/IdsFilter'
       responses:
         '200':
           description: User list.
@@ -585,6 +599,25 @@ components:
         enum:
           - asc
           - desc
+    IdsFilter:
+      name: ids[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          format: uuid
+    EnabledFilter:
+      name: enabled[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: boolean
     UserIdFilter:
       name: user_id
       in: query
@@ -633,11 +666,65 @@ components:
       in: query
       schema:
         $ref: '#/components/schemas/RuleTargetSubjectKind'
+    RuleTypeFilter:
+      name: rule_type[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/RuleType'
     RulePolicyFilter:
       name: policy
       in: query
       schema:
         $ref: '#/components/schemas/RulePolicy'
+    MachineRuleSyncStatusFilter:
+      name: rule_sync_status[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/MachineRuleSyncStatus'
+    MachineClientModeFilter:
+      name: client_mode[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/MachineClientMode'
+    ExecutableSourceFilter:
+      name: source[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/ExecutableSource'
+    EventDecisionFilter:
+      name: decision[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/EventDecision'
+    FileAccessDecisionFilter:
+      name: decision[]
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/FileAccessDecision'
   responses:
     Problem:
       description: Problem response.
@@ -1145,6 +1232,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         kind:
           $ref: '#/components/schemas/GroupMembershipKind'
         group:
@@ -1199,6 +1287,37 @@ components:
       enum:
         - actual
         - effective
+    GroupMembershipListItem:
+      x-go-type: domain.GroupMembershipListItem
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - kind
+        - group
+        - member
+        - created_at
+        - updated_at
+      properties:
+        actual_membership_id:
+          type: string
+          format: uuid
+          nullable: true
+        effective_membership_id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/GroupMembershipKind'
+        group:
+          $ref: '#/components/schemas/GroupMembershipGroup'
+        member:
+          $ref: '#/components/schemas/GroupMembershipMember'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     GroupMembershipListResponse:
       type: object
       required:
@@ -1211,7 +1330,7 @@ components:
         rows:
           type: array
           items:
-            $ref: '#/components/schemas/GroupMembership'
+            $ref: '#/components/schemas/GroupMembershipListItem'
     GroupMembershipMember:
       x-go-type: domain.GroupMembershipMember
       x-go-type-import:

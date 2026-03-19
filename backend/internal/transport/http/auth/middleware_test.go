@@ -63,21 +63,39 @@ func TestNewAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", response.Code)
 	}
-	assertAuthErrorBody(t, response, "unauthorized")
+	assertAuthErrorBody(t, response)
 }
 
-func assertAuthErrorBody(t *testing.T, response *httptest.ResponseRecorder, want string) {
+func assertAuthErrorBody(t *testing.T, response *httptest.ResponseRecorder) {
 	t.Helper()
 
 	if got := response.Header().Get("Content-Type"); got != "application/json" {
 		t.Fatalf("Content-Type = %q, want application/json", got)
 	}
 
-	var body map[string]string
+	var body struct {
+		Type   string `json:"type"`
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+		Code   string `json:"code"`
+	}
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
-	if body["error"] != want {
-		t.Fatalf("error body = %q, want %q", body["error"], want)
+	if body.Type != "urn:grinch:problem:unauthorized" {
+		t.Fatalf("Type = %q, want unauthorized problem type", body.Type)
+	}
+	if body.Title != "Unauthorized" {
+		t.Fatalf("Title = %q, want Unauthorized", body.Title)
+	}
+	if body.Status != http.StatusUnauthorized {
+		t.Fatalf("Status = %d, want 401", body.Status)
+	}
+	if body.Detail != "Authentication is required." {
+		t.Fatalf("Detail = %q, want authentication detail", body.Detail)
+	}
+	if body.Code != "unauthorized" {
+		t.Fatalf("Code = %q, want unauthorized", body.Code)
 	}
 }

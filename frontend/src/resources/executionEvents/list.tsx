@@ -1,8 +1,12 @@
+import { EVENT_DECISION_CHOICES } from "@/resources/executionEvents/choices";
 import { EventDecisionField } from "@/resources/shared/decisionField";
 import type { ReactElement } from "react";
-import { DataTable, DateField, List, ReferenceField, SearchInput, TextField } from "react-admin";
+import { DataTable, DateField, List, ReferenceField, SearchInput, SelectArrayInput, TextField } from "react-admin";
 
-const executionEventFilters = [<SearchInput key="search" source="search" alwaysOn />];
+const executionEventFilters = [
+  <SearchInput key="search" source="search" alwaysOn />,
+  <SelectArrayInput key="decision" source="decision" label="Decision" choices={EVENT_DECISION_CHOICES} />,
+];
 
 export const ExecutionEventList = (): ReactElement => (
   <List sort={{ field: "occurred_at", order: "DESC" }} filters={executionEventFilters}>

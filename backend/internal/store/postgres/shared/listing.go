@@ -32,6 +32,19 @@ func NullableUUID(id *uuid.UUID) any {
 	return *id
 }
 
+func Strings[T ~string](values []T) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, string(value))
+	}
+
+	return result
+}
+
 func OrderBy(sort string, order string, allowed map[string]string, fallback []string) (string, error) {
 	term := strings.TrimSpace(sort)
 	if term == "" {

@@ -7,23 +7,20 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-type groupWriteRequest struct {
-	description *string
-	name        *string
-}
-
 type groupWriteRequestBody struct {
-	ID          *string `json:"id,omitempty"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
-	Source      *string `json:"source,omitempty"`
-	MemberCount *int32  `json:"member_count,omitempty"`
-	CreatedAt   *string `json:"created_at,omitempty"`
-	UpdatedAt   *string `json:"updated_at,omitempty"`
 }
 
 func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Request, params ListGroupsParams) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -51,7 +48,7 @@ func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	input, inputErr := decodeGroupWriteRequest(body)
+	name, description, inputErr := decodeGroupWriteRequest(body)
 	if inputErr != nil {
 		// Groups write straight to the store, so this transport check owns the
 		// minimal required-field validation for the request body shape.
@@ -67,7 +64,7 @@ func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	group, err := handler.admin.CreateLocalGroup(request.Context(), *input.name, optionalStringValue(input.description))
+	group, err := handler.admin.CreateLocalGroup(request.Context(), name, description)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -94,7 +91,7 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
-	input, inputErr := decodeGroupWriteRequest(body)
+	name, description, inputErr := decodeGroupWriteRequest(body)
 	if inputErr != nil {
 		writeClassifiedError(writer, &domain.ValidationError{
 			Code:   "validation_error",
@@ -111,8 +108,8 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 	updated, err := handler.admin.UpdateGroup(
 		request.Context(),
 		id,
-		*input.name,
-		optionalStringValue(input.description),
+		name,
+		description,
 	)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group not found"})
@@ -132,15 +129,11 @@ func (handler *Server) DeleteGroup(writer http.ResponseWriter, request *http.Req
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func decodeGroupWriteRequest(body groupWriteRequestBody) (groupWriteRequest, error) {
+func decodeGroupWriteRequest(body groupWriteRequestBody) (string, string, error) {
 	name := strings.TrimSpace(body.Name)
 	if name == "" {
-		return groupWriteRequest{}, badRequestError("name is required")
+		return "", "", badRequestError("name is required")
 	}
 
-	description := optionalStringValue(body.Description)
-	return groupWriteRequest{
-		description: &description,
-		name:        &name,
-	}, nil
+	return name, optionalString(body.Description), nil
 }

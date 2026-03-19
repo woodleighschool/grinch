@@ -48,13 +48,7 @@ type MachineSyncState struct {
 	LastRuleSyncSuccessAt   *time.Time
 }
 
-type StoredRuleTarget struct {
-	domain.MachineRuleTarget
-
-	RuleID      *uuid.UUID
-	RuleName    string
-	PayloadHash string
-}
+type StoredRuleTarget = domain.StoredRuleTarget
 
 type SyncRule struct {
 	StoredRuleTarget
@@ -110,7 +104,6 @@ type DataStore interface {
 		[]*syncv1.FileAccessEvent,
 		map[domain.EventDecision]struct{},
 	) (int, error)
-	DeleteEventsBefore(context.Context, time.Time) (int64, error)
 }
 
 type RuleResolver interface {

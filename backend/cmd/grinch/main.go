@@ -25,6 +25,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/postgres"
 	adminpostgres "github.com/woodleighschool/grinch/internal/store/postgres/admin"
 	entrasyncpostgres "github.com/woodleighschool/grinch/internal/store/postgres/entrasync"
+	eventspostgres "github.com/woodleighschool/grinch/internal/store/postgres/events"
 	groupmembershipspostgres "github.com/woodleighschool/grinch/internal/store/postgres/groupmemberships"
 	rulespostgres "github.com/woodleighschool/grinch/internal/store/postgres/rules"
 	santapostgres "github.com/woodleighschool/grinch/internal/store/postgres/santa"
@@ -67,18 +68,17 @@ func run() error {
 	}
 	defer store.Close()
 
-	eventService, server, err := buildServer(logger, cfg, store)
+	stopContext, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	server, err := buildServer(stopContext, logger, cfg, store)
 	if err != nil {
 		return err
 	}
 
-	stopContext, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
 	if syncErr := maybeStartEntraSync(stopContext, logger, cfg, store); syncErr != nil {
 		return syncErr
 	}
-	maybeStartEventRetention(stopContext, eventService)
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -116,10 +116,11 @@ func run() error {
 }
 
 func buildServer(
+	ctx context.Context,
 	logger *slog.Logger,
 	cfg config.Config,
 	store *postgres.Store,
-) (*appevents.Service, *http.Server, error) {
+) (*http.Server, error) {
 	adminStore := adminpostgres.New(store)
 	ruleService := apprules.New(rulespostgres.New(store))
 	groupMembershipService := appgroupmemberships.New(groupmembershipspostgres.New(store))
@@ -130,7 +131,7 @@ func buildServer(
 		cfg.Events,
 		ruleService,
 	)
-	eventService := appevents.New(logger, santaStore, cfg.Events.RetentionDays)
+	eventService := appevents.New(logger, eventspostgres.New(store), cfg.Events.RetentionDays)
 	syncHandler := synchttp.New(
 		syncService,
 		cfg.Sync.SharedSecret,
@@ -144,7 +145,7 @@ func buildServer(
 		LocalAdminPassword: cfg.Auth.LocalAdminPass,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("configure auth: %w", err)
+		return nil, fmt.Errorf("configure auth: %w", err)
 	}
 
 	apiAuthMiddleware := authhttp.NewAPIMiddleware(
@@ -158,7 +159,10 @@ func buildServer(
 			store.Ping,
 			syncHandler.RegisterRoutes,
 			authService.RegisterRoutes,
-			newAPIRouteRegistrar(apiAuthMiddleware, apiHandler),
+			func(router chi.Router) {
+				router.Use(apiAuthMiddleware)
+				apiHandler.RegisterRoutes(router)
+			},
 			frontendDistDir,
 		),
 		ReadHeaderTimeout: readHeaderTimeout,
@@ -166,7 +170,9 @@ func buildServer(
 		Addr:              cfg.HTTP.Addr(),
 	}
 
-	return eventService, server, nil
+	go eventService.RunRetention(ctx, retentionInterval)
+
+	return server, nil
 }
 
 func maybeStartEntraSync(
@@ -197,15 +203,4 @@ func maybeStartEntraSync(
 
 	go entraSyncService.Run(ctx)
 	return nil
-}
-
-func newAPIRouteRegistrar(middleware func(http.Handler) http.Handler, handler *httpapi.Server) func(chi.Router) {
-	return func(router chi.Router) {
-		router.Use(middleware)
-		handler.RegisterRoutes(router)
-	}
-}
-
-func maybeStartEventRetention(ctx context.Context, eventService *appevents.Service) {
-	go eventService.RunRetention(ctx, retentionInterval)
 }

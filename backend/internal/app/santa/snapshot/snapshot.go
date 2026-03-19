@@ -9,9 +9,7 @@ package snapshot
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -23,6 +21,7 @@ import (
 	"github.com/zeebo/xxh3"
 
 	"github.com/woodleighschool/grinch/internal/app/santa/model"
+	"github.com/woodleighschool/grinch/internal/app/santa/protocol"
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
@@ -107,7 +106,7 @@ func PendingSnapshotForMachine(
 
 	return PendingSnapshot{
 		FullSync:          state.PendingFullSync,
-		Targets:           cloneTargets(state.PendingTargets),
+		Targets:           slices.Clone(state.PendingTargets),
 		Payload:           payload,
 		ExpectedRulesHash: state.ExpectedRulesHash,
 		PayloadRuleCount:  state.PendingPayloadRuleCount,
@@ -138,7 +137,7 @@ func buildPendingSnapshot(
 	preparedAt time.Time,
 	machineID uuid.UUID,
 ) (PendingSnapshot, model.PendingSnapshotWrite) {
-	applied := cloneTargets(state.AppliedTargets)
+	applied := slices.Clone(state.AppliedTargets)
 	payload := diffSnapshot(current, applied)
 	expectedRulesHash := SantaRulesHash(current)
 	clientRulesHash := strings.TrimSpace(request.GetRulesHash())
@@ -147,10 +146,10 @@ func buildPendingSnapshot(
 		payload = fullSyncRules(current)
 	}
 
-	payloadRuleCount := countSyncRules(payload)
+	payloadRuleCount := int64(len(payload))
 	snapshot := PendingSnapshot{
 		FullSync:          fullSync,
-		Targets:           cloneTargets(current),
+		Targets:           slices.Clone(current),
 		Payload:           payload,
 		ExpectedRulesHash: expectedRulesHash,
 		PayloadRuleCount:  payloadRuleCount,
@@ -160,19 +159,19 @@ func buildPendingSnapshot(
 		MachineID:               machineID,
 		RulesHash:               state.RulesHash,
 		AppliedTargets:          applied,
-		PendingTargets:          cloneTargets(current),
+		PendingTargets:          slices.Clone(current),
 		ExpectedRulesHash:       expectedRulesHash,
 		PendingPayloadRuleCount: payloadRuleCount,
 		PendingFullSync:         fullSync,
 		PendingPreflightAt:      preparedAt,
-		ClientMode:              machineClientModeFromProto(request.GetClientMode()),
-		BinaryRuleCount:         int32(request.GetBinaryRuleCount()),
-		CertificateRuleCount:    int32(request.GetCertificateRuleCount()),
-		CompilerRuleCount:       int32(request.GetCompilerRuleCount()),
-		TransitiveRuleCount:     int32(request.GetTransitiveRuleCount()),
-		TeamIDRuleCount:         int32(request.GetTeamidRuleCount()),
-		SigningIDRuleCount:      int32(request.GetSigningidRuleCount()),
-		CDHashRuleCount:         int32(request.GetCdhashRuleCount()),
+		ClientMode:              protocol.MapClientMode(request.GetClientMode()),
+		BinaryRuleCount:         protocol.SafeCount(request.GetBinaryRuleCount()),
+		CertificateRuleCount:    protocol.SafeCount(request.GetCertificateRuleCount()),
+		CompilerRuleCount:       protocol.SafeCount(request.GetCompilerRuleCount()),
+		TransitiveRuleCount:     protocol.SafeCount(request.GetTransitiveRuleCount()),
+		TeamIDRuleCount:         protocol.SafeCount(request.GetTeamidRuleCount()),
+		SigningIDRuleCount:      protocol.SafeCount(request.GetSigningidRuleCount()),
+		CDHashRuleCount:         protocol.SafeCount(request.GetCdhashRuleCount()),
 		RulesReceived:           state.RulesReceived,
 		RulesProcessed:          state.RulesProcessed,
 		LastRuleSyncAttemptAt:   state.LastRuleSyncAttemptAt,
@@ -183,13 +182,13 @@ func buildPendingSnapshot(
 func diffSnapshot(current []model.StoredRuleTarget, applied []model.StoredRuleTarget) []model.SyncRule {
 	appliedByKey := make(map[string]model.StoredRuleTarget, len(applied))
 	for _, target := range applied {
-		appliedByKey[ruleTargetKey(target.MachineRuleTarget)] = target
+		appliedByKey[domain.MachineRuleTargetKey(target.MachineRuleTarget)] = target
 	}
 
 	payload := make([]model.SyncRule, 0, len(current)+len(applied))
 	currentKeys := make(map[string]struct{}, len(current))
 	for _, target := range current {
-		key := ruleTargetKey(target.MachineRuleTarget)
+		key := domain.MachineRuleTargetKey(target.MachineRuleTarget)
 		currentKeys[key] = struct{}{}
 
 		appliedTarget, exists := appliedByKey[key]
@@ -199,7 +198,7 @@ func diffSnapshot(current []model.StoredRuleTarget, applied []model.StoredRuleTa
 	}
 
 	for _, target := range applied {
-		if _, exists := currentKeys[ruleTargetKey(target.MachineRuleTarget)]; !exists {
+		if _, exists := currentKeys[domain.MachineRuleTargetKey(target.MachineRuleTarget)]; !exists {
 			payload = append(payload, model.SyncRule{
 				StoredRuleTarget: target,
 				Removed:          true,
@@ -227,72 +226,11 @@ func withRulePayloadHashes(targets []domain.MachineResolvedRule) []model.StoredR
 			MachineRuleTarget: target.MachineRuleTarget,
 			RuleID:            &ruleID,
 			RuleName:          target.Name,
-			PayloadHash:       ruleTargetPayloadHash(target.MachineRuleTarget),
+			PayloadHash:       domain.MachineRuleTargetPayloadHash(target.MachineRuleTarget),
 		})
 	}
 
 	return result
-}
-
-func cloneTargets(targets []model.StoredRuleTarget) []model.StoredRuleTarget {
-	if len(targets) == 0 {
-		return nil
-	}
-
-	cloned := make([]model.StoredRuleTarget, 0, len(targets))
-	cloned = append(cloned, targets...)
-	return cloned
-}
-
-func countSyncRules(rules []model.SyncRule) int64 {
-	var count int64
-	for range rules {
-		count++
-	}
-
-	return count
-}
-
-func machineClientModeFromProto(value syncv1.ClientMode) domain.MachineClientMode {
-	switch value {
-	case syncv1.ClientMode_MONITOR:
-		return domain.MachineClientModeMonitor
-	case syncv1.ClientMode_LOCKDOWN:
-		return domain.MachineClientModeLockdown
-	case syncv1.ClientMode_STANDALONE:
-		return domain.MachineClientModeStandalone
-	default:
-		return domain.MachineClientModeUnknown
-	}
-}
-
-func ruleTargetKey(target domain.MachineRuleTarget) string {
-	return string(target.RuleType) + "|" + target.IdentifierKey
-}
-
-func RuleTargetKey(target domain.MachineRuleTarget) string {
-	return ruleTargetKey(target)
-}
-
-func ruleTargetPayloadHash(target domain.MachineRuleTarget) string {
-	return stableHash(
-		string(target.RuleType),
-		target.IdentifierKey,
-		target.Identifier,
-		string(target.Policy),
-		target.CustomMessage,
-		target.CustomURL,
-		target.CELExpression,
-	)
-}
-
-func RuleTargetPayloadHash(target domain.MachineRuleTarget) string {
-	return ruleTargetPayloadHash(target)
-}
-
-func stableHash(parts ...string) string {
-	sum := sha256.Sum256([]byte(strings.Join(parts, "\x1f")))
-	return hex.EncodeToString(sum[:])
 }
 
 // SantaRulesHash mirrors Santa's dynamic execution-rule hash:
@@ -303,7 +241,7 @@ func SantaRulesHash(targets []model.StoredRuleTarget) string {
 		return ""
 	}
 
-	sortedTargets := cloneTargets(targets)
+	sortedTargets := slices.Clone(targets)
 	slices.SortFunc(sortedTargets, func(left model.StoredRuleTarget, right model.StoredRuleTarget) int {
 		if left.IdentifierKey != right.IdentifierKey {
 			return strings.Compare(left.IdentifierKey, right.IdentifierKey)

@@ -11,7 +11,20 @@ func (handler *Server) ListFileAccessEvents(
 	request *http.Request,
 	params ListFileAccessEventsParams,
 ) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	decisions, err := parseOptionalValues(params.Decision, domain.ParseFileAccessDecision)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -21,6 +34,7 @@ func (handler *Server) ListFileAccessEvents(
 		ListOptions:  listOptions,
 		MachineID:    params.MachineId,
 		ExecutableID: params.ExecutableId,
+		Decisions:    decisions,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})

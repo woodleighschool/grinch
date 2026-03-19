@@ -8,7 +8,6 @@ import (
 )
 
 type ruleWriteRequestBody struct {
-	ID            *string            `json:"id,omitempty"`
 	Name          string             `json:"name"`
 	Description   *string            `json:"description,omitempty"`
 	RuleType      domain.RuleType    `json:"rule_type"`
@@ -17,18 +16,33 @@ type ruleWriteRequestBody struct {
 	CustomURL     *string            `json:"custom_url,omitempty"`
 	Enabled       *bool              `json:"enabled,omitempty"`
 	Targets       domain.RuleTargets `json:"targets"`
-	CreatedAt     *string            `json:"created_at,omitempty"`
-	UpdatedAt     *string            `json:"updated_at,omitempty"`
 }
 
 func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Request, params ListRulesParams) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
-	items, total, err := handler.rules.ListRules(request.Context(), domain.RuleListOptions{ListOptions: listOptions})
+	ruleTypes, err := parseOptionalValues(params.RuleType, domain.ParseRuleType)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	items, total, err := handler.rules.ListRules(request.Context(), domain.RuleListOptions{
+		ListOptions: listOptions,
+		Enabled:     optionalBools(params.Enabled),
+		RuleTypes:   ruleTypes,
+	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -104,9 +118,9 @@ func decodeRuleWriteRequest(body ruleWriteRequestBody) rules.WriteInput {
 	}
 
 	return rules.WriteInput{
-		CustomMessage: optionalStringValue(body.CustomMessage),
-		CustomURL:     optionalStringValue(body.CustomURL),
-		Description:   optionalStringValue(body.Description),
+		CustomMessage: optionalString(body.CustomMessage),
+		CustomURL:     optionalString(body.CustomURL),
+		Description:   optionalString(body.Description),
 		Enabled:       enabled,
 		Identifier:    body.Identifier,
 		Name:          body.Name,

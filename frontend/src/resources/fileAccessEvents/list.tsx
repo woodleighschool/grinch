@@ -1,8 +1,12 @@
+import { FILE_ACCESS_DECISION_CHOICES } from "@/resources/fileAccessEvents/choices";
 import { FileAccessDecisionField } from "@/resources/shared/decisionField";
 import type { ReactElement } from "react";
-import { DataTable, DateField, List, ReferenceField, SearchInput, TextField } from "react-admin";
+import { DataTable, DateField, List, ReferenceField, SearchInput, SelectArrayInput, TextField } from "react-admin";
 
-const fileAccessEventFilters = [<SearchInput key="search" source="search" alwaysOn />];
+const fileAccessEventFilters = [
+  <SearchInput key="search" source="search" alwaysOn />,
+  <SelectArrayInput key="decision" source="decision" label="Decision" choices={FILE_ACCESS_DECISION_CHOICES} />,
+];
 
 export const FileAccessEventList = (): ReactElement => (
   <List sort={{ field: "created_at", order: "DESC" }} filters={fileAccessEventFilters}>

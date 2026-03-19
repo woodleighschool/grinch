@@ -18,7 +18,7 @@ type Store interface {
 	ListGroupMemberships(
 		context.Context,
 		domain.GroupMembershipListOptions,
-	) ([]domain.GroupMembership, int32, error)
+	) ([]domain.GroupMembershipListItem, int32, error)
 	GetGroupMembership(context.Context, uuid.UUID) (domain.GroupMembership, error)
 	CreateGroupMembership(
 		context.Context,
@@ -42,7 +42,7 @@ func New(store Store) *Service {
 func (service *Service) ListGroupMemberships(
 	ctx context.Context,
 	options domain.GroupMembershipListOptions,
-) ([]domain.GroupMembership, int32, error) {
+) ([]domain.GroupMembershipListItem, int32, error) {
 	return service.store.ListGroupMemberships(ctx, options)
 }
 

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,6 +29,17 @@ func (store *Store) ListUsers(
 		return nil, 0, err
 	}
 
+	whereClauses := []string{
+		"($1 = '' OR u.display_name ILIKE $1 OR u.upn ILIKE $1 OR u.source ILIKE $1)",
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("u.id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
+
 	query := fmt.Sprintf(`
 SELECT
   u.id,
@@ -38,14 +50,15 @@ SELECT
   u.updated_at,
   COUNT(*) OVER()::INT4 AS total
 FROM users AS u
-WHERE ($1 = '' OR u.display_name ILIKE $1 OR u.upn ILIKE $1 OR u.source ILIKE $1)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($2::INT, 0)
-OFFSET $3
-`, orderBy)
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
 
-	rows, err := store.store.Pool().
-		Query(ctx, query, pgutil.SearchPattern(options.Search), options.Limit, options.Offset)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, err := store.store.Pool().Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -78,11 +91,11 @@ OFFSET $3
 }
 
 func (store *Store) GetUser(ctx context.Context, id uuid.UUID) (domain.User, error) {
-	return pgutil.GetUser(ctx, store.queries, id)
+	return pgutil.GetUser(ctx, store.store.Queries(), id)
 }
 
 func mapUser(row db.User) (domain.User, error) {
-	source, err := pgutil.ToSource(row.Source)
+	source, err := domain.ParsePrincipalSource(row.Source)
 	if err != nil {
 		return domain.User{}, err
 	}

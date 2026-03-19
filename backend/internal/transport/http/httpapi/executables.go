@@ -11,7 +11,20 @@ func (handler *Server) ListExecutables(
 	request *http.Request,
 	params ListExecutablesParams,
 ) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	sources, err := parseOptionalValues(params.Source, domain.ParseExecutableSource)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -19,6 +32,7 @@ func (handler *Server) ListExecutables(
 
 	items, total, err := handler.admin.ListExecutables(request.Context(), domain.ExecutableListOptions{
 		ListOptions: listOptions,
+		Sources:     sources,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})

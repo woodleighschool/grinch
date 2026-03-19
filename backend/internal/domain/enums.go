@@ -43,6 +43,17 @@ func ParsePrincipalSource(value string) (PrincipalSource, error) {
 	}
 }
 
+func ParseExecutableSource(value string) (ExecutableSource, error) {
+	switch ExecutableSource(value) {
+	case ExecutableSourceEvent:
+		return ExecutableSourceEvent, nil
+	case ExecutableSourceProcess:
+		return ExecutableSourceProcess, nil
+	default:
+		return "", fmt.Errorf("unsupported executable source %q", value)
+	}
+}
+
 func ParseMemberKind(value string) (MemberKind, error) {
 	switch MemberKind(value) {
 	case MemberKindUser:
@@ -107,6 +118,34 @@ func ParseRuleTargetSubjectKind(value string) (RuleTargetSubjectKind, error) {
 		return RuleTargetSubjectKindAllUsers, nil
 	default:
 		return "", fmt.Errorf("unsupported rule target subject kind %q", value)
+	}
+}
+
+func ParseMachineRuleSyncStatus(value string) (MachineRuleSyncStatus, error) {
+	switch MachineRuleSyncStatus(value) {
+	case MachineRuleSyncStatusSynced:
+		return MachineRuleSyncStatusSynced, nil
+	case MachineRuleSyncStatusPending:
+		return MachineRuleSyncStatusPending, nil
+	case MachineRuleSyncStatusIssue:
+		return MachineRuleSyncStatusIssue, nil
+	default:
+		return "", fmt.Errorf("unsupported machine rule sync status %q", value)
+	}
+}
+
+func ParseMachineClientMode(value string) (MachineClientMode, error) {
+	switch MachineClientMode(value) {
+	case MachineClientModeUnknown:
+		return MachineClientModeUnknown, nil
+	case MachineClientModeMonitor:
+		return MachineClientModeMonitor, nil
+	case MachineClientModeLockdown:
+		return MachineClientModeLockdown, nil
+	case MachineClientModeStandalone:
+		return MachineClientModeStandalone, nil
+	default:
+		return "", fmt.Errorf("unsupported machine client mode %q", value)
 	}
 }
 

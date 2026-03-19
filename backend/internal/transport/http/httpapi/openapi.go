@@ -305,10 +305,13 @@ type GroupMembershipGroup = domain.GroupMembershipGroup
 // GroupMembershipKind defines model for GroupMembershipKind.
 type GroupMembershipKind = domain.GroupMembershipKind
 
+// GroupMembershipListItem defines model for GroupMembershipListItem.
+type GroupMembershipListItem = domain.GroupMembershipListItem
+
 // GroupMembershipListResponse defines model for GroupMembershipListResponse.
 type GroupMembershipListResponse struct {
-	Rows  []GroupMembership `json:"rows"`
-	Total int32             `json:"total"`
+	Rows  []GroupMembershipListItem `json:"rows"`
+	Total int32                     `json:"total"`
 }
 
 // GroupMembershipMember defines model for GroupMembershipMember.
@@ -422,8 +425,20 @@ type UserListResponse struct {
 	Total int32  `json:"total"`
 }
 
+// EnabledFilter defines model for EnabledFilter.
+type EnabledFilter = []bool
+
+// EventDecisionFilter defines model for EventDecisionFilter.
+type EventDecisionFilter = []EventDecision
+
 // ExecutableIdFilter defines model for ExecutableIdFilter.
 type ExecutableIdFilter = openapi_types.UUID
+
+// ExecutableSourceFilter defines model for ExecutableSourceFilter.
+type ExecutableSourceFilter = []ExecutableSource
+
+// FileAccessDecisionFilter defines model for FileAccessDecisionFilter.
+type FileAccessDecisionFilter = []FileAccessDecision
 
 // GroupIdFilter defines model for GroupIdFilter.
 type GroupIdFilter = openapi_types.UUID
@@ -434,11 +449,20 @@ type GroupMembershipId = openapi_types.UUID
 // Id defines model for Id.
 type Id = openapi_types.UUID
 
+// IdsFilter defines model for IdsFilter.
+type IdsFilter = []openapi_types.UUID
+
 // Limit defines model for Limit.
 type Limit = int32
 
+// MachineClientModeFilter defines model for MachineClientModeFilter.
+type MachineClientModeFilter = []MachineClientMode
+
 // MachineIdFilter defines model for MachineIdFilter.
 type MachineIdFilter = openapi_types.UUID
+
+// MachineRuleSyncStatusFilter defines model for MachineRuleSyncStatusFilter.
+type MachineRuleSyncStatusFilter = []MachineRuleSyncStatus
 
 // Offset defines model for Offset.
 type Offset = int32
@@ -451,6 +475,9 @@ type RuleIdFilter = openapi_types.UUID
 
 // RulePolicyFilter defines model for RulePolicyFilter.
 type RulePolicyFilter = RulePolicy
+
+// RuleTypeFilter defines model for RuleTypeFilter.
+type RuleTypeFilter = []RuleType
 
 // Search defines model for Search.
 type Search = string
@@ -477,8 +504,10 @@ type ListExecutablesParams struct {
 	Search *Search `form:"search,omitempty" json:"search,omitempty"`
 
 	// Sort Sort field name.
-	Sort  *Sort                       `form:"sort,omitempty" json:"sort,omitempty"`
-	Order *ListExecutablesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Sort   *Sort                       `form:"sort,omitempty" json:"sort,omitempty"`
+	Order  *ListExecutablesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids    *IdsFilter                  `form:"ids[],omitempty" json:"ids[],omitempty"`
+	Source *ExecutableSourceFilter     `form:"source[],omitempty" json:"source[],omitempty"`
 }
 
 // ListExecutablesParamsOrder defines parameters for ListExecutables.
@@ -493,9 +522,11 @@ type ListExecutionEventsParams struct {
 	// Sort Sort field name.
 	Sort         *Sort                           `form:"sort,omitempty" json:"sort,omitempty"`
 	Order        *ListExecutionEventsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids          *IdsFilter                      `form:"ids[],omitempty" json:"ids[],omitempty"`
 	MachineId    *MachineIdFilter                `form:"machine_id,omitempty" json:"machine_id,omitempty"`
 	UserId       *UserIdFilter                   `form:"user_id,omitempty" json:"user_id,omitempty"`
 	ExecutableId *ExecutableIdFilter             `form:"executable_id,omitempty" json:"executable_id,omitempty"`
+	Decision     *EventDecisionFilter            `form:"decision[],omitempty" json:"decision[],omitempty"`
 }
 
 // ListExecutionEventsParamsOrder defines parameters for ListExecutionEvents.
@@ -510,8 +541,10 @@ type ListFileAccessEventsParams struct {
 	// Sort Sort field name.
 	Sort         *Sort                            `form:"sort,omitempty" json:"sort,omitempty"`
 	Order        *ListFileAccessEventsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids          *IdsFilter                       `form:"ids[],omitempty" json:"ids[],omitempty"`
 	MachineId    *MachineIdFilter                 `form:"machine_id,omitempty" json:"machine_id,omitempty"`
 	ExecutableId *ExecutableIdFilter              `form:"executable_id,omitempty" json:"executable_id,omitempty"`
+	Decision     *FileAccessDecisionFilter        `form:"decision[],omitempty" json:"decision[],omitempty"`
 }
 
 // ListFileAccessEventsParamsOrder defines parameters for ListFileAccessEvents.
@@ -543,6 +576,7 @@ type ListGroupsParams struct {
 	// Sort Sort field name.
 	Sort  *Sort                  `form:"sort,omitempty" json:"sort,omitempty"`
 	Order *ListGroupsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids   *IdsFilter             `form:"ids[],omitempty" json:"ids[],omitempty"`
 }
 
 // ListGroupsParamsOrder defines parameters for ListGroups.
@@ -570,9 +604,12 @@ type ListMachinesParams struct {
 	Search *Search `form:"search,omitempty" json:"search,omitempty"`
 
 	// Sort Sort field name.
-	Sort   *Sort                    `form:"sort,omitempty" json:"sort,omitempty"`
-	Order  *ListMachinesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	UserId *UserIdFilter            `form:"user_id,omitempty" json:"user_id,omitempty"`
+	Sort           *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
+	Order          *ListMachinesParamsOrder     `form:"order,omitempty" json:"order,omitempty"`
+	Ids            *IdsFilter                   `form:"ids[],omitempty" json:"ids[],omitempty"`
+	UserId         *UserIdFilter                `form:"user_id,omitempty" json:"user_id,omitempty"`
+	RuleSyncStatus *MachineRuleSyncStatusFilter `form:"rule_sync_status[],omitempty" json:"rule_sync_status[],omitempty"`
+	ClientMode     *MachineClientModeFilter     `form:"client_mode[],omitempty" json:"client_mode[],omitempty"`
 }
 
 // ListMachinesParamsOrder defines parameters for ListMachines.
@@ -600,8 +637,11 @@ type ListRulesParams struct {
 	Search *Search `form:"search,omitempty" json:"search,omitempty"`
 
 	// Sort Sort field name.
-	Sort  *Sort                 `form:"sort,omitempty" json:"sort,omitempty"`
-	Order *ListRulesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Sort     *Sort                 `form:"sort,omitempty" json:"sort,omitempty"`
+	Order    *ListRulesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids      *IdsFilter            `form:"ids[],omitempty" json:"ids[],omitempty"`
+	Enabled  *EnabledFilter        `form:"enabled[],omitempty" json:"enabled[],omitempty"`
+	RuleType *RuleTypeFilter       `form:"rule_type[],omitempty" json:"rule_type[],omitempty"`
 }
 
 // ListRulesParamsOrder defines parameters for ListRules.
@@ -616,6 +656,7 @@ type ListUsersParams struct {
 	// Sort Sort field name.
 	Sort  *Sort                 `form:"sort,omitempty" json:"sort,omitempty"`
 	Order *ListUsersParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Ids   *IdsFilter            `form:"ids[],omitempty" json:"ids[],omitempty"`
 }
 
 // ListUsersParamsOrder defines parameters for ListUsers.
@@ -939,6 +980,22 @@ func (siw *ServerInterfaceWrapper) ListExecutables(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "source[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source[]", r.URL.Query(), &params.Source, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source[]", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListExecutables(w, r, params)
 	}))
@@ -1035,6 +1092,14 @@ func (siw *ServerInterfaceWrapper) ListExecutionEvents(w http.ResponseWriter, r 
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "machine_id" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
@@ -1056,6 +1121,14 @@ func (siw *ServerInterfaceWrapper) ListExecutionEvents(w http.ResponseWriter, r 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "executable_id", r.URL.Query(), &params.ExecutableId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "executable_id", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "decision[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "decision[]", r.URL.Query(), &params.Decision, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "decision[]", Err: err})
 		return
 	}
 
@@ -1186,6 +1259,14 @@ func (siw *ServerInterfaceWrapper) ListFileAccessEvents(w http.ResponseWriter, r
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "machine_id" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
@@ -1199,6 +1280,14 @@ func (siw *ServerInterfaceWrapper) ListFileAccessEvents(w http.ResponseWriter, r
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "executable_id", r.URL.Query(), &params.ExecutableId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "executable_id", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "decision[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "decision[]", r.URL.Query(), &params.Decision, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "decision[]", Err: err})
 		return
 	}
 
@@ -1500,6 +1589,14 @@ func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListGroups(w, r, params)
 	}))
@@ -1751,11 +1848,35 @@ func (siw *ServerInterfaceWrapper) ListMachines(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "user_id" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "rule_sync_status[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rule_sync_status[]", r.URL.Query(), &params.RuleSyncStatus, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_sync_status[]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "client_mode[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "client_mode[]", r.URL.Query(), &params.ClientMode, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "client_mode[]", Err: err})
 		return
 	}
 
@@ -1959,6 +2080,30 @@ func (siw *ServerInterfaceWrapper) ListRules(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "enabled[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "enabled[]", r.URL.Query(), &params.Enabled, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enabled[]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "rule_type[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rule_type[]", r.URL.Query(), &params.RuleType, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_type[]", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListRules(w, r, params)
 	}))
@@ -2134,6 +2279,14 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "ids[]" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ids[]", r.URL.Query(), &params.Ids, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ids[]", Err: err})
 		return
 	}
 

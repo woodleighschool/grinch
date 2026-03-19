@@ -10,19 +10,19 @@ import (
 func (handler *Handler) ruleDownload(writer http.ResponseWriter, request *http.Request) {
 	message := &syncv1.RuleDownloadRequest{}
 	if err := handler.decodeRequest(request, message); err != nil {
-		handler.fail(writer, err, http.StatusBadRequest)
+		handler.fail(writer, err)
 		return
 	}
 
 	machineID, err := parseMachineID(chi.URLParam(request, "machine_id"))
 	if err != nil {
-		handler.fail(writer, err, http.StatusBadRequest)
+		handler.fail(writer, err)
 		return
 	}
 
 	response, err := handler.service.HandleRuleDownload(request.Context(), machineID, message)
 	if err != nil {
-		handler.fail(writer, err, http.StatusInternalServerError)
+		handler.fail(writer, err)
 		return
 	}
 	handler.writeResponse(writer, response)

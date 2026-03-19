@@ -11,7 +11,20 @@ func (handler *Server) ListExecutionEvents(
 	request *http.Request,
 	params ListExecutionEventsParams,
 ) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	decisions, err := parseOptionalValues(params.Decision, domain.ParseEventDecision)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
@@ -22,6 +35,7 @@ func (handler *Server) ListExecutionEvents(
 		MachineID:    params.MachineId,
 		UserID:       params.UserId,
 		ExecutableID: params.ExecutableId,
+		Decisions:    decisions,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})

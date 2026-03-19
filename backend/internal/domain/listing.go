@@ -3,6 +3,7 @@ package domain
 import "github.com/google/uuid"
 
 type ListOptions struct {
+	IDs    []uuid.UUID
 	Limit  int32
 	Offset int32
 	Search string
@@ -29,7 +30,9 @@ type GroupMembershipListOptions struct {
 type MachineListOptions struct {
 	ListOptions
 
-	UserID *uuid.UUID
+	UserID           *uuid.UUID
+	RuleSyncStatuses []MachineRuleSyncStatus
+	ClientModes      []MachineClientMode
 }
 
 type MachineRuleListOptions struct {
@@ -46,6 +49,8 @@ type RuleMachineListOptions struct {
 
 type ExecutableListOptions struct {
 	ListOptions
+
+	Sources []ExecutableSource
 }
 
 type ExecutionEventListOptions struct {
@@ -54,6 +59,7 @@ type ExecutionEventListOptions struct {
 	MachineID    *uuid.UUID
 	UserID       *uuid.UUID
 	ExecutableID *uuid.UUID
+	Decisions    []EventDecision
 }
 
 type FileAccessEventListOptions struct {
@@ -61,10 +67,14 @@ type FileAccessEventListOptions struct {
 
 	MachineID    *uuid.UUID
 	ExecutableID *uuid.UUID
+	Decisions    []FileAccessDecision
 }
 
 type RuleListOptions struct {
 	ListOptions
+
+	Enabled   []bool
+	RuleTypes []RuleType
 }
 
 type RuleTargetListOptions struct {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -71,7 +70,7 @@ type GroupMembershipService interface {
 	ListGroupMemberships(
 		context.Context,
 		domain.GroupMembershipListOptions,
-	) ([]domain.GroupMembership, int32, error)
+	) ([]domain.GroupMembershipListItem, int32, error)
 	GetGroupMembership(context.Context, uuid.UUID) (domain.GroupMembership, error)
 	CreateGroupMembership(context.Context, appgroupmemberships.CreateInput) (domain.GroupMembership, error)
 	DeleteGroupMembership(context.Context, uuid.UUID) error
@@ -131,19 +130,13 @@ func optionalString[T ~string](value *T) string {
 	return string(*value)
 }
 
-func optionalStringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 func parseListOptions[T ~string, O ~string](
 	limit *int32,
 	offset *int32,
 	search *T,
 	sort *Sort,
 	order *O,
+	ids *IdsFilter,
 ) (domain.ListOptions, error) {
 	resolvedLimit, resolvedOffset, err := parsePagination(limit, offset)
 	if err != nil {
@@ -151,6 +144,7 @@ func parseListOptions[T ~string, O ~string](
 	}
 
 	return domain.ListOptions{
+		IDs:    optionalUUIDs(ids),
 		Limit:  resolvedLimit,
 		Offset: resolvedOffset,
 		Search: optionalString(search),
@@ -159,9 +153,46 @@ func parseListOptions[T ~string, O ~string](
 	}, nil
 }
 
+func optionalUUIDs(values *IdsFilter) []uuid.UUID {
+	if values == nil {
+		return nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(*values))
+	ids = append(ids, *values...)
+
+	return ids
+}
+
+func optionalBools(values *EnabledFilter) []bool {
+	if values == nil {
+		return nil
+	}
+
+	result := make([]bool, 0, len(*values))
+	result = append(result, (*values)...)
+	return result
+}
+
+func parseOptionalValues[T any, V ~string](values *[]V, parse func(string) (T, error)) ([]T, error) {
+	if values == nil {
+		return nil, nil
+	}
+
+	result := make([]T, 0, len(*values))
+	for _, value := range *values {
+		parsed, err := parse(string(value))
+		if err != nil {
+			return nil, badRequestError(err.Error())
+		}
+		result = append(result, parsed)
+	}
+
+	return result, nil
+}
+
 func decodeJSONBody(request *http.Request, dst any) error {
 	decoder := json.NewDecoder(io.LimitReader(request.Body, maxJSONBodyBytes))
-	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(dst); err != nil {
 		if errors.Is(err, io.EOF) {
@@ -184,7 +215,7 @@ func writeJSON(writer http.ResponseWriter, statusCode int, payload any) {
 	_ = json.NewEncoder(writer).Encode(payload)
 }
 
-type problemSpec struct {
+type ProblemSpec struct {
 	Type        string
 	Title       string
 	Code        string
@@ -192,11 +223,13 @@ type problemSpec struct {
 	FieldErrors []domain.FieldError
 }
 
-func writeProblem(writer http.ResponseWriter, statusCode int, spec problemSpec) {
+type problemSpec = ProblemSpec
+
+func WriteProblem(writer http.ResponseWriter, statusCode int, spec ProblemSpec) {
 	problem := Problem{
 		Type:   spec.Type,
 		Title:  spec.Title,
-		Status: safeInt32(statusCode),
+		Status: problemStatus(statusCode),
 		Detail: spec.Detail,
 		Code:   spec.Code,
 	}
@@ -218,14 +251,27 @@ func writeProblem(writer http.ResponseWriter, statusCode int, spec problemSpec) 
 	writeJSON(writer, statusCode, problem)
 }
 
-func safeInt32(value int) int32 {
-	if value < math.MinInt32 {
-		return math.MinInt32
+func writeProblem(writer http.ResponseWriter, statusCode int, spec ProblemSpec) {
+	WriteProblem(writer, statusCode, spec)
+}
+
+func problemStatus(statusCode int) int32 {
+	switch statusCode {
+	case http.StatusBadRequest:
+		return http.StatusBadRequest
+	case http.StatusUnauthorized:
+		return http.StatusUnauthorized
+	case http.StatusForbidden:
+		return http.StatusForbidden
+	case http.StatusNotFound:
+		return http.StatusNotFound
+	case http.StatusConflict:
+		return http.StatusConflict
+	case http.StatusUnprocessableEntity:
+		return http.StatusUnprocessableEntity
+	default:
+		return http.StatusInternalServerError
 	}
-	if value > math.MaxInt32 {
-		return math.MaxInt32
-	}
-	return int32(value)
 }
 
 func isNotFound(err error) bool {

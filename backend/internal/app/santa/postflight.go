@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/woodleighschool/grinch/internal/app/santa/protocol"
 	"github.com/woodleighschool/grinch/internal/app/santa/snapshot"
 )
 
@@ -31,8 +32,8 @@ func (service *Service) HandlePostflight(
 	recordErr := service.dataStore.RecordPostflight(ctx, PostflightWrite{
 		MachineID:             machineID,
 		RulesHash:             request.GetRulesHash(),
-		RulesReceived:         int32(request.GetRulesReceived()),
-		RulesProcessed:        int32(request.GetRulesProcessed()),
+		RulesReceived:         protocol.SafeCount(request.GetRulesReceived()),
+		RulesProcessed:        protocol.SafeCount(request.GetRulesProcessed()),
 		LastRuleSyncAttemptAt: now,
 	})
 	if recordErr != nil {

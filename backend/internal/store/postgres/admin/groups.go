@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -30,6 +31,17 @@ func (store *Store) ListGroups(
 		return nil, 0, err
 	}
 
+	whereClauses := []string{
+		"($1 = '' OR g.name ILIKE $1 OR g.description ILIKE $1 OR g.source ILIKE $1)",
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("g.id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
+
 	query := fmt.Sprintf(`
 SELECT
   g.id,
@@ -47,14 +59,15 @@ LEFT JOIN (
   GROUP BY group_id
 ) AS member_counts
   ON member_counts.group_id = g.id
-WHERE ($1 = '' OR g.name ILIKE $1 OR g.description ILIKE $1 OR g.source ILIKE $1)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($2::INT, 0)
-OFFSET $3
-`, orderBy)
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
 
-	rows, err := store.store.Pool().
-		Query(ctx, query, pgutil.SearchPattern(options.Search), options.Limit, options.Offset)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, err := store.store.Pool().Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -89,7 +102,7 @@ OFFSET $3
 }
 
 func (store *Store) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error) {
-	return pgutil.GetGroup(ctx, store.queries, id)
+	return pgutil.GetGroup(ctx, store.store.Queries(), id)
 }
 
 func (store *Store) CreateLocalGroup(ctx context.Context, name string, description string) (domain.Group, error) {
@@ -98,7 +111,7 @@ func (store *Store) CreateLocalGroup(ctx context.Context, name string, descripti
 		return domain.Group{}, fmt.Errorf("create group id: %w", err)
 	}
 
-	row, err := store.queries.UpsertGroup(ctx, db.UpsertGroupParams{
+	row, err := store.store.Queries().UpsertGroup(ctx, db.UpsertGroupParams{
 		ID:          id,
 		Name:        name,
 		Description: description,
@@ -117,7 +130,7 @@ func (store *Store) UpdateGroup(
 	name string,
 	description string,
 ) (domain.Group, error) {
-	row, err := store.queries.UpdateGroup(ctx, db.UpdateGroupParams{
+	row, err := store.store.Queries().UpdateGroup(ctx, db.UpdateGroupParams{
 		ID:          id,
 		Name:        name,
 		Description: description,
@@ -139,7 +152,7 @@ func (store *Store) UpdateGroup(
 }
 
 func (store *Store) DeleteGroup(ctx context.Context, id uuid.UUID) error {
-	status, err := store.queries.DeleteGroup(ctx, id)
+	status, err := store.store.Queries().DeleteGroup(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -155,7 +168,7 @@ func (store *Store) DeleteGroup(ctx context.Context, id uuid.UUID) error {
 }
 
 func mapGroup(row db.Group, memberCount int32) (domain.Group, error) {
-	source, err := pgutil.ToSource(row.Source)
+	source, err := domain.ParsePrincipalSource(row.Source)
 	if err != nil {
 		return domain.Group{}, err
 	}

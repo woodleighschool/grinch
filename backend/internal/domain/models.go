@@ -78,19 +78,6 @@ const (
 	MachineClientModeStandalone MachineClientMode = "standalone"
 )
 
-func ParseMachineClientMode(value string) MachineClientMode {
-	switch MachineClientMode(value) {
-	case MachineClientModeMonitor:
-		return MachineClientModeMonitor
-	case MachineClientModeLockdown:
-		return MachineClientModeLockdown
-	case MachineClientModeStandalone:
-		return MachineClientModeStandalone
-	default:
-		return MachineClientModeUnknown
-	}
-}
-
 func DeriveMachineRuleSyncStatus(
 	pendingPreflightAt *time.Time,
 	lastRuleSyncAttemptAt *time.Time,
@@ -314,13 +301,13 @@ type ExcludedGroup struct {
 }
 
 type MachineRuleTarget struct {
-	RuleType      RuleType
-	Identifier    string
-	IdentifierKey string
-	Policy        RulePolicy
-	CustomMessage string
-	CustomURL     string
-	CELExpression string
+	RuleType      RuleType   `json:"rule_type"`
+	Identifier    string     `json:"identifier"`
+	IdentifierKey string     `json:"identifier_key"`
+	Policy        RulePolicy `json:"policy"`
+	CustomMessage string     `json:"custom_message"`
+	CustomURL     string     `json:"custom_url"`
+	CELExpression string     `json:"cel_expression"`
 }
 
 type User struct {
@@ -362,12 +349,22 @@ type GroupMembershipMember struct {
 }
 
 type GroupMembership struct {
-	ID        string                `json:"id"`
+	ID        uuid.UUID             `json:"id"`
 	Kind      GroupMembershipKind   `json:"kind"`
 	Group     GroupMembershipGroup  `json:"group"`
 	Member    GroupMembershipMember `json:"member"`
 	CreatedAt time.Time             `json:"created_at"`
 	UpdatedAt time.Time             `json:"updated_at"`
+}
+
+type GroupMembershipListItem struct {
+	Kind                  GroupMembershipKind   `json:"kind"`
+	ActualMembershipID    *uuid.UUID            `json:"actual_membership_id,omitempty"`
+	EffectiveMembershipID string                `json:"effective_membership_id,omitempty"`
+	Group                 GroupMembershipGroup  `json:"group"`
+	Member                GroupMembershipMember `json:"member"`
+	CreatedAt             time.Time             `json:"created_at"`
+	UpdatedAt             time.Time             `json:"updated_at"`
 }
 
 type MachineResolvedRule struct {

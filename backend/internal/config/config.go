@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -70,9 +71,8 @@ type EntraSyncConfig struct {
 
 // EventsConfig contains event storage settings.
 type EventsConfig struct {
-	RetentionDays        int                    `env:"EVENT_RETENTION_DAYS"     envDefault:"90"`
-	DecisionAllowlistRaw string                 `env:"EVENT_DECISION_ALLOWLIST"`
-	DecisionAllowlist    []domain.EventDecision `env:"-"`
+	RetentionDays     int                    `env:"EVENT_RETENTION_DAYS" envDefault:"90"`
+	DecisionAllowlist []domain.EventDecision `env:"-"`
 }
 
 // LoadFromEnv loads and validates all configuration from environment variables.
@@ -84,7 +84,7 @@ func LoadFromEnv() (Config, error) {
 
 	cfg.Logging.Level = strings.ToLower(cfg.Logging.Level)
 
-	decisionAllowlist, err := parseDecisionAllowlist(cfg.Events.DecisionAllowlistRaw)
+	decisionAllowlist, err := parseDecisionAllowlist(os.Getenv("EVENT_DECISION_ALLOWLIST"))
 	if err != nil {
 		return Config{}, err
 	}

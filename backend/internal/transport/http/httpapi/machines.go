@@ -7,15 +7,36 @@ import (
 )
 
 func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Request, params ListMachinesParams) {
-	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order)
+	listOptions, err := parseListOptions(
+		params.Limit,
+		params.Offset,
+		params.Search,
+		params.Sort,
+		params.Order,
+		params.Ids,
+	)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	ruleSyncStatuses, err := parseOptionalValues(params.RuleSyncStatus, domain.ParseMachineRuleSyncStatus)
+	if err != nil {
+		writeClassifiedError(writer, err, apiErrorOptions{})
+		return
+	}
+
+	clientModes, err := parseOptionalValues(params.ClientMode, domain.ParseMachineClientMode)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return
 	}
 
 	items, total, err := handler.admin.ListMachines(request.Context(), domain.MachineListOptions{
-		ListOptions: listOptions,
-		UserID:      params.UserId,
+		ListOptions:      listOptions,
+		UserID:           params.UserId,
+		RuleSyncStatuses: ruleSyncStatuses,
+		ClientModes:      clientModes,
 	})
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})

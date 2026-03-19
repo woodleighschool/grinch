@@ -1,7 +1,17 @@
+import { CLIENT_MODE_CHOICES, RULE_SYNC_STATUS_CHOICES } from "@/resources/machines/choices";
 import type { ReactElement } from "react";
-import { DataTable, DateField, List, ReferenceField, SearchInput, TextField } from "react-admin";
+import { DataTable, DateField, List, ReferenceField, SearchInput, SelectArrayInput, TextField } from "react-admin";
 
-const machineFilters = [<SearchInput key="search" source="search" alwaysOn />];
+const machineFilters = [
+  <SearchInput key="search" source="search" alwaysOn />,
+  <SelectArrayInput
+    key="rule_sync_status"
+    source="rule_sync_status"
+    label="Rule Sync Status"
+    choices={RULE_SYNC_STATUS_CHOICES}
+  />,
+  <SelectArrayInput key="client_mode" source="client_mode" label="Client Mode" choices={CLIENT_MODE_CHOICES} />,
+];
 
 export const MachineList = (): ReactElement => (
   <List sort={{ field: "last_seen_at", order: "DESC" }} filters={machineFilters}>

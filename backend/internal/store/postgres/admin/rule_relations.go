@@ -3,37 +3,16 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	santasnapshot "github.com/woodleighschool/grinch/internal/app/santa/snapshot"
 	"github.com/woodleighschool/grinch/internal/domain"
 	pgutil "github.com/woodleighschool/grinch/internal/store/postgres/shared"
 )
-
-type storedRuleTargetRow struct {
-	RuleID       *uuid.UUID `json:"rule_id,omitempty"`
-	RuleName     string     `json:"rule_name"`
-	RuleType     string     `json:"rule_type"`
-	Identifier   string     `json:"identifier"`
-	IdentifierKey string    `json:"identifier_key"`
-	Policy       string     `json:"policy"`
-	CustomMessage string    `json:"custom_message"`
-	CustomURL    string     `json:"custom_url"`
-	CELExpression string    `json:"cel_expression"`
-	PayloadHash  string     `json:"payload_hash"`
-}
-
-type appliedRuleTarget struct {
-	domain.MachineRuleTarget
-
-	RuleID      *uuid.UUID
-	RuleName    string
-	PayloadHash string
-}
 
 type machineRuleRow struct {
 	domain.MachineRule
@@ -55,9 +34,9 @@ func (store *Store) ListMachineRules(
 	if err != nil {
 		return nil, 0, err
 	}
-	appliedByKey := make(map[string]appliedRuleTarget, len(appliedTargets))
+	appliedByKey := make(map[string]domain.StoredRuleTarget, len(appliedTargets))
 	for _, target := range appliedTargets {
-		appliedByKey[santasnapshot.RuleTargetKey(target.MachineRuleTarget)] = target
+		appliedByKey[domain.MachineRuleTargetKey(target.MachineRuleTarget)] = target
 	}
 
 	desiredRows, err := store.store.Queries().ListResolvedRulesForMachine(ctx, *options.MachineID)
@@ -68,11 +47,11 @@ func (store *Store) ListMachineRules(
 	items := make([]machineRuleRow, 0, len(desiredRows)+len(appliedTargets))
 	seen := make(map[string]struct{}, len(desiredRows))
 	for _, row := range desiredRows {
-		ruleType, ruleTypeErr := pgutil.ToRuleType(row.RuleType)
+		ruleType, ruleTypeErr := domain.ParseRuleType(row.RuleType)
 		if ruleTypeErr != nil {
 			return nil, 0, ruleTypeErr
 		}
-		policy, policyErr := pgutil.ToRulePolicy(row.Policy.String)
+		policy, policyErr := domain.ParseRulePolicy(row.Policy.String)
 		if policyErr != nil {
 			return nil, 0, policyErr
 		}
@@ -86,7 +65,7 @@ func (store *Store) ListMachineRules(
 			CustomURL:     row.CustomUrl,
 			CELExpression: row.CelExpression,
 		}
-		key := santasnapshot.RuleTargetKey(target)
+		key := domain.MachineRuleTargetKey(target)
 		applied, exists := appliedByKey[key]
 		items = append(items, machineRuleRow{
 			MachineRule: domain.MachineRule{
@@ -94,7 +73,7 @@ func (store *Store) ListMachineRules(
 				MachineID: *options.MachineID,
 				RuleID:    &row.ID,
 				Policy:    policy,
-				Applied:   exists && applied.PayloadHash == santasnapshot.RuleTargetPayloadHash(target),
+				Applied:   exists && applied.PayloadHash == domain.MachineRuleTargetPayloadHash(target),
 			},
 			name:       row.Name,
 			ruleType:   ruleType,
@@ -104,7 +83,7 @@ func (store *Store) ListMachineRules(
 	}
 
 	for _, target := range appliedTargets {
-		key := santasnapshot.RuleTargetKey(target.MachineRuleTarget)
+		key := domain.MachineRuleTargetKey(target.MachineRuleTarget)
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -126,7 +105,7 @@ func (store *Store) ListMachineRules(
 	filtered := filterMachineRules(items, options.Search)
 	sortMachineRules(filtered, options.Sort, options.Order)
 
-	total := int32(len(filtered))
+	total := safeListTotal(len(filtered))
 	start, end := paginate(len(filtered), options.Offset, options.Limit)
 	rows := make([]domain.MachineRule, 0, end-start)
 	for _, item := range filtered[start:end] {
@@ -143,7 +122,8 @@ func (store *Store) ListRuleMachines(
 		return nil, 0, nil
 	}
 
-	rows, err := store.store.Pool().Query(ctx, ruleMachineListQuery, pgutil.SearchPattern(options.Search), *options.RuleID)
+	rows, err := store.store.Pool().
+		Query(ctx, ruleMachineListQuery, pgutil.SearchPattern(options.Search), *options.RuleID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -162,7 +142,7 @@ func (store *Store) ListRuleMachines(
 	}
 
 	sortRuleMachines(items, options.Sort, options.Order)
-	total := int32(len(items))
+	total := safeListTotal(len(items))
 	start, end := paginate(len(items), options.Offset, options.Limit)
 	return items[start:end], total, nil
 }
@@ -304,11 +284,11 @@ func scanRuleMachine(rows pgx.Rows) (domain.RuleMachine, error) {
 		return domain.RuleMachine{}, scanErr
 	}
 
-	policy, policyErr := pgutil.ToRulePolicy(policyValue)
+	policy, policyErr := domain.ParseRulePolicy(policyValue)
 	if policyErr != nil {
 		return domain.RuleMachine{}, policyErr
 	}
-	ruleTypeValue, ruleTypeErr := pgutil.ToRuleType(ruleType)
+	ruleTypeValue, ruleTypeErr := domain.ParseRuleType(ruleType)
 	if ruleTypeErr != nil {
 		return domain.RuleMachine{}, ruleTypeErr
 	}
@@ -329,17 +309,20 @@ func scanRuleMachine(rows pgx.Rows) (domain.RuleMachine, error) {
 		CustomURL:     customURL,
 		CELExpression: celExpression,
 	}
-	appliedByKey := make(map[string]appliedRuleTarget, len(applied))
+	appliedByKey := make(map[string]domain.StoredRuleTarget, len(applied))
 	for _, target := range applied {
-		appliedByKey[santasnapshot.RuleTargetKey(target.MachineRuleTarget)] = target
+		appliedByKey[domain.MachineRuleTargetKey(target.MachineRuleTarget)] = target
 	}
-	appliedTarget, exists := appliedByKey[santasnapshot.RuleTargetKey(target)]
-	item.Applied = exists && appliedTarget.PayloadHash == santasnapshot.RuleTargetPayloadHash(target)
+	appliedTarget, exists := appliedByKey[domain.MachineRuleTargetKey(target)]
+	item.Applied = exists && appliedTarget.PayloadHash == domain.MachineRuleTargetPayloadHash(target)
 
 	return item, nil
 }
 
-func (store *Store) listAppliedRuleTargets(ctx context.Context, machineID uuid.UUID) ([]appliedRuleTarget, error) {
+func (store *Store) listAppliedRuleTargets(
+	ctx context.Context,
+	machineID uuid.UUID,
+) ([]domain.StoredRuleTarget, error) {
 	row, err := store.store.Queries().GetMachineSyncState(ctx, machineID)
 	if err != nil {
 		return nil, err
@@ -347,41 +330,14 @@ func (store *Store) listAppliedRuleTargets(ctx context.Context, machineID uuid.U
 	return unmarshalAppliedRuleTargets(row.AppliedTargets)
 }
 
-func unmarshalAppliedRuleTargets(value []byte) ([]appliedRuleTarget, error) {
+func unmarshalAppliedRuleTargets(value []byte) ([]domain.StoredRuleTarget, error) {
 	if len(value) == 0 {
 		return nil, nil
 	}
 
-	var rows []storedRuleTargetRow
-	if err := json.Unmarshal(value, &rows); err != nil {
+	var targets []domain.StoredRuleTarget
+	if err := json.Unmarshal(value, &targets); err != nil {
 		return nil, err
-	}
-
-	targets := make([]appliedRuleTarget, 0, len(rows))
-	for _, row := range rows {
-		ruleType, err := domain.ParseRuleType(row.RuleType)
-		if err != nil {
-			return nil, err
-		}
-		policy, err := domain.ParseRulePolicy(row.Policy)
-		if err != nil {
-			return nil, err
-		}
-
-		targets = append(targets, appliedRuleTarget{
-			MachineRuleTarget: domain.MachineRuleTarget{
-				RuleType:      ruleType,
-				Identifier:    row.Identifier,
-				IdentifierKey: row.IdentifierKey,
-				Policy:        policy,
-				CustomMessage: row.CustomMessage,
-				CustomURL:     row.CustomURL,
-				CELExpression: row.CELExpression,
-			},
-			RuleID:      row.RuleID,
-			RuleName:    row.RuleName,
-			PayloadHash: row.PayloadHash,
-		})
 	}
 
 	return targets, nil
@@ -475,11 +431,18 @@ func uuidString(value *uuid.UUID) string {
 	return value.String()
 }
 
-func paginate(length int, offset int32, limit int32) (int, int) {
-	start := int(offset)
-	if start > length {
-		start = length
+func safeListTotal(value int) int32 {
+	if value < math.MinInt32 {
+		return math.MinInt32
 	}
+	if value > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(value)
+}
+
+func paginate(length int, offset int32, limit int32) (int, int) {
+	start := min(int(offset), length)
 	end := length
 	if limit > 0 && start+int(limit) < end {
 		end = start + int(limit)

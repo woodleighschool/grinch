@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,7 +16,6 @@ func (store *Store) ListFileAccessEvents(
 	ctx context.Context,
 	options domain.FileAccessEventListOptions,
 ) ([]domain.FileAccessEventSummary, int32, error) {
-	machineID, executableID := fileAccessEventListFilterValues(options)
 	orderBy, err := pgutil.OrderBy(options.Sort, options.Order, map[string]string{
 		"id":          "fe.id",
 		"occurred_at": "fe.occurred_at",
@@ -27,6 +27,34 @@ func (store *Store) ListFileAccessEvents(
 	if err != nil {
 		return nil, 0, err
 	}
+
+	whereClauses := []string{
+		`($1 = '' OR
+  fe.target ILIKE $1 OR
+  fe.rule_name ILIKE $1 OR
+  x.file_name ILIKE $1 OR
+  x.signing_id ILIKE $1 OR
+  m.hostname ILIKE $1)`,
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("fe.id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	if options.MachineID != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("fe.machine_id = $%d::uuid", len(args)+1))
+		args = append(args, *options.MachineID)
+	}
+	if options.ExecutableID != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("fe.executable_id = $%d::uuid", len(args)+1))
+		args = append(args, *options.ExecutableID)
+	}
+	if len(options.Decisions) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("fe.decision = ANY($%d)", len(args)+1))
+		args = append(args, pgutil.Strings(options.Decisions))
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
 
 	query := fmt.Sprintf(`
 SELECT
@@ -47,28 +75,15 @@ SELECT
 FROM file_access_events AS fe
 JOIN machines AS m ON m.machine_id = fe.machine_id
 LEFT JOIN executables AS x ON x.id = fe.executable_id
-WHERE ($1 = '' OR
-  fe.target ILIKE $1 OR
-  fe.rule_name ILIKE $1 OR
-  x.file_name ILIKE $1 OR
-  x.signing_id ILIKE $1 OR
-  m.hostname ILIKE $1)
-  AND ($2::uuid IS NULL OR fe.machine_id = $2::uuid)
-  AND ($3::uuid IS NULL OR fe.executable_id = $3::uuid)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($4::INT, 0)
-OFFSET $5
-`, orderBy)
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
 
-	rows, queryErr := store.store.Pool().Query(
-		ctx,
-		query,
-		pgutil.SearchPattern(options.Search),
-		machineID,
-		executableID,
-		options.Limit,
-		options.Offset,
-	)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, queryErr := store.store.Pool().Query(ctx, query, args...)
 	if queryErr != nil {
 		return nil, 0, queryErr
 	}
@@ -112,12 +127,8 @@ func scanFileAccessEventSummary(rows pgx.Rows) (domain.FileAccessEventSummary, i
 	return item, total, nil
 }
 
-func fileAccessEventListFilterValues(options domain.FileAccessEventListOptions) (any, any) {
-	return pgutil.NullableUUID(options.MachineID), pgutil.NullableUUID(options.ExecutableID)
-}
-
 func (store *Store) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domain.FileAccessEvent, error) {
-	row, err := store.queries.GetFileAccessEvent(ctx, id)
+	row, err := store.store.Queries().GetFileAccessEvent(ctx, id)
 	if err != nil {
 		return domain.FileAccessEvent{}, err
 	}
@@ -174,7 +185,7 @@ func (store *Store) populateProcessNames(
 		executableIDs = append(executableIDs, process.ExecutableID)
 	}
 
-	rows, err := store.queries.GetExecutableNamesByIds(ctx, executableIDs)
+	rows, err := store.store.Queries().GetExecutableNamesByIds(ctx, executableIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -194,5 +205,5 @@ func (store *Store) populateProcessNames(
 }
 
 func (store *Store) DeleteFileAccessEvent(ctx context.Context, id uuid.UUID) error {
-	return store.queries.DeleteFileAccessEvent(ctx, id)
+	return store.store.Queries().DeleteFileAccessEvent(ctx, id)
 }

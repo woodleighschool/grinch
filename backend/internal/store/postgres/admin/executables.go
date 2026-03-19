@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,6 +29,27 @@ func (store *Store) ListExecutables(
 		return nil, 0, err
 	}
 
+	whereClauses := []string{
+		`($1 = '' OR
+  e.file_name ILIKE $1 OR
+  e.file_path ILIKE $1 OR
+  e.file_sha256 ILIKE $1 OR
+  e.signing_id ILIKE $1 OR
+  e.team_id ILIKE $1 OR
+  e.cdhash ILIKE $1)`,
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("e.id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	if len(options.Sources) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("e.source = ANY($%d)", len(args)+1))
+		args = append(args, pgutil.Strings(options.Sources))
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
+
 	query := fmt.Sprintf(`
 SELECT
   e.id,
@@ -43,25 +65,15 @@ SELECT
   e.created_at,
   COUNT(*) OVER()::INT4 AS total
 FROM executables AS e
-WHERE ($1 = '' OR
-  e.file_name ILIKE $1 OR
-  e.file_path ILIKE $1 OR
-  e.file_sha256 ILIKE $1 OR
-  e.signing_id ILIKE $1 OR
-  e.team_id ILIKE $1 OR
-  e.cdhash ILIKE $1)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($2::INT, 0)
-OFFSET $3
-`, orderBy)
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
 
-	rows, queryErr := store.store.Pool().Query(
-		ctx,
-		query,
-		pgutil.SearchPattern(options.Search),
-		options.Limit,
-		options.Offset,
-	)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, queryErr := store.store.Pool().Query(ctx, query, args...)
 	if queryErr != nil {
 		return nil, 0, queryErr
 	}
@@ -93,7 +105,7 @@ OFFSET $3
 }
 
 func (store *Store) GetExecutable(ctx context.Context, id uuid.UUID) (domain.Executable, error) {
-	row, err := store.queries.GetExecutable(ctx, id)
+	row, err := store.store.Queries().GetExecutable(ctx, id)
 	if err != nil {
 		return domain.Executable{}, err
 	}

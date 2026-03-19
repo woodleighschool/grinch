@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,15 +31,45 @@ func (store *Store) ListMachines(
 		return nil, 0, err
 	}
 
-	query := fmt.Sprintf(machineListQuery, orderBy)
-	rows, err := store.store.Pool().Query(
-		ctx,
-		query,
-		pgutil.SearchPattern(options.Search),
-		pgutil.NullableUUID(options.UserID),
-		options.Limit,
-		options.Offset,
-	)
+	whereClauses := []string{
+		`($1 = '' OR
+  m.hostname ILIKE $1 OR
+  m.serial_number ILIKE $1 OR
+  m.model_identifier ILIKE $1 OR
+  m.os_version ILIKE $1 OR
+  m.primary_user ILIKE $1 OR
+  COALESCE(u.display_name, '') ILIKE $1)`,
+	}
+	args := []any{pgutil.SearchPattern(options.Search)}
+	if len(options.IDs) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("m.machine_id = ANY($%d)", len(args)+1))
+		args = append(args, options.IDs)
+	}
+	if options.UserID != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("u.id = $%d::uuid", len(args)+1))
+		args = append(args, *options.UserID)
+	}
+	if len(options.RuleSyncStatuses) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf(`(
+  CASE
+    WHEN ms.pending_preflight_at IS NULL THEN 'synced'
+    WHEN ms.last_rule_sync_attempt_at IS NULL OR ms.last_rule_sync_attempt_at < ms.pending_preflight_at THEN 'pending'
+    ELSE 'issue'
+  END
+) = ANY($%d)`, len(args)+1))
+		args = append(args, pgutil.Strings(options.RuleSyncStatuses))
+	}
+	if len(options.ClientModes) > 0 {
+		whereClauses = append(whereClauses, fmt.Sprintf("COALESCE(ms.client_mode, 'unknown') = ANY($%d)", len(args)+1))
+		args = append(args, pgutil.Strings(options.ClientModes))
+	}
+	limitParam := len(args) + 1
+	offsetParam := limitParam + 1
+
+	query := fmt.Sprintf(machineListQuery, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
+	args = append(args, options.Limit, options.Offset)
+
+	rows, err := store.store.Pool().Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -53,10 +84,9 @@ SELECT
   m.hostname,
   m.model_identifier,
   m.os_version,
-  m.santa_version,
-  m.primary_user,
-  u.id AS primary_user_id,
-  COALESCE(ms.expected_rules_hash, '') AS expected_rules_hash,
+	m.santa_version,
+	m.primary_user,
+	u.id AS primary_user_id,
   ms.pending_preflight_at,
   ms.last_rule_sync_attempt_at,
   m.last_seen_at,
@@ -69,26 +99,18 @@ LEFT JOIN machine_sync_states AS ms
 LEFT JOIN users AS u
   ON u.upn = m.primary_user
   AND m.primary_user <> ''
-WHERE ($1 = '' OR
-  m.hostname ILIKE $1 OR
-  m.serial_number ILIKE $1 OR
-  m.model_identifier ILIKE $1 OR
-  m.os_version ILIKE $1 OR
-  m.primary_user ILIKE $1 OR
-  COALESCE(u.display_name, '') ILIKE $1)
-  AND ($2::uuid IS NULL OR u.id = $2::uuid)
+WHERE %s
 ORDER BY %s
-LIMIT NULLIF($3::INT, 0)
-OFFSET $4
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
 `
 
 func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 	var (
-		item                domain.MachineSummary
-		expectedRulesHash   string
-		pendingPreflightAt  *time.Time
+		item                  domain.MachineSummary
+		pendingPreflightAt    *time.Time
 		lastRuleSyncAttemptAt *time.Time
-		total               int32
+		total                 int32
 	)
 
 	if scanErr := rows.Scan(
@@ -100,7 +122,6 @@ func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 		&item.SantaVersion,
 		&item.PrimaryUser,
 		&item.PrimaryUserID,
-		&expectedRulesHash,
 		&pendingPreflightAt,
 		&lastRuleSyncAttemptAt,
 		&item.LastSeenAt,
@@ -111,15 +132,15 @@ func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 		return domain.MachineSummary{}, 0, scanErr
 	}
 
-	item.RuleSyncStatus = domain.DeriveMachineRuleSyncStatus(expectedRulesHash, pendingPreflightAt, lastRuleSyncAttemptAt)
+	item.RuleSyncStatus = domain.DeriveMachineRuleSyncStatus(pendingPreflightAt, lastRuleSyncAttemptAt)
 
 	return item, total, nil
 }
 
 func (store *Store) GetMachine(ctx context.Context, id uuid.UUID) (domain.Machine, error) {
-	return pgutil.GetMachine(ctx, store.queries, id)
+	return pgutil.GetMachine(ctx, store.store.Queries(), id)
 }
 
 func (store *Store) DeleteMachine(ctx context.Context, id uuid.UUID) error {
-	return store.queries.DeleteMachine(ctx, id)
+	return store.store.Queries().DeleteMachine(ctx, id)
 }

@@ -1,10 +1,10 @@
-import type { GroupMembership } from "@/api/types";
+import type { GroupMembershipListItem } from "@/api/types";
 import { ResourceLink } from "@/resources/shared/resourceLinks";
 import { SourceField } from "@/resources/shared/sourceField";
 import type { ReactElement } from "react";
 import { RecordContextProvider, useRecordContext } from "react-admin";
 
-type GroupMembershipGroupRecord = Pick<GroupMembership, "group">;
+type GroupMembershipGroupRecord = Pick<GroupMembershipListItem, "group">;
 
 export const GroupMembershipGroupLinkField = (): ReactElement => {
   const membership = useRecordContext<GroupMembershipGroupRecord>();

@@ -1,4 +1,4 @@
-import type { Group, GroupMembership } from "@/api/types";
+import type { Group, GroupMembershipListItem } from "@/api/types";
 import { MEMBER_KIND_CHOICES } from "@/resources/groups/choices";
 import { getErrorMessage } from "@/resources/shared/errors";
 import { ResourceLink } from "@/resources/shared/resourceLinks";
@@ -124,7 +124,7 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
 };
 
 const MemberKindField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembership>();
+  const membership = useRecordContext<GroupMembershipListItem>();
 
   if (!membership) {
     return <></>;
@@ -141,7 +141,7 @@ const MemberKindField = (): ReactElement => {
 };
 
 const MemberNameField = (): ReactElement => {
-  const membership = useRecordContext<GroupMembership>();
+  const membership = useRecordContext<GroupMembershipListItem>();
 
   if (!membership) {
     return <></>;
