@@ -30,13 +30,14 @@ func (store *Store) ListMachines(
 	}
 
 	query := fmt.Sprintf(machineListQuery, orderBy)
-	var userID any
-	if options.UserID != nil {
-		userID = *options.UserID
-	}
-
-	rows, err := store.store.Pool().
-		Query(ctx, query, pgutil.SearchPattern(options.Search), userID, options.Limit, options.Offset)
+	rows, err := store.store.Pool().Query(
+		ctx,
+		query,
+		pgutil.SearchPattern(options.Search),
+		pgutil.NullableUUID(options.UserID),
+		options.Limit,
+		options.Offset,
+	)
 	if err != nil {
 		return nil, 0, err
 	}

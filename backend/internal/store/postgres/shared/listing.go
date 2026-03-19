@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -21,6 +22,14 @@ func SearchPattern(search string) string {
 	}
 
 	return "%" + search + "%"
+}
+
+func NullableUUID(id *uuid.UUID) any {
+	if id == nil {
+		return nil
+	}
+
+	return *id
 }
 
 func OrderBy(sort string, order string, allowed map[string]string, fallback []string) (string, error) {

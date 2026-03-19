@@ -22,7 +22,7 @@ func New(store *postgres.Store) *Store {
 }
 
 // ReconcileSnapshot upserts current Entra objects and converts missing Entra objects to local.
-func (dataStore *Store) ReconcileSnapshot(
+func (store *Store) ReconcileSnapshot(
 	ctx context.Context,
 	snapshot *graphsync.Snapshot,
 ) (appentrasync.Result, error) {
@@ -37,7 +37,7 @@ func (dataStore *Store) ReconcileSnapshot(
 	userIDs := collectUserIDs(snapshot.Users)
 	groupIDs := collectGroupIDs(snapshot.Groups)
 
-	err := dataStore.store.RunInTx(ctx, func(queries *db.Queries) error {
+	err := store.store.RunInTx(ctx, func(queries *db.Queries) error {
 		if upsertErr := upsertEntraUsers(ctx, queries, snapshot.Users); upsertErr != nil {
 			return upsertErr
 		}

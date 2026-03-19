@@ -15,7 +15,7 @@ import (
 )
 
 func (store *Store) UpsertMachine(ctx context.Context, machine appsanta.MachineUpsert) error {
-	_, err := store.store.Queries().UpsertMachine(ctx, db.UpsertMachineParams{
+	_, err := store.queries.UpsertMachine(ctx, db.UpsertMachineParams{
 		MachineID:            machine.MachineID,
 		SerialNumber:         machine.SerialNumber,
 		Hostname:             machine.Hostname,
@@ -62,12 +62,12 @@ func (store *Store) IngestEvents(
 }
 
 func (store *Store) DeleteEventsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
-	deletedExecution, executionErr := store.store.Queries().DeleteExecutionEventsBefore(ctx, createdAt)
+	deletedExecution, executionErr := store.queries.DeleteExecutionEventsBefore(ctx, createdAt)
 	if executionErr != nil {
 		return 0, executionErr
 	}
 
-	deletedFileAccess, fileAccessErr := store.store.Queries().DeleteFileAccessEventsBefore(ctx, createdAt)
+	deletedFileAccess, fileAccessErr := store.queries.DeleteFileAccessEventsBefore(ctx, createdAt)
 	if fileAccessErr != nil {
 		return 0, fileAccessErr
 	}

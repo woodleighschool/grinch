@@ -3,24 +3,22 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/woodleighschool/grinch/internal/app/rules"
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
 type ruleWriteRequestBody struct {
-	ID            *string    `json:"id,omitempty"`
-	Name          string     `json:"name"`
-	Description   *string    `json:"description,omitempty"`
-	RuleType      RuleType   `json:"rule_type"`
-	Identifier    string     `json:"identifier"`
-	CustomMessage *string    `json:"custom_message,omitempty"`
-	CustomUrl     *string    `json:"custom_url,omitempty"`
-	Enabled       *bool      `json:"enabled,omitempty"`
+	ID            *string     `json:"id,omitempty"`
+	Name          string      `json:"name"`
+	Description   *string     `json:"description,omitempty"`
+	RuleType      RuleType    `json:"rule_type"`
+	Identifier    string      `json:"identifier"`
+	CustomMessage *string     `json:"custom_message,omitempty"`
+	CustomURL     *string     `json:"custom_url,omitempty"`
+	Enabled       *bool       `json:"enabled,omitempty"`
 	Targets       RuleTargets `json:"targets"`
-	CreatedAt     *string    `json:"created_at,omitempty"`
-	UpdatedAt     *string    `json:"updated_at,omitempty"`
+	CreatedAt     *string     `json:"created_at,omitempty"`
+	UpdatedAt     *string     `json:"updated_at,omitempty"`
 }
 
 func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Request, params ListRulesParams) {
@@ -149,7 +147,7 @@ func decodeRuleWriteRequest(body ruleWriteRequestBody) (rules.WriteInput, error)
 
 	return rules.WriteInput{
 		CustomMessage: optionalStringValue(body.CustomMessage),
-		CustomURL:     optionalStringValue(body.CustomUrl),
+		CustomURL:     optionalStringValue(body.CustomURL),
 		Description:   optionalStringValue(body.Description),
 		Enabled:       enabled,
 		Identifier:    body.Identifier,
@@ -185,7 +183,7 @@ func decodeRuleTargets(targets RuleTargets) (rules.TargetsWriteInput, error) {
 	exclude := make([]rules.ExcludedGroupWriteInput, 0, len(targets.Exclude))
 	for _, target := range targets.Exclude {
 		exclude = append(exclude, rules.ExcludedGroupWriteInput{
-			GroupID: uuid.UUID(target.GroupId),
+			GroupID: target.GroupId,
 		})
 	}
 

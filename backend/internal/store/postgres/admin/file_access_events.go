@@ -113,17 +113,7 @@ func scanFileAccessEventSummary(rows pgx.Rows) (domain.FileAccessEventSummary, i
 }
 
 func fileAccessEventListFilterValues(options domain.FileAccessEventListOptions) (any, any) {
-	var machineID any
-	if options.MachineID != nil {
-		machineID = *options.MachineID
-	}
-
-	var executableID any
-	if options.ExecutableID != nil {
-		executableID = *options.ExecutableID
-	}
-
-	return machineID, executableID
+	return pgutil.NullableUUID(options.MachineID), pgutil.NullableUUID(options.ExecutableID)
 }
 
 func (store *Store) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domain.FileAccessEvent, error) {

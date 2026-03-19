@@ -46,23 +46,6 @@ SELECT
 FROM rules
 WHERE id = $1;
 
--- name: ListRules :many
-SELECT
-  id,
-  name,
-  description,
-  rule_type,
-  identifier,
-  custom_message,
-  custom_url,
-  enabled,
-  created_at,
-  updated_at
-FROM rules
-ORDER BY created_at DESC, id DESC
-LIMIT $1
-OFFSET $2;
-
 -- name: UpdateRule :one
 UPDATE rules
 SET
@@ -91,16 +74,6 @@ RETURNING
 DELETE FROM rules
 WHERE id = $1
 RETURNING id;
-
--- name: CountGroupsByIDs :one
-SELECT COUNT(*)::INT4
-FROM groups
-WHERE id = ANY(sqlc.arg(group_ids)::UUID[]);
-
--- name: CountRulesByIDs :one
-SELECT COUNT(*)::INT4
-FROM rules
-WHERE id = ANY(sqlc.arg(rule_ids)::UUID[]);
 
 -- name: ListResolvedRulesForMachine :many
 WITH effective_groups AS (
@@ -197,3 +170,54 @@ LEFT JOIN matching_excludes AS me
 WHERE me.rule_id IS NULL
   AND r.enabled = true
 ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC;
+
+-- name: CreateRuleTarget :exec
+INSERT INTO rule_targets (
+  id,
+  rule_id,
+  subject_kind,
+  subject_id,
+  assignment,
+  priority,
+  policy,
+  cel_expression
+)
+VALUES (
+  $1,
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8
+);
+
+-- name: ListRuleTargetsByRule :many
+SELECT
+  rt.subject_kind,
+  rt.subject_id,
+  rt.assignment,
+  rt.priority,
+  rt.policy,
+  rt.cel_expression,
+  CASE
+    WHEN rt.subject_kind = 'group' THEN COALESCE(g.name, '')
+    WHEN rt.subject_kind = 'all_devices' THEN 'All Devices'
+    WHEN rt.subject_kind = 'all_users' THEN 'All Users'
+    ELSE ''
+  END AS subject_name
+FROM rule_targets AS rt
+LEFT JOIN groups AS g
+  ON rt.subject_kind = 'group'
+  AND g.id = rt.subject_id
+WHERE rt.rule_id = $1
+ORDER BY
+  CASE WHEN rt.assignment = 'include' THEN 0 ELSE 1 END ASC,
+  rt.priority ASC NULLS LAST,
+  rt.subject_kind ASC,
+  rt.subject_id ASC;
+
+-- name: DeleteRuleTargetsByRule :exec
+DELETE FROM rule_targets
+WHERE rule_id = $1;

@@ -111,22 +111,9 @@ func scanExecutionEventSummary(rows pgx.Rows) (domain.ExecutionEventSummary, int
 }
 
 func executionEventListFilterValues(options domain.ExecutionEventListOptions) (any, any, any) {
-	var machineID any
-	if options.MachineID != nil {
-		machineID = *options.MachineID
-	}
-
-	var userID any
-	if options.UserID != nil {
-		userID = *options.UserID
-	}
-
-	var executableID any
-	if options.ExecutableID != nil {
-		executableID = *options.ExecutableID
-	}
-
-	return machineID, userID, executableID
+	return pgutil.NullableUUID(options.MachineID),
+		pgutil.NullableUUID(options.UserID),
+		pgutil.NullableUUID(options.ExecutableID)
 }
 
 func (store *Store) GetExecutionEvent(ctx context.Context, id uuid.UUID) (domain.ExecutionEvent, error) {

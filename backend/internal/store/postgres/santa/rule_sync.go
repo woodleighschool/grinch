@@ -28,7 +28,7 @@ func (store *Store) GetMachineRuleSyncState(
 	ctx context.Context,
 	machineID uuid.UUID,
 ) (appsanta.MachineRuleSyncState, error) {
-	row, err := store.store.Queries().GetMachineRuleSyncState(ctx, machineID)
+	row, err := store.queries.GetMachineRuleSyncState(ctx, machineID)
 	if err != nil {
 		return appsanta.MachineRuleSyncState{}, err
 	}
@@ -49,7 +49,7 @@ func (store *Store) ReplacePendingSnapshot(
 		return err
 	}
 
-	_, err = store.store.Queries().UpsertMachineRuleSyncState(ctx, db.UpsertMachineRuleSyncStateParams{
+	_, err = store.queries.UpsertMachineRuleSyncState(ctx, db.UpsertMachineRuleSyncStateParams{
 		MachineID:                snapshot.MachineID,
 		RequestCleanSync:         snapshot.RequestCleanSync,
 		LastClientRulesHash:      snapshot.LastClientRulesHash,

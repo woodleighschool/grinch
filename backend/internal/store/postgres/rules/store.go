@@ -13,8 +13,21 @@ import (
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
 	"github.com/woodleighschool/grinch/internal/domain"
 	"github.com/woodleighschool/grinch/internal/store/db"
+	"github.com/woodleighschool/grinch/internal/store/postgres"
 	pgutil "github.com/woodleighschool/grinch/internal/store/postgres/shared"
 )
+
+type Store struct {
+	store   *postgres.Store
+	queries *db.Queries
+}
+
+func New(store *postgres.Store) *Store {
+	return &Store{
+		store:   store,
+		queries: store.Queries(),
+	}
+}
 
 func (store *Store) ListRules(
 	ctx context.Context,
@@ -98,7 +111,7 @@ func ruleSortColumns() map[string]string {
 }
 
 func (store *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
-	queries := store.queriesSet()
+	queries := store.queries
 	row, err := queries.GetRule(ctx, id)
 	if err != nil {
 		return domain.Rule{}, err
@@ -180,7 +193,7 @@ func (store *Store) UpdateRule(ctx context.Context, id uuid.UUID, input apprules
 }
 
 func (store *Store) DeleteRule(ctx context.Context, id uuid.UUID) error {
-	_, err := store.queriesSet().DeleteRule(ctx, id)
+	_, err := store.queries.DeleteRule(ctx, id)
 	return err
 }
 
@@ -188,7 +201,7 @@ func (store *Store) ListResolvedMachineRules(
 	ctx context.Context,
 	machineID uuid.UUID,
 ) ([]domain.MachineResolvedRule, error) {
-	rows, err := store.queriesSet().ListResolvedRulesForMachine(ctx, machineID)
+	rows, err := store.queries.ListResolvedRulesForMachine(ctx, machineID)
 	if err != nil {
 		return nil, err
 	}

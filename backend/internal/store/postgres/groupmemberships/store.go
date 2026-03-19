@@ -142,25 +142,10 @@ func groupMembershipSortColumns() map[string]string {
 }
 
 func groupMembershipListArguments(options domain.GroupMembershipListOptions) []any {
-	var groupID any
-	if options.GroupID != nil {
-		groupID = *options.GroupID
-	}
-
-	var userID any
-	if options.UserID != nil {
-		userID = *options.UserID
-	}
-
-	var machineID any
-	if options.MachineID != nil {
-		machineID = *options.MachineID
-	}
-
 	return []any{
-		groupID,
-		userID,
-		machineID,
+		pgutil.NullableUUID(options.GroupID),
+		pgutil.NullableUUID(options.UserID),
+		pgutil.NullableUUID(options.MachineID),
 		pgutil.SearchPattern(options.Search),
 		options.Limit,
 		options.Offset,
