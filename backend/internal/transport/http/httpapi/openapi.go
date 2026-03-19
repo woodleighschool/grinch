@@ -126,6 +126,24 @@ func (e ListGroupsParamsOrder) Valid() bool {
 	}
 }
 
+// Defines values for ListMachineRulesParamsOrder.
+const (
+	ListMachineRulesParamsOrderAsc  ListMachineRulesParamsOrder = "asc"
+	ListMachineRulesParamsOrderDesc ListMachineRulesParamsOrder = "desc"
+)
+
+// Valid indicates whether the value is a known member of the ListMachineRulesParamsOrder enum.
+func (e ListMachineRulesParamsOrder) Valid() bool {
+	switch e {
+	case ListMachineRulesParamsOrderAsc:
+		return true
+	case ListMachineRulesParamsOrderDesc:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListMachinesParamsOrder.
 const (
 	ListMachinesParamsOrderAsc  ListMachinesParamsOrder = "asc"
@@ -138,6 +156,24 @@ func (e ListMachinesParamsOrder) Valid() bool {
 	case ListMachinesParamsOrderAsc:
 		return true
 	case ListMachinesParamsOrderDesc:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListRuleMachinesParamsOrder.
+const (
+	ListRuleMachinesParamsOrderAsc  ListRuleMachinesParamsOrder = "asc"
+	ListRuleMachinesParamsOrderDesc ListRuleMachinesParamsOrder = "desc"
+)
+
+// Valid indicates whether the value is a known member of the ListRuleMachinesParamsOrder enum.
+func (e ListRuleMachinesParamsOrder) Valid() bool {
+	switch e {
+	case ListRuleMachinesParamsOrderAsc:
+		return true
+	case ListRuleMachinesParamsOrderDesc:
 		return true
 	default:
 		return false
@@ -284,11 +320,26 @@ type IncludeRuleTarget = domain.IncludeRuleTarget
 // Machine defines model for Machine.
 type Machine = domain.Machine
 
+// MachineClientMode defines model for MachineClientMode.
+type MachineClientMode = domain.MachineClientMode
+
 // MachineListResponse defines model for MachineListResponse.
 type MachineListResponse struct {
 	Rows  []MachineSummary `json:"rows"`
 	Total int32            `json:"total"`
 }
+
+// MachineRule defines model for MachineRule.
+type MachineRule = domain.MachineRule
+
+// MachineRuleListResponse defines model for MachineRuleListResponse.
+type MachineRuleListResponse struct {
+	Rows  []MachineRule `json:"rows"`
+	Total int32         `json:"total"`
+}
+
+// MachineRuleSyncStatus defines model for MachineRuleSyncStatus.
+type MachineRuleSyncStatus = domain.MachineRuleSyncStatus
 
 // MachineSummary defines model for MachineSummary.
 type MachineSummary = domain.MachineSummary
@@ -326,6 +377,15 @@ type RuleCreateRequest struct {
 // RuleListResponse defines model for RuleListResponse.
 type RuleListResponse struct {
 	Rows  []RuleSummary `json:"rows"`
+	Total int32         `json:"total"`
+}
+
+// RuleMachine defines model for RuleMachine.
+type RuleMachine = domain.RuleMachine
+
+// RuleMachineListResponse defines model for RuleMachineListResponse.
+type RuleMachineListResponse struct {
+	Rows  []RuleMachine `json:"rows"`
 	Total int32         `json:"total"`
 }
 
@@ -488,6 +548,21 @@ type ListGroupsParams struct {
 // ListGroupsParamsOrder defines parameters for ListGroups.
 type ListGroupsParamsOrder string
 
+// ListMachineRulesParams defines parameters for ListMachineRules.
+type ListMachineRulesParams struct {
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+	Search *Search `form:"search,omitempty" json:"search,omitempty"`
+
+	// Sort Sort field name.
+	Sort      *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
+	Order     *ListMachineRulesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	MachineId *MachineIdFilter             `form:"machine_id,omitempty" json:"machine_id,omitempty"`
+}
+
+// ListMachineRulesParamsOrder defines parameters for ListMachineRules.
+type ListMachineRulesParamsOrder string
+
 // ListMachinesParams defines parameters for ListMachines.
 type ListMachinesParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
@@ -502,6 +577,21 @@ type ListMachinesParams struct {
 
 // ListMachinesParamsOrder defines parameters for ListMachines.
 type ListMachinesParamsOrder string
+
+// ListRuleMachinesParams defines parameters for ListRuleMachines.
+type ListRuleMachinesParams struct {
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+	Search *Search `form:"search,omitempty" json:"search,omitempty"`
+
+	// Sort Sort field name.
+	Sort   *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
+	Order  *ListRuleMachinesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	RuleId *RuleIdFilter                `form:"rule_id,omitempty" json:"rule_id,omitempty"`
+}
+
+// ListRuleMachinesParamsOrder defines parameters for ListRuleMachines.
+type ListRuleMachinesParamsOrder string
 
 // ListRulesParams defines parameters for ListRules.
 type ListRulesParams struct {
@@ -600,6 +690,9 @@ type ServerInterface interface {
 	// (PUT /groups/{id})
 	UpdateGroup(w http.ResponseWriter, r *http.Request, id Id)
 
+	// (GET /machine-rules)
+	ListMachineRules(w http.ResponseWriter, r *http.Request, params ListMachineRulesParams)
+
 	// (GET /machines)
 	ListMachines(w http.ResponseWriter, r *http.Request, params ListMachinesParams)
 
@@ -608,6 +701,9 @@ type ServerInterface interface {
 
 	// (GET /machines/{id})
 	GetMachine(w http.ResponseWriter, r *http.Request, id Id)
+
+	// (GET /rule-machines)
+	ListRuleMachines(w http.ResponseWriter, r *http.Request, params ListRuleMachinesParams)
 
 	// (GET /rules)
 	ListRules(w http.ResponseWriter, r *http.Request, params ListRulesParams)
@@ -720,6 +816,11 @@ func (_ Unimplemented) UpdateGroup(w http.ResponseWriter, r *http.Request, id Id
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /machine-rules)
+func (_ Unimplemented) ListMachineRules(w http.ResponseWriter, r *http.Request, params ListMachineRulesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /machines)
 func (_ Unimplemented) ListMachines(w http.ResponseWriter, r *http.Request, params ListMachinesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -732,6 +833,11 @@ func (_ Unimplemented) DeleteMachine(w http.ResponseWriter, r *http.Request, id 
 
 // (GET /machines/{id})
 func (_ Unimplemented) GetMachine(w http.ResponseWriter, r *http.Request, id Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /rule-machines)
+func (_ Unimplemented) ListRuleMachines(w http.ResponseWriter, r *http.Request, params ListRuleMachinesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1518,6 +1624,79 @@ func (siw *ServerInterfaceWrapper) UpdateGroup(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListMachineRules operation middleware
+func (siw *ServerInterfaceWrapper) ListMachineRules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMachineRulesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "machine_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "machine_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMachineRules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMachines operation middleware
 func (siw *ServerInterfaceWrapper) ListMachines(w http.ResponseWriter, r *http.Request) {
 
@@ -1644,6 +1823,79 @@ func (siw *ServerInterfaceWrapper) GetMachine(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMachine(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRuleMachines operation middleware
+func (siw *ServerInterfaceWrapper) ListRuleMachines(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRuleMachinesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "rule_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rule_id", r.URL.Query(), &params.RuleId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRuleMachines(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2092,6 +2344,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/groups/{id}", wrapper.UpdateGroup)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/machine-rules", wrapper.ListMachineRules)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines", wrapper.ListMachines)
 	})
 	r.Group(func(r chi.Router) {
@@ -2099,6 +2354,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines/{id}", wrapper.GetMachine)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/rule-machines", wrapper.ListRuleMachines)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/rules", wrapper.ListRules)

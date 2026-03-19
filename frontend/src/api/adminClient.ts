@@ -13,8 +13,10 @@ import type {
   GroupMembershipListResponse,
   Machine,
   MachineListResponse,
+  MachineRuleListResponse,
   Rule,
   RuleListResponse,
+  RuleMachineListResponse,
   User,
   UserListResponse,
 } from "@/api/types";
@@ -152,6 +154,10 @@ export const machinesApi = {
   delete: deleteOne("/machines/{id}"),
 };
 
+export const machineRulesApi = {
+  list: list<MachineRuleListResponse>("/machine-rules"),
+};
+
 export const executablesApi = {
   list: list<ExecutableListResponse>("/executables"),
   get: getOne<Executable>("/executables/{id}"),
@@ -175,6 +181,10 @@ export const rulesApi = {
   create: createOne<Rule>("/rules"),
   update: updateOne<Rule>("/rules/{id}"),
   delete: deleteOne("/rules/{id}"),
+};
+
+export const ruleMachinesApi = {
+  list: list<RuleMachineListResponse>("/rule-machines"),
 };
 
 export const groupsApi = {

@@ -47,18 +47,14 @@ func (service *Service) HandlePreflight(
 		service.dataStore,
 		service.ruleResolver,
 		machineID,
-		request.GetRulesHash(),
-		request.GetRequestCleanSync(),
+		request,
 		time.Now().UTC(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("prepare pending rule snapshot: %w", err)
 	}
 
-	syncType, err := protocol.MapStoredRuleSyncType(pendingSnapshot.SyncType)
-	if err != nil {
-		return nil, err
-	}
+	syncType := protocol.MapPendingFullSync(pendingSnapshot.FullSync)
 	response := syncv1.PreflightResponse_builder{
 		ClientMode: request.GetClientMode(),
 		SyncType:   &syncType,

@@ -32,6 +32,18 @@ type MachineListOptions struct {
 	UserID *uuid.UUID
 }
 
+type MachineRuleListOptions struct {
+	ListOptions
+
+	MachineID *uuid.UUID
+}
+
+type RuleMachineListOptions struct {
+	ListOptions
+
+	RuleID *uuid.UUID
+}
+
 type ExecutableListOptions struct {
 	ListOptions
 }

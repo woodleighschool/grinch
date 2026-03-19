@@ -315,6 +315,27 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
+  /machine-rules:
+    get:
+      operationId: listMachineRules
+      tags:
+        - machine-rules
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/MachineIdFilter'
+      responses:
+        '200':
+          description: Machine rules list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MachineRuleListResponse'
+        default:
+          $ref: '#/components/responses/Problem'
   /machines:
     get:
       operationId: listMachines
@@ -363,6 +384,27 @@ paths:
       responses:
         '204':
           description: Machine deleted.
+        default:
+          $ref: '#/components/responses/Problem'
+  /rule-machines:
+    get:
+      operationId: listRuleMachines
+      tags:
+        - rule-machines
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/RuleIdFilter'
+      responses:
+        '200':
+          description: Rule machines list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleMachineListResponse'
         default:
           $ref: '#/components/responses/Problem'
   /rules:
@@ -1224,7 +1266,15 @@ components:
         - os_build
         - santa_version
         - primary_user
-        - request_clean_sync
+        - rule_sync_status
+        - client_mode
+        - binary_rule_count
+        - certificate_rule_count
+        - compiler_rule_count
+        - transitive_rule_count
+        - teamid_rule_count
+        - signingid_rule_count
+        - cdhash_rule_count
         - last_seen_at
         - created_at
         - updated_at
@@ -1250,8 +1300,31 @@ components:
           type: string
           format: uuid
           nullable: true
-        request_clean_sync:
-          type: boolean
+        rule_sync_status:
+          $ref: '#/components/schemas/MachineRuleSyncStatus'
+        client_mode:
+          $ref: '#/components/schemas/MachineClientMode'
+        binary_rule_count:
+          type: integer
+          format: int32
+        certificate_rule_count:
+          type: integer
+          format: int32
+        compiler_rule_count:
+          type: integer
+          format: int32
+        transitive_rule_count:
+          type: integer
+          format: int32
+        teamid_rule_count:
+          type: integer
+          format: int32
+        signingid_rule_count:
+          type: integer
+          format: int32
+        cdhash_rule_count:
+          type: integer
+          format: int32
         last_seen_at:
           type: string
           format: date-time
@@ -1261,6 +1334,17 @@ components:
         updated_at:
           type: string
           format: date-time
+    MachineClientMode:
+      x-go-type: domain.MachineClientMode
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: string
+      enum:
+        - unknown
+        - monitor
+        - lockdown
+        - standalone
     MachineListResponse:
       type: object
       required:
@@ -1274,6 +1358,54 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MachineSummary'
+    MachineRule:
+      x-go-type: domain.MachineRule
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - id
+        - machine_id
+        - policy
+        - applied
+      properties:
+        id:
+          type: string
+        machine_id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+          format: uuid
+          nullable: true
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+        applied:
+          type: boolean
+    MachineRuleListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/MachineRule'
+    MachineRuleSyncStatus:
+      x-go-type: domain.MachineRuleSyncStatus
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: string
+      enum:
+        - synced
+        - pending
+        - issue
     MachineSummary:
       x-go-type: domain.MachineSummary
       x-go-type-import:
@@ -1288,6 +1420,7 @@ components:
         - os_version
         - santa_version
         - primary_user
+        - rule_sync_status
         - last_seen_at
         - created_at
         - updated_at
@@ -1311,6 +1444,8 @@ components:
           type: string
           format: uuid
           nullable: true
+        rule_sync_status:
+          $ref: '#/components/schemas/MachineRuleSyncStatus'
         last_seen_at:
           type: string
           format: date-time
@@ -1413,6 +1548,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RuleSummary'
+    RuleMachine:
+      x-go-type: domain.RuleMachine
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - id
+        - rule_id
+        - machine_id
+        - policy
+        - applied
+      properties:
+        id:
+          type: string
+        rule_id:
+          type: string
+          format: uuid
+        machine_id:
+          type: string
+          format: uuid
+        policy:
+          $ref: '#/components/schemas/RulePolicy'
+        applied:
+          type: boolean
+    RuleMachineListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleMachine'
     RulePolicy:
       x-go-type: domain.RulePolicy
       x-go-type-import:

@@ -38,7 +38,7 @@ export const RULE_TYPE_CHOICES = [
   { id: "cd_hash", name: "CD Hash" },
 ] as { id: RuleType; name: string }[];
 
-const RULE_POLICY_CHOICES = [
+export const RULE_POLICY_CHOICES = [
   { id: "allowlist", name: "Allowlist" },
   { id: "blocklist", name: "Blocklist" },
   { id: "silent_blocklist", name: "Silent Blocklist" },
@@ -145,17 +145,17 @@ const CelExpressionInput = ({ source, showRequired }: { source: string; showRequ
       <IconButton
         size="small"
         color={showRequired ? "error" : "default"}
-        onClick={() => {
+        onClick={(): void => {
           setOpen(true);
         }}
         aria-label="Edit CEL expression"
       >
         <CodeIcon fontSize="small" />
       </IconButton>
-      {showRequired ? <FormHelperText error>CEL required</FormHelperText> : null}
+      {showRequired ? <FormHelperText error>CEL required</FormHelperText> : undefined}
       <Dialog
         open={open}
-        onClose={() => {
+        onClose={(): void => {
           setOpen(false);
         }}
         maxWidth="md"
@@ -180,7 +180,7 @@ const CelExpressionInput = ({ source, showRequired }: { source: string; showRequ
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => {
+            onClick={(): void => {
               setOpen(false);
             }}
           >
@@ -192,13 +192,17 @@ const CelExpressionInput = ({ source, showRequired }: { source: string; showRequ
   );
 };
 
-const IncludeTargetCelField = (): ReactElement | null => {
+const IncludeTargetCelField = (): ReactElement | undefined => {
   const { index } = useSimpleFormIteratorItem();
-  const policy = useWatch({ name: `targets.include.${index}.policy` }) as RulePolicy | undefined;
-  const celExpression = useWatch({ name: `targets.include.${index}.cel_expression` }) as string | undefined;
-  if (policy !== "cel") return null;
+  const indexPath = String(index);
+  const policy = useWatch({ name: `targets.include.${indexPath}.policy` }) as RulePolicy | undefined;
+  const celExpression = useWatch({ name: `targets.include.${indexPath}.cel_expression` }) as string | undefined;
+  if (policy !== "cel") return undefined;
   return (
-    <CelExpressionInput source="cel_expression" showRequired={celExpression?.trim() === "" || celExpression == undefined} />
+    <CelExpressionInput
+      source="cel_expression"
+      showRequired={celExpression?.trim() === "" || celExpression === undefined}
+    />
   );
 };
 

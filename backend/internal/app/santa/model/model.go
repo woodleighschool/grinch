@@ -25,30 +25,34 @@ type MachineUpsert struct {
 	LastSeenAt           time.Time
 }
 
-type RuleSyncType string
-
-const (
-	RuleSyncTypeNone   RuleSyncType = ""
-	RuleSyncTypeNormal RuleSyncType = "normal"
-	RuleSyncTypeClean  RuleSyncType = "clean"
-)
-
-type MachineRuleSyncState struct {
-	MachineID                uuid.UUID
-	RequestCleanSync         bool
-	LastClientRulesHash      string
-	AcknowledgedTargets      []StoredRuleTarget
-	PendingTargets           []StoredRuleTarget
-	PendingExpectedRulesHash string
-	PendingPayloadRuleCount  int64
-	PendingSyncType          RuleSyncType
-	PendingPreflightAt       *time.Time
-	LastPostflightAt         *time.Time
+type MachineSyncState struct {
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []StoredRuleTarget
+	PendingTargets          []StoredRuleTarget
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingFullSync         bool
+	PendingPreflightAt      *time.Time
+	ClientMode              domain.MachineClientMode
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamIDRuleCount         int32
+	SigningIDRuleCount      int32
+	CDHashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
+	LastRuleSyncSuccessAt   *time.Time
 }
 
 type StoredRuleTarget struct {
 	domain.MachineRuleTarget
 
+	RuleID      *uuid.UUID
+	RuleName    string
 	PayloadHash string
 }
 
@@ -59,16 +63,35 @@ type SyncRule struct {
 }
 
 type PendingSnapshotWrite struct {
-	MachineID                uuid.UUID
-	RequestCleanSync         bool
-	LastClientRulesHash      string
-	AcknowledgedTargets      []StoredRuleTarget
-	PendingTargets           []StoredRuleTarget
-	PendingExpectedRulesHash string
-	PendingPayloadRuleCount  int64
-	PendingSyncType          RuleSyncType
-	PendingPreflightAt       time.Time
-	LastPostflightAt         *time.Time
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []StoredRuleTarget
+	PendingTargets          []StoredRuleTarget
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingFullSync         bool
+	PendingPreflightAt      time.Time
+	ClientMode              domain.MachineClientMode
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamIDRuleCount         int32
+	SigningIDRuleCount      int32
+	CDHashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
+	LastRuleSyncSuccessAt   *time.Time
+}
+
+type PostflightWrite struct {
+	MachineID             uuid.UUID
+	RulesHash             string
+	RulesReceived         int32
+	RulesProcessed        int32
+	LastRuleSyncAttemptAt time.Time
+	LastRuleSyncSuccessAt *time.Time
 }
 
 // DataStore keeps the two-phase sync state:
@@ -76,9 +99,10 @@ type PendingSnapshotWrite struct {
 // once the client reports the expected final rules hash and processed count.
 type DataStore interface {
 	UpsertMachine(context.Context, MachineUpsert) error
-	GetMachineRuleSyncState(context.Context, uuid.UUID) (MachineRuleSyncState, error)
+	GetMachineSyncState(context.Context, uuid.UUID) (MachineSyncState, error)
 	ReplacePendingSnapshot(context.Context, PendingSnapshotWrite) error
-	PromotePendingSnapshot(context.Context, uuid.UUID, string, time.Time) error
+	RecordPostflight(context.Context, PostflightWrite) error
+	PromotePendingSnapshot(context.Context, uuid.UUID, time.Time) error
 	IngestEvents(
 		context.Context,
 		uuid.UUID,
@@ -90,5 +114,5 @@ type DataStore interface {
 }
 
 type RuleResolver interface {
-	ResolveMachineRuleTargets(context.Context, uuid.UUID) ([]domain.MachineRuleTarget, error)
+	ResolveMachineRuleTargets(context.Context, uuid.UUID) ([]domain.MachineResolvedRule, error)
 }

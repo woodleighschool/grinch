@@ -61,34 +61,86 @@ const (
 	RuleTargetSubjectKindAllUsers   RuleTargetSubjectKind = "all_users"
 )
 
+type MachineRuleSyncStatus string
+
+const (
+	MachineRuleSyncStatusSynced  MachineRuleSyncStatus = "synced"
+	MachineRuleSyncStatusPending MachineRuleSyncStatus = "pending"
+	MachineRuleSyncStatusIssue   MachineRuleSyncStatus = "issue"
+)
+
+type MachineClientMode string
+
+const (
+	MachineClientModeUnknown    MachineClientMode = "unknown"
+	MachineClientModeMonitor    MachineClientMode = "monitor"
+	MachineClientModeLockdown   MachineClientMode = "lockdown"
+	MachineClientModeStandalone MachineClientMode = "standalone"
+)
+
+func ParseMachineClientMode(value string) MachineClientMode {
+	switch MachineClientMode(value) {
+	case MachineClientModeMonitor:
+		return MachineClientModeMonitor
+	case MachineClientModeLockdown:
+		return MachineClientModeLockdown
+	case MachineClientModeStandalone:
+		return MachineClientModeStandalone
+	default:
+		return MachineClientModeUnknown
+	}
+}
+
+func DeriveMachineRuleSyncStatus(
+	pendingPreflightAt *time.Time,
+	lastRuleSyncAttemptAt *time.Time,
+) MachineRuleSyncStatus {
+	if pendingPreflightAt == nil {
+		return MachineRuleSyncStatusSynced
+	}
+	if lastRuleSyncAttemptAt == nil || lastRuleSyncAttemptAt.Before(*pendingPreflightAt) {
+		return MachineRuleSyncStatusPending
+	}
+	return MachineRuleSyncStatusIssue
+}
+
 type Machine struct {
-	ID               uuid.UUID  `json:"id"`
-	SerialNumber     string     `json:"serial_number"`
-	Hostname         string     `json:"hostname"`
-	ModelIdentifier  string     `json:"model_identifier"`
-	OSVersion        string     `json:"os_version"`
-	OSBuild          string     `json:"os_build"`
-	SantaVersion     string     `json:"santa_version"`
-	PrimaryUser      string     `json:"primary_user"`
-	PrimaryUserID    *uuid.UUID `json:"primary_user_id,omitempty"`
-	RequestCleanSync bool       `json:"request_clean_sync"`
-	LastSeenAt       time.Time  `json:"last_seen_at"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID                   uuid.UUID             `json:"id"`
+	SerialNumber         string                `json:"serial_number"`
+	Hostname             string                `json:"hostname"`
+	ModelIdentifier      string                `json:"model_identifier"`
+	OSVersion            string                `json:"os_version"`
+	OSBuild              string                `json:"os_build"`
+	SantaVersion         string                `json:"santa_version"`
+	PrimaryUser          string                `json:"primary_user"`
+	PrimaryUserID        *uuid.UUID            `json:"primary_user_id,omitempty"`
+	RuleSyncStatus       MachineRuleSyncStatus `json:"rule_sync_status"`
+	ClientMode           MachineClientMode     `json:"client_mode"`
+	BinaryRuleCount      int32                 `json:"binary_rule_count"`
+	CertificateRuleCount int32                 `json:"certificate_rule_count"`
+	CompilerRuleCount    int32                 `json:"compiler_rule_count"`
+	TransitiveRuleCount  int32                 `json:"transitive_rule_count"`
+	TeamIDRuleCount      int32                 `json:"teamid_rule_count"`
+	SigningIDRuleCount   int32                 `json:"signingid_rule_count"`
+	CDHashRuleCount      int32                 `json:"cdhash_rule_count"`
+	LastSeenAt           time.Time             `json:"last_seen_at"`
+	CreatedAt            time.Time             `json:"created_at"`
+	UpdatedAt            time.Time             `json:"updated_at"`
 }
 
 type MachineSummary struct {
-	ID              uuid.UUID  `json:"id"`
-	SerialNumber    string     `json:"serial_number"`
-	Hostname        string     `json:"hostname"`
-	ModelIdentifier string     `json:"model_identifier"`
-	OSVersion       string     `json:"os_version"`
-	SantaVersion    string     `json:"santa_version"`
-	PrimaryUser     string     `json:"primary_user"`
-	PrimaryUserID   *uuid.UUID `json:"primary_user_id,omitempty"`
-	LastSeenAt      time.Time  `json:"last_seen_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              uuid.UUID             `json:"id"`
+	SerialNumber    string                `json:"serial_number"`
+	Hostname        string                `json:"hostname"`
+	ModelIdentifier string                `json:"model_identifier"`
+	OSVersion       string                `json:"os_version"`
+	SantaVersion    string                `json:"santa_version"`
+	PrimaryUser     string                `json:"primary_user"`
+	PrimaryUserID   *uuid.UUID            `json:"primary_user_id,omitempty"`
+	RuleSyncStatus  MachineRuleSyncStatus `json:"rule_sync_status"`
+	LastSeenAt      time.Time             `json:"last_seen_at"`
+	CreatedAt       time.Time             `json:"created_at"`
+	UpdatedAt       time.Time             `json:"updated_at"`
 }
 
 type ExecutableSource string
@@ -322,4 +374,21 @@ type MachineResolvedRule struct {
 	MachineRuleTarget
 
 	RuleID uuid.UUID
+	Name   string
+}
+
+type MachineRule struct {
+	ID        string     `json:"id"`
+	MachineID uuid.UUID  `json:"machine_id"`
+	RuleID    *uuid.UUID `json:"rule_id,omitempty"`
+	Policy    RulePolicy `json:"policy"`
+	Applied   bool       `json:"applied"`
+}
+
+type RuleMachine struct {
+	ID        string     `json:"id"`
+	RuleID    uuid.UUID  `json:"rule_id"`
+	MachineID uuid.UUID  `json:"machine_id"`
+	Policy    RulePolicy `json:"policy"`
+	Applied   bool       `json:"applied"`
 }

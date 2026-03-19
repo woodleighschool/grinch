@@ -19,12 +19,24 @@ func (service *Service) HandlePostflight(
 	machineID uuid.UUID,
 	request *syncv1.PostflightRequest,
 ) (*syncv1.PostflightResponse, error) {
-	snapshotState, stateErr := service.dataStore.GetMachineRuleSyncState(ctx, machineID)
+	now := time.Now().UTC()
+	snapshotState, stateErr := service.dataStore.GetMachineSyncState(ctx, machineID)
 	if stateErr != nil {
 		if errors.Is(stateErr, pgx.ErrNoRows) {
 			return syncv1.PostflightResponse_builder{}.Build(), nil
 		}
 		return nil, stateErr
+	}
+
+	recordErr := service.dataStore.RecordPostflight(ctx, PostflightWrite{
+		MachineID:             machineID,
+		RulesHash:             request.GetRulesHash(),
+		RulesReceived:         int32(request.GetRulesReceived()),
+		RulesProcessed:        int32(request.GetRulesProcessed()),
+		LastRuleSyncAttemptAt: now,
+	})
+	if recordErr != nil {
+		return nil, recordErr
 	}
 
 	if !snapshot.PostflightMatchesSnapshot(request, snapshotState) {
@@ -34,8 +46,7 @@ func (service *Service) HandlePostflight(
 	if promoteErr := service.dataStore.PromotePendingSnapshot(
 		ctx,
 		machineID,
-		request.GetRulesHash(),
-		time.Now().UTC(),
+		now,
 	); promoteErr != nil {
 		return nil, promoteErr
 	}

@@ -3,7 +3,6 @@ package santa
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,33 +13,35 @@ import (
 )
 
 type syncRuleTargetRow struct {
-	RuleType      string `json:"rule_type"`
-	Identifier    string `json:"identifier"`
-	IdentifierKey string `json:"identifier_key"`
-	Policy        string `json:"policy"`
-	CustomMessage string `json:"custom_message"`
-	CustomURL     string `json:"custom_url"`
-	CELExpression string `json:"cel_expression"`
-	PayloadHash   string `json:"payload_hash"`
+	RuleID        *uuid.UUID `json:"rule_id,omitempty"`
+	RuleName      string     `json:"rule_name"`
+	RuleType      string     `json:"rule_type"`
+	Identifier    string     `json:"identifier"`
+	IdentifierKey string     `json:"identifier_key"`
+	Policy        string     `json:"policy"`
+	CustomMessage string     `json:"custom_message"`
+	CustomURL     string     `json:"custom_url"`
+	CELExpression string     `json:"cel_expression"`
+	PayloadHash   string     `json:"payload_hash"`
 }
 
-func (store *Store) GetMachineRuleSyncState(
+func (store *Store) GetMachineSyncState(
 	ctx context.Context,
 	machineID uuid.UUID,
-) (appsanta.MachineRuleSyncState, error) {
-	row, err := store.queries.GetMachineRuleSyncState(ctx, machineID)
+) (appsanta.MachineSyncState, error) {
+	row, err := store.queries.GetMachineSyncState(ctx, machineID)
 	if err != nil {
-		return appsanta.MachineRuleSyncState{}, err
+		return appsanta.MachineSyncState{}, err
 	}
 
-	return mapMachineRuleSyncState(row)
+	return mapMachineSyncState(row)
 }
 
 func (store *Store) ReplacePendingSnapshot(
 	ctx context.Context,
 	snapshot appsanta.PendingSnapshotWrite,
 ) error {
-	acknowledgedTargets, err := marshalSyncRuleTargets(snapshot.AcknowledgedTargets)
+	appliedTargets, err := marshalSyncRuleTargets(snapshot.AppliedTargets)
 	if err != nil {
 		return err
 	}
@@ -49,84 +50,138 @@ func (store *Store) ReplacePendingSnapshot(
 		return err
 	}
 
-	_, err = store.queries.UpsertMachineRuleSyncState(ctx, db.UpsertMachineRuleSyncStateParams{
-		MachineID:                snapshot.MachineID,
-		RequestCleanSync:         snapshot.RequestCleanSync,
-		LastClientRulesHash:      snapshot.LastClientRulesHash,
-		AcknowledgedTargets:      acknowledgedTargets,
-		PendingTargets:           pendingTargets,
-		PendingExpectedRulesHash: snapshot.PendingExpectedRulesHash,
-		PendingPayloadRuleCount:  snapshot.PendingPayloadRuleCount,
-		PendingSyncType:          string(snapshot.PendingSyncType),
-		PendingPreflightAt:       &snapshot.PendingPreflightAt,
-		LastPostflightAt:         snapshot.LastPostflightAt,
+	_, err = store.queries.UpsertMachineSyncState(ctx, db.UpsertMachineSyncStateParams{
+		MachineID:               snapshot.MachineID,
+		RulesHash:               snapshot.RulesHash,
+		AppliedTargets:          appliedTargets,
+		PendingTargets:          pendingTargets,
+		ExpectedRulesHash:       snapshot.ExpectedRulesHash,
+		PendingPayloadRuleCount: snapshot.PendingPayloadRuleCount,
+		PendingFullSync:         snapshot.PendingFullSync,
+		PendingPreflightAt:      &snapshot.PendingPreflightAt,
+		ClientMode:              string(snapshot.ClientMode),
+		BinaryRuleCount:         snapshot.BinaryRuleCount,
+		CertificateRuleCount:    snapshot.CertificateRuleCount,
+		CompilerRuleCount:       snapshot.CompilerRuleCount,
+		TransitiveRuleCount:     snapshot.TransitiveRuleCount,
+		TeamidRuleCount:         snapshot.TeamIDRuleCount,
+		SigningidRuleCount:      snapshot.SigningIDRuleCount,
+		CdhashRuleCount:         snapshot.CDHashRuleCount,
+		RulesReceived:           snapshot.RulesReceived,
+		RulesProcessed:          snapshot.RulesProcessed,
+		LastRuleSyncAttemptAt:   snapshot.LastRuleSyncAttemptAt,
+		LastRuleSyncSuccessAt:   snapshot.LastRuleSyncSuccessAt,
 	})
 	return err
+}
+
+func (store *Store) RecordPostflight(
+	ctx context.Context,
+	write appsanta.PostflightWrite,
+) error {
+	return store.store.RunInTx(ctx, func(queries *db.Queries) error {
+		row, err := queries.GetMachineSyncState(ctx, write.MachineID)
+		if err != nil {
+			return err
+		}
+
+		return upsertMachineSyncState(ctx, queries, row, db.UpsertMachineSyncStateParams{
+			MachineID:               write.MachineID,
+			RulesHash:               write.RulesHash,
+			AppliedTargets:          row.AppliedTargets,
+			PendingTargets:          row.PendingTargets,
+			ExpectedRulesHash:       row.ExpectedRulesHash,
+			PendingPayloadRuleCount: row.PendingPayloadRuleCount,
+			PendingFullSync:         row.PendingFullSync,
+			PendingPreflightAt:      row.PendingPreflightAt,
+			ClientMode:              row.ClientMode,
+			BinaryRuleCount:         row.BinaryRuleCount,
+			CertificateRuleCount:    row.CertificateRuleCount,
+			CompilerRuleCount:       row.CompilerRuleCount,
+			TransitiveRuleCount:     row.TransitiveRuleCount,
+			TeamidRuleCount:         row.TeamidRuleCount,
+			SigningidRuleCount:      row.SigningidRuleCount,
+			CdhashRuleCount:         row.CdhashRuleCount,
+			RulesReceived:           write.RulesReceived,
+			RulesProcessed:          write.RulesProcessed,
+			LastRuleSyncAttemptAt:   &write.LastRuleSyncAttemptAt,
+			LastRuleSyncSuccessAt:   row.LastRuleSyncSuccessAt,
+		})
+	})
 }
 
 func (store *Store) PromotePendingSnapshot(
 	ctx context.Context,
 	machineID uuid.UUID,
-	clientRulesHash string,
 	completedAt time.Time,
 ) error {
 	return store.store.RunInTx(ctx, func(queries *db.Queries) error {
-		row, err := queries.GetMachineRuleSyncState(ctx, machineID)
+		row, err := queries.GetMachineSyncState(ctx, machineID)
 		if err != nil {
 			return err
 		}
 
-		pendingTargets, err := unmarshalSyncRuleTargets(row.PendingTargets)
-		if err != nil {
-			return err
-		}
-
-		acknowledgedTargets, err := marshalSyncRuleTargets(pendingTargets)
-		if err != nil {
-			return err
-		}
 		emptyTargets, err := marshalSyncRuleTargets(nil)
 		if err != nil {
 			return err
 		}
 
-		_, err = queries.UpsertMachineRuleSyncState(ctx, db.UpsertMachineRuleSyncStateParams{
-			MachineID:                machineID,
-			RequestCleanSync:         false,
-			LastClientRulesHash:      strings.TrimSpace(clientRulesHash),
-			AcknowledgedTargets:      acknowledgedTargets,
-			PendingTargets:           emptyTargets,
-			PendingExpectedRulesHash: "",
-			PendingPayloadRuleCount:  0,
-			PendingSyncType:          string(appsanta.RuleSyncTypeNone),
-			PendingPreflightAt:       nil,
-			LastPostflightAt:         &completedAt,
+		return upsertMachineSyncState(ctx, queries, row, db.UpsertMachineSyncStateParams{
+			MachineID:               machineID,
+			RulesHash:               row.RulesHash,
+			AppliedTargets:          row.PendingTargets,
+			PendingTargets:          emptyTargets,
+			ExpectedRulesHash:       "",
+			PendingPayloadRuleCount: 0,
+			PendingFullSync:         false,
+			PendingPreflightAt:      nil,
+			ClientMode:              row.ClientMode,
+			BinaryRuleCount:         row.BinaryRuleCount,
+			CertificateRuleCount:    row.CertificateRuleCount,
+			CompilerRuleCount:       row.CompilerRuleCount,
+			TransitiveRuleCount:     row.TransitiveRuleCount,
+			TeamidRuleCount:         row.TeamidRuleCount,
+			SigningidRuleCount:      row.SigningidRuleCount,
+			CdhashRuleCount:         row.CdhashRuleCount,
+			RulesReceived:           row.RulesReceived,
+			RulesProcessed:          row.RulesProcessed,
+			LastRuleSyncAttemptAt:   row.LastRuleSyncAttemptAt,
+			LastRuleSyncSuccessAt:   &completedAt,
 		})
-		return err
 	})
 }
 
-func mapMachineRuleSyncState(row db.GetMachineRuleSyncStateRow) (appsanta.MachineRuleSyncState, error) {
-	acknowledgedTargets, err := unmarshalSyncRuleTargets(row.AcknowledgedTargets)
+func mapMachineSyncState(row db.GetMachineSyncStateRow) (appsanta.MachineSyncState, error) {
+	appliedTargets, err := unmarshalSyncRuleTargets(row.AppliedTargets)
 	if err != nil {
-		return appsanta.MachineRuleSyncState{}, err
+		return appsanta.MachineSyncState{}, err
 	}
 	pendingTargets, err := unmarshalSyncRuleTargets(row.PendingTargets)
 	if err != nil {
-		return appsanta.MachineRuleSyncState{}, err
+		return appsanta.MachineSyncState{}, err
 	}
 
-	return appsanta.MachineRuleSyncState{
-		MachineID:                row.MachineID,
-		RequestCleanSync:         row.RequestCleanSync,
-		LastClientRulesHash:      row.LastClientRulesHash,
-		AcknowledgedTargets:      acknowledgedTargets,
-		PendingTargets:           pendingTargets,
-		PendingExpectedRulesHash: row.PendingExpectedRulesHash,
-		PendingPayloadRuleCount:  row.PendingPayloadRuleCount,
-		PendingSyncType:          appsanta.RuleSyncType(row.PendingSyncType),
-		PendingPreflightAt:       row.PendingPreflightAt,
-		LastPostflightAt:         row.LastPostflightAt,
+	return appsanta.MachineSyncState{
+		MachineID:               row.MachineID,
+		RulesHash:               row.RulesHash,
+		AppliedTargets:          appliedTargets,
+		PendingTargets:          pendingTargets,
+		ExpectedRulesHash:       row.ExpectedRulesHash,
+		PendingPayloadRuleCount: row.PendingPayloadRuleCount,
+		PendingFullSync:         row.PendingFullSync,
+		PendingPreflightAt:      row.PendingPreflightAt,
+		ClientMode:              domain.ParseMachineClientMode(row.ClientMode),
+		BinaryRuleCount:         row.BinaryRuleCount,
+		CertificateRuleCount:    row.CertificateRuleCount,
+		CompilerRuleCount:       row.CompilerRuleCount,
+		TransitiveRuleCount:     row.TransitiveRuleCount,
+		TeamIDRuleCount:         row.TeamidRuleCount,
+		SigningIDRuleCount:      row.SigningidRuleCount,
+		CDHashRuleCount:         row.CdhashRuleCount,
+		RulesReceived:           row.RulesReceived,
+		RulesProcessed:          row.RulesProcessed,
+		LastRuleSyncAttemptAt:   row.LastRuleSyncAttemptAt,
+		LastRuleSyncSuccessAt:   row.LastRuleSyncSuccessAt,
 	}, nil
 }
 
@@ -134,6 +189,8 @@ func marshalSyncRuleTargets(targets []appsanta.StoredRuleTarget) ([]byte, error)
 	rows := make([]syncRuleTargetRow, 0, len(targets))
 	for _, target := range targets {
 		rows = append(rows, syncRuleTargetRow{
+			RuleID:        target.RuleID,
+			RuleName:      target.RuleName,
 			RuleType:      string(target.RuleType),
 			Identifier:    target.Identifier,
 			IdentifierKey: target.IdentifierKey,
@@ -179,9 +236,27 @@ func unmarshalSyncRuleTargets(value []byte) ([]appsanta.StoredRuleTarget, error)
 				CustomURL:     row.CustomURL,
 				CELExpression: row.CELExpression,
 			},
+			RuleID:      row.RuleID,
+			RuleName:    row.RuleName,
 			PayloadHash: row.PayloadHash,
 		})
 	}
 
 	return targets, nil
+}
+
+func upsertMachineSyncState(
+	ctx context.Context,
+	queries *db.Queries,
+	row db.GetMachineSyncStateRow,
+	params db.UpsertMachineSyncStateParams,
+) error {
+	if params.AppliedTargets == nil {
+		params.AppliedTargets = row.AppliedTargets
+	}
+	if params.PendingTargets == nil {
+		params.PendingTargets = row.PendingTargets
+	}
+	_, err := queries.UpsertMachineSyncState(ctx, params)
+	return err
 }

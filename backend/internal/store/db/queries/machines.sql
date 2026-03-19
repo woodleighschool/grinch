@@ -59,13 +59,22 @@ SELECT
   m.santa_version,
   m.primary_user,
   m.primary_user_groups_raw,
-  COALESCE(rs.request_clean_sync, FALSE) AS request_clean_sync,
+  rs.pending_preflight_at,
+  rs.last_rule_sync_attempt_at,
+  COALESCE(rs.client_mode, 'unknown') AS client_mode,
+  COALESCE(rs.binary_rule_count, 0)::INT4 AS binary_rule_count,
+  COALESCE(rs.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
+  COALESCE(rs.compiler_rule_count, 0)::INT4 AS compiler_rule_count,
+  COALESCE(rs.transitive_rule_count, 0)::INT4 AS transitive_rule_count,
+  COALESCE(rs.teamid_rule_count, 0)::INT4 AS teamid_rule_count,
+  COALESCE(rs.signingid_rule_count, 0)::INT4 AS signingid_rule_count,
+  COALESCE(rs.cdhash_rule_count, 0)::INT4 AS cdhash_rule_count,
   m.last_seen_at,
   m.created_at,
   m.updated_at,
   u.id AS primary_user_id
 FROM machines AS m
-LEFT JOIN machine_rule_sync_states AS rs
+LEFT JOIN machine_sync_states AS rs
   ON rs.machine_id = m.machine_id
 LEFT JOIN users AS u
   ON u.upn = m.primary_user

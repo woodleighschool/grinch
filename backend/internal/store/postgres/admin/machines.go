@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -55,11 +56,16 @@ SELECT
   m.santa_version,
   m.primary_user,
   u.id AS primary_user_id,
+  COALESCE(ms.expected_rules_hash, '') AS expected_rules_hash,
+  ms.pending_preflight_at,
+  ms.last_rule_sync_attempt_at,
   m.last_seen_at,
   m.created_at,
   m.updated_at,
   COUNT(*) OVER()::INT4 AS total
 FROM machines AS m
+LEFT JOIN machine_sync_states AS ms
+  ON ms.machine_id = m.machine_id
 LEFT JOIN users AS u
   ON u.upn = m.primary_user
   AND m.primary_user <> ''
@@ -78,8 +84,11 @@ OFFSET $4
 
 func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 	var (
-		item  domain.MachineSummary
-		total int32
+		item                domain.MachineSummary
+		expectedRulesHash   string
+		pendingPreflightAt  *time.Time
+		lastRuleSyncAttemptAt *time.Time
+		total               int32
 	)
 
 	if scanErr := rows.Scan(
@@ -91,6 +100,9 @@ func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 		&item.SantaVersion,
 		&item.PrimaryUser,
 		&item.PrimaryUserID,
+		&expectedRulesHash,
+		&pendingPreflightAt,
+		&lastRuleSyncAttemptAt,
 		&item.LastSeenAt,
 		&item.CreatedAt,
 		&item.UpdatedAt,
@@ -98,6 +110,8 @@ func scanMachineSummary(rows pgx.Rows) (domain.MachineSummary, int32, error) {
 	); scanErr != nil {
 		return domain.MachineSummary{}, 0, scanErr
 	}
+
+	item.RuleSyncStatus = domain.DeriveMachineRuleSyncStatus(expectedRulesHash, pendingPreflightAt, lastRuleSyncAttemptAt)
 
 	return item, total, nil
 }

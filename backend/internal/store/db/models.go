@@ -87,19 +87,29 @@ type Machine struct {
 	UpdatedAt            time.Time
 }
 
-type MachineRuleSyncState struct {
-	MachineID                uuid.UUID
-	RequestCleanSync         bool
-	LastClientRulesHash      string
-	AcknowledgedTargets      []byte
-	PendingTargets           []byte
-	PendingExpectedRulesHash string
-	PendingPayloadRuleCount  int64
-	PendingSyncType          string
-	PendingPreflightAt       *time.Time
-	LastPostflightAt         *time.Time
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
+type MachineSyncState struct {
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []byte
+	PendingTargets          []byte
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingPreflightAt      *time.Time
+	LastRuleSyncSuccessAt   *time.Time
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	PendingFullSync         bool
+	ClientMode              string
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamidRuleCount         int32
+	SigningidRuleCount      int32
+	CdhashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
 }
 
 type Rule struct {

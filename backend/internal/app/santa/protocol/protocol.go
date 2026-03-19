@@ -26,17 +26,11 @@ func BuildRuleDownloadResponse(rules []model.SyncRule) (*syncv1.RuleDownloadResp
 	return syncv1.RuleDownloadResponse_builder{Rules: protoRules}.Build(), nil
 }
 
-func MapStoredRuleSyncType(value model.RuleSyncType) (syncv1.SyncType, error) {
-	switch value {
-	case model.RuleSyncTypeNone:
-		return syncv1.SyncType_SYNC_TYPE_UNSPECIFIED, nil
-	case model.RuleSyncTypeNormal:
-		return syncv1.SyncType_NORMAL, nil
-	case model.RuleSyncTypeClean:
-		return syncv1.SyncType_CLEAN, nil
-	default:
-		return syncv1.SyncType_SYNC_TYPE_UNSPECIFIED, fmt.Errorf("unsupported rule sync type %q", value)
+func MapPendingFullSync(value bool) syncv1.SyncType {
+	if value {
+		return syncv1.SyncType_CLEAN
 	}
+	return syncv1.SyncType_NORMAL
 }
 
 func buildRule(rule model.SyncRule) (*syncv1.Rule, error) {

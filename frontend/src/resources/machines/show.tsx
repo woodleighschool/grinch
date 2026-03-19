@@ -1,3 +1,4 @@
+import { RULE_POLICY_CHOICES } from "@/resources/rules/fields";
 import { EventDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
 import {
   GroupMembershipGroupLinkField,
@@ -13,11 +14,25 @@ import {
   Pagination,
   ReferenceField,
   ReferenceManyField,
+  SelectField,
   Show,
   TabbedShowLayout,
   TextField,
   TopToolbar,
 } from "react-admin";
+
+const RULE_SYNC_STATUS_CHOICES = [
+  { id: "synced", name: "Synced" },
+  { id: "pending", name: "Pending" },
+  { id: "issue", name: "Issue" },
+];
+
+const CLIENT_MODE_CHOICES = [
+  { id: "unknown", name: "Unknown" },
+  { id: "monitor", name: "Monitor" },
+  { id: "lockdown", name: "Lockdown" },
+  { id: "standalone", name: "Standalone" },
+];
 
 const MachineShowActions = (): ReactElement => (
   <TopToolbar>
@@ -40,10 +55,35 @@ export const MachineShow = (): ReactElement => (
           <TextField source="display_name" />
         </ReferenceField>
         <TextField source="primary_user" label="Primary User UPN" />
-        <BooleanField source="request_clean_sync" label="Request Clean Sync" />
+        <SelectField source="rule_sync_status" label="Rule Sync Status" choices={RULE_SYNC_STATUS_CHOICES} />
+        <SelectField source="client_mode" label="Client Mode" choices={CLIENT_MODE_CHOICES} />
+        <TextField source="binary_rule_count" label="Binary Rules" />
+        <TextField source="certificate_rule_count" label="Certificate Rules" />
+        <TextField source="compiler_rule_count" label="Compiler Rules" />
+        <TextField source="transitive_rule_count" label="Transitive Rules" />
+        <TextField source="teamid_rule_count" label="Team ID Rules" />
+        <TextField source="signingid_rule_count" label="Signing ID Rules" />
+        <TextField source="cdhash_rule_count" label="CD Hash Rules" />
         <DateField source="last_seen_at" label="Last Seen" showTime />
         <DateField source="created_at" label="Created" showTime />
         <DateField source="updated_at" label="Updated" showTime />
+      </TabbedShowLayout.Tab>
+      <TabbedShowLayout.Tab label="Rules">
+        <ReferenceManyField reference="machine-rules" target="machine_id" pagination={<Pagination />}>
+          <DataTable bulkActionButtons={false}>
+            <DataTable.Col source="rule_id" label="Rule">
+              <ReferenceField source="rule_id" reference="rules" label="Rule">
+                <TextField source="name" />
+              </ReferenceField>
+            </DataTable.Col>
+            <DataTable.Col source="policy" label="Policy">
+              <SelectField source="policy" choices={RULE_POLICY_CHOICES} optionText="name" />
+            </DataTable.Col>
+            <DataTable.Col source="applied" label="Applied">
+              <BooleanField source="applied" />
+            </DataTable.Col>
+          </DataTable>
+        </ReferenceManyField>
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Groups">
         <ReferenceManyField reference="group-memberships" target="machine_id" pagination={<Pagination />}>

@@ -4,17 +4,11 @@ import "github.com/woodleighschool/grinch/internal/app/santa/model"
 
 type (
 	MachineUpsert        = model.MachineUpsert
-	RuleSyncType         = model.RuleSyncType
-	MachineRuleSyncState = model.MachineRuleSyncState
+	MachineSyncState     = model.MachineSyncState
 	StoredRuleTarget     = model.StoredRuleTarget
 	SyncRule             = model.SyncRule
 	PendingSnapshotWrite = model.PendingSnapshotWrite
+	PostflightWrite      = model.PostflightWrite
 	DataStore            = model.DataStore
 	RuleResolver         = model.RuleResolver
-)
-
-const (
-	RuleSyncTypeNone   = model.RuleSyncTypeNone
-	RuleSyncTypeNormal = model.RuleSyncTypeNormal
-	RuleSyncTypeClean  = model.RuleSyncTypeClean
 )

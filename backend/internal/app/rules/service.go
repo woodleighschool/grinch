@@ -90,18 +90,8 @@ func (service *Service) DeleteRule(ctx context.Context, id uuid.UUID) error {
 func (service *Service) ResolveMachineRuleTargets(
 	ctx context.Context,
 	machineID uuid.UUID,
-) ([]domain.MachineRuleTarget, error) {
-	resolved, err := service.store.ListResolvedMachineRules(ctx, machineID)
-	if err != nil {
-		return nil, err
-	}
-
-	targets := make([]domain.MachineRuleTarget, 0, len(resolved))
-	for _, rule := range resolved {
-		targets = append(targets, rule.MachineRuleTarget)
-	}
-
-	return targets, nil
+) ([]domain.MachineResolvedRule, error) {
+	return service.store.ListResolvedMachineRules(ctx, machineID)
 }
 
 func normalizeInput(input WriteInput) WriteInput {

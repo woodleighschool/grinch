@@ -40,6 +40,8 @@ type AdminService interface {
 	DeleteGroup(context.Context, uuid.UUID) error
 	ListMachines(context.Context, domain.MachineListOptions) ([]domain.MachineSummary, int32, error)
 	GetMachine(context.Context, uuid.UUID) (domain.Machine, error)
+	ListMachineRules(context.Context, domain.MachineRuleListOptions) ([]domain.MachineRule, int32, error)
+	ListRuleMachines(context.Context, domain.RuleMachineListOptions) ([]domain.RuleMachine, int32, error)
 	DeleteMachine(context.Context, uuid.UUID) error
 	ListExecutables(context.Context, domain.ExecutableListOptions) ([]domain.ExecutableSummary, int32, error)
 	GetExecutable(context.Context, uuid.UUID) (domain.Executable, error)

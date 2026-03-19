@@ -4,7 +4,9 @@ import {
   fileAccessEventsApi,
   groupMembershipsApi,
   groupsApi,
+  machineRulesApi,
   machinesApi,
+  ruleMachinesApi,
   rulesApi,
   usersApi,
 } from "@/api/adminClient";
@@ -99,9 +101,11 @@ type ResourceName =
   | "groups"
   | "group-memberships"
   | "machines"
+  | "machine-rules"
   | "executables"
   | "execution-events"
   | "file-access-events"
+  | "rule-machines"
   | "rules";
 
 const listHandlers: Record<ResourceName, ListHandler> = {
@@ -134,6 +138,19 @@ const listHandlers: Record<ResourceName, ListHandler> = {
       await machinesApi.list(
         asListQuery(parameters, {
           user_id: getOptionalString(filter.user_id),
+        }),
+        signal,
+      ),
+    );
+  },
+
+  "machine-rules": async (parameters, signal): Promise<ListResult> => {
+    const filter = asRecord(parameters.filter);
+
+    return toListResult(
+      await machineRulesApi.list(
+        asListQuery(parameters, {
+          machine_id: getOptionalString(filter.machine_id),
         }),
         signal,
       ),
@@ -174,9 +191,22 @@ const listHandlers: Record<ResourceName, ListHandler> = {
 
   rules: async (parameters, signal): Promise<ListResult> =>
     toListResult(await rulesApi.list(asListQuery(parameters), signal)),
+
+  "rule-machines": async (parameters, signal): Promise<ListResult> => {
+    const filter = asRecord(parameters.filter);
+
+    return toListResult(
+      await ruleMachinesApi.list(
+        asListQuery(parameters, {
+          rule_id: getOptionalString(filter.rule_id),
+        }),
+        signal,
+      ),
+    );
+  },
 };
 
-const getOneHandlers: Record<ResourceName, GetOneHandler> = {
+const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   users: (id, signal): Promise<RaRecord> => usersApi.get(String(id), signal) as Promise<RaRecord>,
   groups: (id, signal): Promise<RaRecord> => groupsApi.get(String(id), signal) as Promise<RaRecord>,
   "group-memberships": (id, signal): Promise<RaRecord> =>
@@ -188,6 +218,15 @@ const getOneHandlers: Record<ResourceName, GetOneHandler> = {
   "file-access-events": (id, signal): Promise<RaRecord> =>
     fileAccessEventsApi.get(String(id), signal) as Promise<RaRecord>,
   rules: (id, signal): Promise<RaRecord> => rulesApi.get(String(id), signal) as Promise<RaRecord>,
+};
+
+const getGetOneHandler = (resourceName: ResourceName): GetOneHandler => {
+  const handler = getOneHandlers[resourceName];
+  if (!handler) {
+    return unsupported("GetOne", resourceName);
+  }
+
+  return handler;
 };
 
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
@@ -267,7 +306,7 @@ export const dataProvider: DataProvider = {
     parameters: GetOneParams<RecordType>,
   ): Promise<GetOneResult<RecordType>> {
     const resourceName = assertResourceName("GetOne", resource);
-    const handler = getOneHandlers[resourceName];
+    const handler = getGetOneHandler(resourceName);
 
     const data = await handler(parameters.id, parameters.signal);
     return { data: data as RecordType };
@@ -278,7 +317,7 @@ export const dataProvider: DataProvider = {
     parameters: GetManyParams<RecordType>,
   ): Promise<GetManyResult<RecordType>> {
     const resourceName = assertResourceName("GetMany", resource);
-    const handler = getOneHandlers[resourceName];
+    const handler = getGetOneHandler(resourceName);
 
     const records = await Promise.all(parameters.ids.map((id): Promise<RaRecord> => handler(id, parameters.signal)));
     return { data: records as RecordType[] };

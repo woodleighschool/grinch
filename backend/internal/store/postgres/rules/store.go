@@ -228,6 +228,7 @@ func (store *Store) ListResolvedMachineRules(
 				CELExpression: row.CelExpression,
 			},
 			RuleID: row.ID,
+			Name:   row.Name,
 		})
 	}
 

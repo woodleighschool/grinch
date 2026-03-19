@@ -12,85 +12,107 @@ import (
 	uuid "github.com/google/uuid"
 )
 
-const getMachineAcknowledgedRuleTargetsJSON = `-- name: GetMachineAcknowledgedRuleTargetsJSON :one
-SELECT COALESCE(
-  (
-    SELECT acknowledged_targets::TEXT
-    FROM machine_rule_sync_states
-    WHERE machine_id = $1
-  ),
-  '[]'
-) AS acknowledged_targets
-`
-
-func (q *Queries) GetMachineAcknowledgedRuleTargetsJSON(ctx context.Context, machineID uuid.UUID) (interface{}, error) {
-	row := q.db.QueryRow(ctx, getMachineAcknowledgedRuleTargetsJSON, machineID)
-	var acknowledged_targets interface{}
-	err := row.Scan(&acknowledged_targets)
-	return acknowledged_targets, err
-}
-
-const getMachineRuleSyncState = `-- name: GetMachineRuleSyncState :one
+const getMachineSyncState = `-- name: GetMachineSyncState :one
 SELECT
   m.machine_id,
-  COALESCE(rs.request_clean_sync, FALSE) AS request_clean_sync,
-  COALESCE(rs.last_client_rules_hash, '') AS last_client_rules_hash,
-  COALESCE(rs.acknowledged_targets, '[]'::JSONB) AS acknowledged_targets,
-  COALESCE(rs.pending_targets, '[]'::JSONB) AS pending_targets,
-  COALESCE(rs.pending_expected_rules_hash, '') AS pending_expected_rules_hash,
-  COALESCE(rs.pending_payload_rule_count, 0)::INT8 AS pending_payload_rule_count,
-  COALESCE(rs.pending_sync_type, '') AS pending_sync_type,
-  rs.pending_preflight_at,
-  rs.last_postflight_at
+  COALESCE(ms.rules_hash, '') AS rules_hash,
+  COALESCE(ms.applied_targets, '[]'::JSONB) AS applied_targets,
+  COALESCE(ms.pending_targets, '[]'::JSONB) AS pending_targets,
+  COALESCE(ms.expected_rules_hash, '') AS expected_rules_hash,
+  COALESCE(ms.pending_payload_rule_count, 0)::INT8 AS pending_payload_rule_count,
+  COALESCE(ms.pending_full_sync, FALSE) AS pending_full_sync,
+  ms.pending_preflight_at,
+  COALESCE(ms.client_mode, 'unknown') AS client_mode,
+  COALESCE(ms.binary_rule_count, 0)::INT4 AS binary_rule_count,
+  COALESCE(ms.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
+  COALESCE(ms.compiler_rule_count, 0)::INT4 AS compiler_rule_count,
+  COALESCE(ms.transitive_rule_count, 0)::INT4 AS transitive_rule_count,
+  COALESCE(ms.teamid_rule_count, 0)::INT4 AS teamid_rule_count,
+  COALESCE(ms.signingid_rule_count, 0)::INT4 AS signingid_rule_count,
+  COALESCE(ms.cdhash_rule_count, 0)::INT4 AS cdhash_rule_count,
+  COALESCE(ms.rules_received, 0)::INT4 AS rules_received,
+  COALESCE(ms.rules_processed, 0)::INT4 AS rules_processed,
+  ms.last_rule_sync_attempt_at,
+  ms.last_rule_sync_success_at
 FROM machines AS m
-LEFT JOIN machine_rule_sync_states AS rs
-  ON rs.machine_id = m.machine_id
+LEFT JOIN machine_sync_states AS ms
+  ON ms.machine_id = m.machine_id
 WHERE m.machine_id = $1
 `
 
-type GetMachineRuleSyncStateRow struct {
-	MachineID                uuid.UUID
-	RequestCleanSync         bool
-	LastClientRulesHash      string
-	AcknowledgedTargets      []byte
-	PendingTargets           []byte
-	PendingExpectedRulesHash string
-	PendingPayloadRuleCount  int64
-	PendingSyncType          string
-	PendingPreflightAt       *time.Time
-	LastPostflightAt         *time.Time
+type GetMachineSyncStateRow struct {
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []byte
+	PendingTargets          []byte
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingFullSync         bool
+	PendingPreflightAt      *time.Time
+	ClientMode              string
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamidRuleCount         int32
+	SigningidRuleCount      int32
+	CdhashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
+	LastRuleSyncSuccessAt   *time.Time
 }
 
-func (q *Queries) GetMachineRuleSyncState(ctx context.Context, machineID uuid.UUID) (GetMachineRuleSyncStateRow, error) {
-	row := q.db.QueryRow(ctx, getMachineRuleSyncState, machineID)
-	var i GetMachineRuleSyncStateRow
+func (q *Queries) GetMachineSyncState(ctx context.Context, machineID uuid.UUID) (GetMachineSyncStateRow, error) {
+	row := q.db.QueryRow(ctx, getMachineSyncState, machineID)
+	var i GetMachineSyncStateRow
 	err := row.Scan(
 		&i.MachineID,
-		&i.RequestCleanSync,
-		&i.LastClientRulesHash,
-		&i.AcknowledgedTargets,
+		&i.RulesHash,
+		&i.AppliedTargets,
 		&i.PendingTargets,
-		&i.PendingExpectedRulesHash,
+		&i.ExpectedRulesHash,
 		&i.PendingPayloadRuleCount,
-		&i.PendingSyncType,
+		&i.PendingFullSync,
 		&i.PendingPreflightAt,
-		&i.LastPostflightAt,
+		&i.ClientMode,
+		&i.BinaryRuleCount,
+		&i.CertificateRuleCount,
+		&i.CompilerRuleCount,
+		&i.TransitiveRuleCount,
+		&i.TeamidRuleCount,
+		&i.SigningidRuleCount,
+		&i.CdhashRuleCount,
+		&i.RulesReceived,
+		&i.RulesProcessed,
+		&i.LastRuleSyncAttemptAt,
+		&i.LastRuleSyncSuccessAt,
 	)
 	return i, err
 }
 
-const upsertMachineRuleSyncState = `-- name: UpsertMachineRuleSyncState :one
-INSERT INTO machine_rule_sync_states (
+const upsertMachineSyncState = `-- name: UpsertMachineSyncState :one
+INSERT INTO machine_sync_states (
   machine_id,
-  request_clean_sync,
-  last_client_rules_hash,
-  acknowledged_targets,
+  rules_hash,
+  applied_targets,
   pending_targets,
-  pending_expected_rules_hash,
+  expected_rules_hash,
   pending_payload_rule_count,
-  pending_sync_type,
+  pending_full_sync,
   pending_preflight_at,
-  last_postflight_at
+  client_mode,
+  binary_rule_count,
+  certificate_rule_count,
+  compiler_rule_count,
+  transitive_rule_count,
+  teamid_rule_count,
+  signingid_rule_count,
+  cdhash_rule_count,
+  rules_received,
+  rules_processed,
+  last_rule_sync_attempt_at,
+  last_rule_sync_success_at
 )
 VALUES (
   $1,
@@ -102,72 +124,157 @@ VALUES (
   $7,
   $8,
   $9,
-  $10
+  $10,
+  $11,
+  $12,
+  $13,
+  $14,
+  $15,
+  $16,
+  $17,
+  $18,
+  $19,
+  $20
 )
 ON CONFLICT (machine_id) DO UPDATE SET
-  request_clean_sync = EXCLUDED.request_clean_sync,
-  last_client_rules_hash = EXCLUDED.last_client_rules_hash,
-  acknowledged_targets = EXCLUDED.acknowledged_targets,
+  rules_hash = EXCLUDED.rules_hash,
+  applied_targets = EXCLUDED.applied_targets,
   pending_targets = EXCLUDED.pending_targets,
-  pending_expected_rules_hash = EXCLUDED.pending_expected_rules_hash,
+  expected_rules_hash = EXCLUDED.expected_rules_hash,
   pending_payload_rule_count = EXCLUDED.pending_payload_rule_count,
-  pending_sync_type = EXCLUDED.pending_sync_type,
+  pending_full_sync = EXCLUDED.pending_full_sync,
   pending_preflight_at = EXCLUDED.pending_preflight_at,
-  last_postflight_at = EXCLUDED.last_postflight_at,
+  client_mode = EXCLUDED.client_mode,
+  binary_rule_count = EXCLUDED.binary_rule_count,
+  certificate_rule_count = EXCLUDED.certificate_rule_count,
+  compiler_rule_count = EXCLUDED.compiler_rule_count,
+  transitive_rule_count = EXCLUDED.transitive_rule_count,
+  teamid_rule_count = EXCLUDED.teamid_rule_count,
+  signingid_rule_count = EXCLUDED.signingid_rule_count,
+  cdhash_rule_count = EXCLUDED.cdhash_rule_count,
+  rules_received = EXCLUDED.rules_received,
+  rules_processed = EXCLUDED.rules_processed,
+  last_rule_sync_attempt_at = EXCLUDED.last_rule_sync_attempt_at,
+  last_rule_sync_success_at = EXCLUDED.last_rule_sync_success_at,
   updated_at = NOW()
 RETURNING
   machine_id,
-  request_clean_sync,
-  last_client_rules_hash,
-  acknowledged_targets,
+  rules_hash,
+  applied_targets,
   pending_targets,
-  pending_expected_rules_hash,
+  expected_rules_hash,
   pending_payload_rule_count,
-  pending_sync_type,
+  pending_full_sync,
   pending_preflight_at,
-  last_postflight_at,
+  client_mode,
+  binary_rule_count,
+  certificate_rule_count,
+  compiler_rule_count,
+  transitive_rule_count,
+  teamid_rule_count,
+  signingid_rule_count,
+  cdhash_rule_count,
+  rules_received,
+  rules_processed,
+  last_rule_sync_attempt_at,
+  last_rule_sync_success_at,
   created_at,
   updated_at
 `
 
-type UpsertMachineRuleSyncStateParams struct {
-	MachineID                uuid.UUID
-	RequestCleanSync         bool
-	LastClientRulesHash      string
-	AcknowledgedTargets      []byte
-	PendingTargets           []byte
-	PendingExpectedRulesHash string
-	PendingPayloadRuleCount  int64
-	PendingSyncType          string
-	PendingPreflightAt       *time.Time
-	LastPostflightAt         *time.Time
+type UpsertMachineSyncStateParams struct {
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []byte
+	PendingTargets          []byte
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingFullSync         bool
+	PendingPreflightAt      *time.Time
+	ClientMode              string
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamidRuleCount         int32
+	SigningidRuleCount      int32
+	CdhashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
+	LastRuleSyncSuccessAt   *time.Time
 }
 
-func (q *Queries) UpsertMachineRuleSyncState(ctx context.Context, arg UpsertMachineRuleSyncStateParams) (MachineRuleSyncState, error) {
-	row := q.db.QueryRow(ctx, upsertMachineRuleSyncState,
+type UpsertMachineSyncStateRow struct {
+	MachineID               uuid.UUID
+	RulesHash               string
+	AppliedTargets          []byte
+	PendingTargets          []byte
+	ExpectedRulesHash       string
+	PendingPayloadRuleCount int64
+	PendingFullSync         bool
+	PendingPreflightAt      *time.Time
+	ClientMode              string
+	BinaryRuleCount         int32
+	CertificateRuleCount    int32
+	CompilerRuleCount       int32
+	TransitiveRuleCount     int32
+	TeamidRuleCount         int32
+	SigningidRuleCount      int32
+	CdhashRuleCount         int32
+	RulesReceived           int32
+	RulesProcessed          int32
+	LastRuleSyncAttemptAt   *time.Time
+	LastRuleSyncSuccessAt   *time.Time
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+}
+
+func (q *Queries) UpsertMachineSyncState(ctx context.Context, arg UpsertMachineSyncStateParams) (UpsertMachineSyncStateRow, error) {
+	row := q.db.QueryRow(ctx, upsertMachineSyncState,
 		arg.MachineID,
-		arg.RequestCleanSync,
-		arg.LastClientRulesHash,
-		arg.AcknowledgedTargets,
+		arg.RulesHash,
+		arg.AppliedTargets,
 		arg.PendingTargets,
-		arg.PendingExpectedRulesHash,
+		arg.ExpectedRulesHash,
 		arg.PendingPayloadRuleCount,
-		arg.PendingSyncType,
+		arg.PendingFullSync,
 		arg.PendingPreflightAt,
-		arg.LastPostflightAt,
+		arg.ClientMode,
+		arg.BinaryRuleCount,
+		arg.CertificateRuleCount,
+		arg.CompilerRuleCount,
+		arg.TransitiveRuleCount,
+		arg.TeamidRuleCount,
+		arg.SigningidRuleCount,
+		arg.CdhashRuleCount,
+		arg.RulesReceived,
+		arg.RulesProcessed,
+		arg.LastRuleSyncAttemptAt,
+		arg.LastRuleSyncSuccessAt,
 	)
-	var i MachineRuleSyncState
+	var i UpsertMachineSyncStateRow
 	err := row.Scan(
 		&i.MachineID,
-		&i.RequestCleanSync,
-		&i.LastClientRulesHash,
-		&i.AcknowledgedTargets,
+		&i.RulesHash,
+		&i.AppliedTargets,
 		&i.PendingTargets,
-		&i.PendingExpectedRulesHash,
+		&i.ExpectedRulesHash,
 		&i.PendingPayloadRuleCount,
-		&i.PendingSyncType,
+		&i.PendingFullSync,
 		&i.PendingPreflightAt,
-		&i.LastPostflightAt,
+		&i.ClientMode,
+		&i.BinaryRuleCount,
+		&i.CertificateRuleCount,
+		&i.CompilerRuleCount,
+		&i.TransitiveRuleCount,
+		&i.TeamidRuleCount,
+		&i.SigningidRuleCount,
+		&i.CdhashRuleCount,
+		&i.RulesReceived,
+		&i.RulesProcessed,
+		&i.LastRuleSyncAttemptAt,
+		&i.LastRuleSyncSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
