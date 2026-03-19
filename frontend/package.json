@@ -18,9 +18,11 @@
     "globals": "^17.4.0",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.4",
+    "@mui/utils": "^7.3.9",
     "react-admin": "^5.14.4",
     "react-dom": "^19.2.4",
-    "zod": "^4.3.6"
+    "react-hook-form": "^7.71.2",
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -40,8 +42,8 @@
     "prettier": "^3.8.1",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0",
-    "vite": "^8.0.0"
+    "typescript-eslint": "^8.57.1",
+    "vite": "^8.0.1"
   },
   "engines": {
     "node": ">=25.7.0"
