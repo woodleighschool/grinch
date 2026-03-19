@@ -28,9 +28,9 @@ type MachineUpsert struct {
 type RuleSyncType string
 
 const (
-	RuleSyncTypeNone       RuleSyncType = ""
-	RuleSyncTypeNormal     RuleSyncType = "normal"
-	RuleSyncTypeCleanRules RuleSyncType = "clean_rules"
+	RuleSyncTypeNone   RuleSyncType = ""
+	RuleSyncTypeNormal RuleSyncType = "normal"
+	RuleSyncTypeClean  RuleSyncType = "clean"
 )
 
 type MachineRuleSyncState struct {

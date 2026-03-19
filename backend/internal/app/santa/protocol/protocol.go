@@ -32,8 +32,8 @@ func MapStoredRuleSyncType(value model.RuleSyncType) (syncv1.SyncType, error) {
 		return syncv1.SyncType_SYNC_TYPE_UNSPECIFIED, nil
 	case model.RuleSyncTypeNormal:
 		return syncv1.SyncType_NORMAL, nil
-	case model.RuleSyncTypeCleanRules:
-		return syncv1.SyncType_CLEAN_RULES, nil
+	case model.RuleSyncTypeClean:
+		return syncv1.SyncType_CLEAN, nil
 	default:
 		return syncv1.SyncType_SYNC_TYPE_UNSPECIFIED, fmt.Errorf("unsupported rule sync type %q", value)
 	}

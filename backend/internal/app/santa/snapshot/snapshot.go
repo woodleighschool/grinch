@@ -148,7 +148,7 @@ func buildPendingSnapshot(
 
 	syncType := model.RuleSyncTypeNormal
 	if clientRequestedClean || state.RequestCleanSync || clientRulesHash != SantaRulesHash(acknowledged) {
-		syncType = model.RuleSyncTypeCleanRules
+		syncType = model.RuleSyncTypeClean
 		payload = fullSyncRules(current)
 	}
 
@@ -163,7 +163,7 @@ func buildPendingSnapshot(
 
 	return snapshot, model.PendingSnapshotWrite{
 		MachineID:                machineID,
-		RequestCleanSync:         syncType == model.RuleSyncTypeCleanRules,
+		RequestCleanSync:         syncType == model.RuleSyncTypeClean,
 		LastClientRulesHash:      clientRulesHash,
 		AcknowledgedTargets:      acknowledged,
 		PendingTargets:           cloneTargets(current),

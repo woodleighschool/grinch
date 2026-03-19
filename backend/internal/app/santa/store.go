@@ -14,7 +14,7 @@ type (
 )
 
 const (
-	RuleSyncTypeNone       = model.RuleSyncTypeNone
-	RuleSyncTypeNormal     = model.RuleSyncTypeNormal
-	RuleSyncTypeCleanRules = model.RuleSyncTypeCleanRules
+	RuleSyncTypeNone   = model.RuleSyncTypeNone
+	RuleSyncTypeNormal = model.RuleSyncTypeNormal
+	RuleSyncTypeClean  = model.RuleSyncTypeClean
 )

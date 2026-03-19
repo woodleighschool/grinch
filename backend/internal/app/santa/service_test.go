@@ -175,8 +175,8 @@ func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 	if len(primaryUserGroups) != 2 || primaryUserGroups[0] != "g1" || primaryUserGroups[1] != "g2" {
 		t.Fatalf("PrimaryUserGroupsRaw = %#v, want [g1 g2]", primaryUserGroups)
 	}
-	if response.GetSyncType() != syncv1.SyncType_CLEAN_RULES {
-		t.Fatalf("SyncType = %v, want CLEAN_RULES", response.GetSyncType())
+	if response.GetSyncType() != syncv1.SyncType_CLEAN {
+		t.Fatalf("SyncType = %v, want CLEAN", response.GetSyncType())
 	}
 }
 
@@ -224,7 +224,7 @@ func TestHandlePreflight_ReturnsNormalWhenClientMatchesAcknowledgedHash(t *testi
 	}
 }
 
-func TestHandlePreflight_ReturnsCleanRulesWhenClientHashDiverges(t *testing.T) {
+func TestHandlePreflight_ReturnsCleanWhenClientHashDiverges(t *testing.T) {
 	machineID := uuid.New()
 	acknowledged := storedTarget(domain.MachineRuleTarget{
 		RuleType:      domain.RuleTypeBinary,
@@ -253,8 +253,8 @@ func TestHandlePreflight_ReturnsCleanRulesWhenClientHashDiverges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
-	if response.GetSyncType() != syncv1.SyncType_CLEAN_RULES {
-		t.Fatalf("SyncType = %v, want CLEAN_RULES", response.GetSyncType())
+	if response.GetSyncType() != syncv1.SyncType_CLEAN {
+		t.Fatalf("SyncType = %v, want CLEAN", response.GetSyncType())
 	}
 }
 
