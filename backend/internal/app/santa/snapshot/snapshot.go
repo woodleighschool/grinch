@@ -233,9 +233,10 @@ func withRulePayloadHashes(targets []domain.MachineResolvedRule) []model.StoredR
 	return result
 }
 
-// SantaRulesHash mirrors Santa's dynamic execution-rule hash:
-// identifier bytes, CEL bytes, stored state int32 LE, stored type int32 LE,
-// iterated by (identifier ASC, stored type ASC), excluding transitive rules.
+// SantaRulesHash mirrors the client's execution-rule hash:
+// identifier bytes, CEL bytes, stored state int32 LE, stored type int32 LE.
+// The server canonicalizes by stored rule type first, then identifier, so the
+// hash matches the observed client ordering for the resolved execution-rule set.
 func SantaRulesHash(targets []model.StoredRuleTarget) string {
 	if len(targets) == 0 {
 		return ""
@@ -243,11 +244,17 @@ func SantaRulesHash(targets []model.StoredRuleTarget) string {
 
 	sortedTargets := slices.Clone(targets)
 	slices.SortFunc(sortedTargets, func(left model.StoredRuleTarget, right model.StoredRuleTarget) int {
-		if left.IdentifierKey != right.IdentifierKey {
-			return strings.Compare(left.IdentifierKey, right.IdentifierKey)
+		leftType := santaStoredRuleType(left.RuleType)
+		rightType := santaStoredRuleType(right.RuleType)
+		if leftType != rightType {
+			return int(leftType) - int(rightType)
 		}
 
-		return int(santaStoredRuleType(left.RuleType)) - int(santaStoredRuleType(right.RuleType))
+		if left.Identifier != right.Identifier {
+			return strings.Compare(left.Identifier, right.Identifier)
+		}
+
+		return strings.Compare(left.IdentifierKey, right.IdentifierKey)
 	})
 
 	var payload bytes.Buffer

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -64,8 +65,8 @@ func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending sa
 	store.ruleSyncStates[pending.MachineID] = santa.MachineSyncState{
 		MachineID:               pending.MachineID,
 		RulesHash:               pending.RulesHash,
-		AppliedTargets:          cloneTargets(pending.AppliedTargets),
-		PendingTargets:          cloneTargets(pending.PendingTargets),
+		AppliedTargets:          slices.Clone(pending.AppliedTargets),
+		PendingTargets:          slices.Clone(pending.PendingTargets),
 		ExpectedRulesHash:       pending.ExpectedRulesHash,
 		PendingPayloadRuleCount: pending.PendingPayloadRuleCount,
 		PendingFullSync:         pending.PendingFullSync,
@@ -102,7 +103,7 @@ func (store *fakeDataStore) PromotePendingSnapshot(
 	completedAt time.Time,
 ) error {
 	state := store.ruleSyncStates[machineID]
-	state.AppliedTargets = cloneTargets(state.PendingTargets)
+	state.AppliedTargets = slices.Clone(state.PendingTargets)
 	state.PendingTargets = nil
 	state.ExpectedRulesHash = ""
 	state.PendingPayloadRuleCount = 0
@@ -550,14 +551,26 @@ func TestSantaRulesHash_IgnoresCustomFieldsAndUsesStableOrdering(t *testing.T) {
 	}
 }
 
-func cloneTargets(targets []santa.StoredRuleTarget) []santa.StoredRuleTarget {
-	if len(targets) == 0 {
-		return nil
+func TestSantaRulesHash_MatchesObservedClientHashForSigningIDAndTeamID(t *testing.T) {
+	targets := []santa.StoredRuleTarget{
+		storedTarget(domain.MachineRuleTarget{
+			RuleType:      domain.RuleTypeSigningID,
+			Identifier:    "KL8N8XSYF4:com.brave.Browser",
+			IdentifierKey: "kl8n8xsyf4:com.brave.browser",
+			Policy:        domain.RulePolicyBlocklist,
+		}),
+		storedTarget(domain.MachineRuleTarget{
+			RuleType:      domain.RuleTypeTeamID,
+			Identifier:    "KHRWM533LU",
+			IdentifierKey: "khrwm533lu",
+			Policy:        domain.RulePolicyBlocklist,
+		}),
 	}
 
-	cloned := make([]santa.StoredRuleTarget, 0, len(targets))
-	cloned = append(cloned, targets...)
-	return cloned
+	const expected = "afcb46a9d4c7c0bf3d0387b3c63bafb1"
+	if actual := snapshot.SantaRulesHash(targets); actual != expected {
+		t.Fatalf("SantaRulesHash() = %q, want %q", actual, expected)
+	}
 }
 
 func storedTarget(target domain.MachineRuleTarget) santa.StoredRuleTarget {
@@ -576,13 +589,5 @@ func resolvedTarget(ruleID uuid.UUID, name string, target domain.MachineRuleTarg
 }
 
 func testPayloadHash(target domain.MachineRuleTarget) string {
-	return strings.Join([]string{
-		string(target.RuleType),
-		target.IdentifierKey,
-		target.Identifier,
-		string(target.Policy),
-		target.CustomMessage,
-		target.CustomURL,
-		target.CELExpression,
-	}, "\x1f")
+	return domain.MachineRuleTargetPayloadHash(target)
 }
