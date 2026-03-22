@@ -8,9 +8,8 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/woodleighschool/grinch/internal/app/santa/model"
-	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/domain"
+	"github.com/woodleighschool/grinch/internal/santa/model"
 )
 
 // ErrInvalidSyncRequest indicates invalid sync request data.
@@ -19,20 +18,20 @@ var ErrInvalidSyncRequest = errors.New("invalid sync request")
 // Service is the stage-facing app service used by the /sync transport.
 type Service struct {
 	logger         *slog.Logger
-	dataStore      DataStore
+	dataStore      model.DataStore
 	eventAllowlist map[domain.EventDecision]struct{}
-	ruleResolver   RuleResolver
+	ruleResolver   model.RuleResolver
 }
 
 // New creates a sync service with explicit dependencies.
 func New(
 	logger *slog.Logger,
 	dataStore model.DataStore,
-	eventsConfig config.EventsConfig,
+	eventAllowlist []domain.EventDecision,
 	ruleResolver model.RuleResolver,
 ) *Service {
-	allowlist := make(map[domain.EventDecision]struct{}, len(eventsConfig.DecisionAllowlist))
-	for _, decision := range eventsConfig.DecisionAllowlist {
+	allowlist := make(map[domain.EventDecision]struct{}, len(eventAllowlist))
+	for _, decision := range eventAllowlist {
 		allowlist[decision] = struct{}{}
 	}
 

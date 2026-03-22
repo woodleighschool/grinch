@@ -14,9 +14,7 @@ import (
 
 const createFileAccessEvent = `-- name: CreateFileAccessEvent :one
 INSERT INTO file_access_events (
-  id,
   machine_id,
-  executable_id,
   rule_version,
   rule_name,
   target,
@@ -31,14 +29,11 @@ VALUES (
   $4,
   $5,
   $6,
-  $7,
-  $8,
-  $9
+  $7
 )
 RETURNING
   id,
   machine_id,
-  executable_id,
   rule_version,
   rule_name,
   target,
@@ -49,9 +44,7 @@ RETURNING
 `
 
 type CreateFileAccessEventParams struct {
-	ID           uuid.UUID
 	MachineID    uuid.UUID
-	ExecutableID *uuid.UUID
 	RuleVersion  string
 	RuleName     string
 	Target       string
@@ -62,9 +55,7 @@ type CreateFileAccessEventParams struct {
 
 func (q *Queries) CreateFileAccessEvent(ctx context.Context, arg CreateFileAccessEventParams) (FileAccessEvent, error) {
 	row := q.db.QueryRow(ctx, createFileAccessEvent,
-		arg.ID,
 		arg.MachineID,
-		arg.ExecutableID,
 		arg.RuleVersion,
 		arg.RuleName,
 		arg.Target,
@@ -76,7 +67,6 @@ func (q *Queries) CreateFileAccessEvent(ctx context.Context, arg CreateFileAcces
 	err := row.Scan(
 		&i.ID,
 		&i.MachineID,
-		&i.ExecutableID,
 		&i.RuleVersion,
 		&i.RuleName,
 		&i.Target,
@@ -113,60 +103,29 @@ func (q *Queries) DeleteFileAccessEventsBefore(ctx context.Context, createdAt ti
 
 const getFileAccessEvent = `-- name: GetFileAccessEvent :one
 SELECT
-  fe.id,
-  fe.machine_id,
-  fe.executable_id,
-  fe.rule_version,
-  fe.rule_name,
-  fe.target,
-  fe.decision,
-  COALESCE(x.file_name, '') AS file_name,
-  COALESCE(x.file_sha256, '') AS file_sha256,
-  COALESCE(x.signing_id, '') AS signing_id,
-  COALESCE(x.team_id, '') AS team_id,
-  COALESCE(x.cdhash, '') AS cdhash,
-  fe.process_chain,
-  fe.occurred_at,
-  fe.created_at
-FROM file_access_events AS fe
-LEFT JOIN executables AS x ON x.id = fe.executable_id
-WHERE fe.id = $1
+  id,
+  machine_id,
+  rule_version,
+  rule_name,
+  target,
+  decision,
+  process_chain,
+  occurred_at,
+  created_at
+FROM file_access_events
+WHERE id = $1
 `
 
-type GetFileAccessEventRow struct {
-	ID           uuid.UUID
-	MachineID    uuid.UUID
-	ExecutableID *uuid.UUID
-	RuleVersion  string
-	RuleName     string
-	Target       string
-	Decision     string
-	FileName     string
-	FileSha256   string
-	SigningID    string
-	TeamID       string
-	Cdhash       string
-	ProcessChain []byte
-	OccurredAt   *time.Time
-	CreatedAt    time.Time
-}
-
-func (q *Queries) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (GetFileAccessEventRow, error) {
+func (q *Queries) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (FileAccessEvent, error) {
 	row := q.db.QueryRow(ctx, getFileAccessEvent, id)
-	var i GetFileAccessEventRow
+	var i FileAccessEvent
 	err := row.Scan(
 		&i.ID,
 		&i.MachineID,
-		&i.ExecutableID,
 		&i.RuleVersion,
 		&i.RuleName,
 		&i.Target,
 		&i.Decision,
-		&i.FileName,
-		&i.FileSha256,
-		&i.SigningID,
-		&i.TeamID,
-		&i.Cdhash,
 		&i.ProcessChain,
 		&i.OccurredAt,
 		&i.CreatedAt,

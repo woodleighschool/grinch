@@ -10,6 +10,16 @@ sql:
         package: "db"
         out: "."
         sql_package: "pgx/v5"
+        rename:
+          group_membership: "Membership"
+          custom_url: "CustomURL"
+          file_sha256: "FileSHA256"
+          teamid_rule_count: "TeamIDRuleCount"
+          signingid_rule_count: "SigningIDRuleCount"
+          cdhash_rule_count: "CDHashRuleCount"
+          desired_teamid_rule_count: "DesiredTeamIDRuleCount"
+          desired_signingid_rule_count: "DesiredSigningIDRuleCount"
+          desired_cdhash_rule_count: "DesiredCDHashRuleCount"
         overrides:
           - db_type: "uuid"
             go_type:

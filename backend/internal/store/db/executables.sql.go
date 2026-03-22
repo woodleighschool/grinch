@@ -15,10 +15,8 @@ import (
 const getExecutable = `-- name: GetExecutable :one
 SELECT
   id,
-  source,
   file_sha256,
   file_name,
-  file_path,
   file_bundle_id,
   file_bundle_path,
   signing_id,
@@ -36,10 +34,8 @@ func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (Executable, 
 	var i Executable
 	err := row.Scan(
 		&i.ID,
-		&i.Source,
-		&i.FileSha256,
+		&i.FileSHA256,
 		&i.FileName,
-		&i.FilePath,
 		&i.FileBundleID,
 		&i.FileBundlePath,
 		&i.SigningID,
@@ -52,47 +48,11 @@ func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (Executable, 
 	return i, err
 }
 
-const getExecutableNamesByIds = `-- name: GetExecutableNamesByIds :many
-SELECT
-  id,
-  file_name
-FROM executables
-WHERE id = ANY($1::UUID[])
-`
-
-type GetExecutableNamesByIdsRow struct {
-	ID       uuid.UUID
-	FileName string
-}
-
-func (q *Queries) GetExecutableNamesByIds(ctx context.Context, ids []uuid.UUID) ([]GetExecutableNamesByIdsRow, error) {
-	rows, err := q.db.Query(ctx, getExecutableNamesByIds, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetExecutableNamesByIdsRow
-	for rows.Next() {
-		var i GetExecutableNamesByIdsRow
-		if err := rows.Scan(&i.ID, &i.FileName); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOrCreateEventExecutable = `-- name: GetOrCreateEventExecutable :one
+const getOrCreateExecutable = `-- name: GetOrCreateExecutable :one
 WITH inserted AS (
   INSERT INTO executables (
-    id,
-    source,
     file_sha256,
     file_name,
-    file_path,
     file_bundle_id,
     file_bundle_path,
     signing_id,
@@ -103,25 +63,20 @@ WITH inserted AS (
   )
   VALUES (
     $1,
-    'event',
     $2,
     $3,
-    '',
     $4,
     $5,
     $6,
     $7,
     $8,
-    $9,
-    $10
+    $9
   )
-  ON CONFLICT (file_sha256, file_name) WHERE source = 'event' DO NOTHING
+  ON CONFLICT (file_sha256, file_name) DO NOTHING
   RETURNING
     id,
-    source,
     file_sha256,
     file_name,
-    file_path,
     file_bundle_id,
     file_bundle_path,
     signing_id,
@@ -131,14 +86,12 @@ WITH inserted AS (
     signing_chain,
     created_at
 )
-SELECT id, source, file_sha256, file_name, file_path, file_bundle_id, file_bundle_path, signing_id, team_id, cdhash, entitlements, signing_chain, created_at FROM inserted
+SELECT id, file_sha256, file_name, file_bundle_id, file_bundle_path, signing_id, team_id, cdhash, entitlements, signing_chain, created_at FROM inserted
 UNION ALL
 SELECT
   id,
-  source,
   file_sha256,
   file_name,
-  file_path,
   file_bundle_id,
   file_bundle_path,
   signing_id,
@@ -148,16 +101,14 @@ SELECT
   signing_chain,
   created_at
 FROM executables
-WHERE source = 'event'
-  AND file_sha256 = $2
-  AND file_name = $3
+WHERE file_sha256 = $1
+  AND file_name = $2
   AND NOT EXISTS (SELECT 1 FROM inserted)
 LIMIT 1
 `
 
-type GetOrCreateEventExecutableParams struct {
-	ID             uuid.UUID
-	FileSha256     string
+type GetOrCreateExecutableParams struct {
+	FileSHA256     string
 	FileName       string
 	FileBundleID   string
 	FileBundlePath string
@@ -168,12 +119,10 @@ type GetOrCreateEventExecutableParams struct {
 	SigningChain   []byte
 }
 
-type GetOrCreateEventExecutableRow struct {
+type GetOrCreateExecutableRow struct {
 	ID             uuid.UUID
-	Source         string
-	FileSha256     string
+	FileSHA256     string
 	FileName       string
-	FilePath       string
 	FileBundleID   string
 	FileBundlePath string
 	SigningID      string
@@ -184,10 +133,9 @@ type GetOrCreateEventExecutableRow struct {
 	CreatedAt      time.Time
 }
 
-func (q *Queries) GetOrCreateEventExecutable(ctx context.Context, arg GetOrCreateEventExecutableParams) (GetOrCreateEventExecutableRow, error) {
-	row := q.db.QueryRow(ctx, getOrCreateEventExecutable,
-		arg.ID,
-		arg.FileSha256,
+func (q *Queries) GetOrCreateExecutable(ctx context.Context, arg GetOrCreateExecutableParams) (GetOrCreateExecutableRow, error) {
+	row := q.db.QueryRow(ctx, getOrCreateExecutable,
+		arg.FileSHA256,
 		arg.FileName,
 		arg.FileBundleID,
 		arg.FileBundlePath,
@@ -197,143 +145,11 @@ func (q *Queries) GetOrCreateEventExecutable(ctx context.Context, arg GetOrCreat
 		arg.Entitlements,
 		arg.SigningChain,
 	)
-	var i GetOrCreateEventExecutableRow
+	var i GetOrCreateExecutableRow
 	err := row.Scan(
 		&i.ID,
-		&i.Source,
-		&i.FileSha256,
+		&i.FileSHA256,
 		&i.FileName,
-		&i.FilePath,
-		&i.FileBundleID,
-		&i.FileBundlePath,
-		&i.SigningID,
-		&i.TeamID,
-		&i.Cdhash,
-		&i.Entitlements,
-		&i.SigningChain,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getOrCreateProcessExecutable = `-- name: GetOrCreateProcessExecutable :one
-WITH inserted AS (
-  INSERT INTO executables (
-    id,
-    source,
-    file_sha256,
-    file_name,
-    file_path,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain
-  )
-  VALUES (
-    $1,
-    'process',
-    $2,
-    '',
-    $3,
-    '',
-    '',
-    $4,
-    $5,
-    $6,
-    '{}'::JSONB,
-    $7
-  )
-  ON CONFLICT (file_sha256, file_path, signing_id, team_id, cdhash, signing_chain)
-    WHERE source = 'process' DO NOTHING
-  RETURNING
-    id,
-    source,
-    file_sha256,
-    file_name,
-    file_path,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain,
-    created_at
-)
-SELECT id, source, file_sha256, file_name, file_path, file_bundle_id, file_bundle_path, signing_id, team_id, cdhash, entitlements, signing_chain, created_at FROM inserted
-UNION ALL
-SELECT
-  id,
-  source,
-  file_sha256,
-  file_name,
-  file_path,
-  file_bundle_id,
-  file_bundle_path,
-  signing_id,
-  team_id,
-  cdhash,
-  entitlements,
-  signing_chain,
-  created_at
-FROM executables
-WHERE source = 'process'
-  AND file_sha256 = $2
-  AND file_path = $3
-  AND signing_id = $4
-  AND team_id = $5
-  AND cdhash = $6
-  AND signing_chain = $7
-  AND NOT EXISTS (SELECT 1 FROM inserted)
-LIMIT 1
-`
-
-type GetOrCreateProcessExecutableParams struct {
-	ID           uuid.UUID
-	FileSha256   string
-	FilePath     string
-	SigningID    string
-	TeamID       string
-	Cdhash       string
-	SigningChain []byte
-}
-
-type GetOrCreateProcessExecutableRow struct {
-	ID             uuid.UUID
-	Source         string
-	FileSha256     string
-	FileName       string
-	FilePath       string
-	FileBundleID   string
-	FileBundlePath string
-	SigningID      string
-	TeamID         string
-	Cdhash         string
-	Entitlements   []byte
-	SigningChain   []byte
-	CreatedAt      time.Time
-}
-
-func (q *Queries) GetOrCreateProcessExecutable(ctx context.Context, arg GetOrCreateProcessExecutableParams) (GetOrCreateProcessExecutableRow, error) {
-	row := q.db.QueryRow(ctx, getOrCreateProcessExecutable,
-		arg.ID,
-		arg.FileSha256,
-		arg.FilePath,
-		arg.SigningID,
-		arg.TeamID,
-		arg.Cdhash,
-		arg.SigningChain,
-	)
-	var i GetOrCreateProcessExecutableRow
-	err := row.Scan(
-		&i.ID,
-		&i.Source,
-		&i.FileSha256,
-		&i.FileName,
-		&i.FilePath,
 		&i.FileBundleID,
 		&i.FileBundlePath,
 		&i.SigningID,

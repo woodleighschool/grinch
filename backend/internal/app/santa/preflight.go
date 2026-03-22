@@ -9,8 +9,8 @@ import (
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/google/uuid"
 
-	"github.com/woodleighschool/grinch/internal/app/santa/protocol"
-	"github.com/woodleighschool/grinch/internal/app/santa/snapshot"
+	"github.com/woodleighschool/grinch/internal/santa/model"
+	"github.com/woodleighschool/grinch/internal/santa/snapshot"
 )
 
 // HandlePreflight snapshots machine state and freezes the next pending sync
@@ -26,7 +26,7 @@ func (service *Service) HandlePreflight(
 		return nil, fmt.Errorf("marshal primary user groups: %w", err)
 	}
 
-	err = service.dataStore.UpsertMachine(ctx, MachineUpsert{
+	err = service.dataStore.UpsertMachine(ctx, model.MachineUpsert{
 		MachineID:            machineID,
 		SerialNumber:         request.GetSerialNumber(),
 		Hostname:             request.GetHostname(),
@@ -41,6 +41,10 @@ func (service *Service) HandlePreflight(
 	if err != nil {
 		return nil, fmt.Errorf("upsert machine: %w", err)
 	}
+	syncErr := service.dataStore.SyncMachineDesiredRuleTargets(ctx, machineID)
+	if syncErr != nil {
+		return nil, fmt.Errorf("sync machine desired rule targets: %w", syncErr)
+	}
 
 	pendingSnapshot, err := snapshot.PreparePendingSnapshot(
 		ctx,
@@ -54,7 +58,7 @@ func (service *Service) HandlePreflight(
 		return nil, fmt.Errorf("prepare pending rule snapshot: %w", err)
 	}
 
-	syncType := protocol.MapPendingFullSync(pendingSnapshot.FullSync)
+	syncType := snapshot.MapPendingFullSync(pendingSnapshot.FullSync)
 	response := syncv1.PreflightResponse_builder{
 		ClientMode: request.GetClientMode(),
 		SyncType:   &syncType,

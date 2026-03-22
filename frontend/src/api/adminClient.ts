@@ -18,8 +18,8 @@ type FileAccessEvent = components["schemas"]["FileAccessEvent"];
 type FileAccessEventListResponse = components["schemas"]["FileAccessEventListResponse"];
 type Group = components["schemas"]["Group"];
 type GroupListResponse = components["schemas"]["GroupListResponse"];
-type GroupMembership = components["schemas"]["GroupMembership"];
-type GroupMembershipListResponse = components["schemas"]["GroupMembershipListResponse"];
+type Membership = components["schemas"]["Membership"];
+type MembershipListResponse = components["schemas"]["MembershipListResponse"];
 type Machine = components["schemas"]["Machine"];
 type MachineListResponse = components["schemas"]["MachineListResponse"];
 type MachineRuleListResponse = components["schemas"]["MachineRuleListResponse"];
@@ -183,11 +183,11 @@ export const groupsApi = {
   delete: deleteOne("/groups/{id}"),
 };
 
-export const groupMembershipsApi = {
-  list: list<GroupMembershipListResponse>("/group-memberships"),
-  get: getOne<GroupMembership>("/group-memberships/{id}"),
-  create: createOne<GroupMembership>("/group-memberships"),
-  delete: deleteOne("/group-memberships/{id}"),
+export const membershipsApi = {
+  list: list<MembershipListResponse>("/memberships"),
+  get: getOne<Membership>("/memberships/{id}"),
+  create: createOne<Membership>("/memberships"),
+  delete: deleteOne("/memberships/{id}"),
 };
 
 export const usersApi = {

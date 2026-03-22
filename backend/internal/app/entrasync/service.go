@@ -7,6 +7,8 @@ import (
 	"time"
 
 	graphsync "github.com/woodleighschool/go-entrasync"
+
+	"github.com/woodleighschool/grinch/internal/domain"
 )
 
 // GraphClient reads Entra objects from Microsoft Graph.
@@ -16,14 +18,8 @@ type GraphClient interface {
 
 // DataStore persists a full Entra snapshot.
 type DataStore interface {
-	ReconcileSnapshot(ctx context.Context, snapshot *graphsync.Snapshot) (Result, error)
-}
-
-// Result reports reconciled object counts.
-type Result struct {
-	Users       int
-	Groups      int
-	Memberships int
+	ReconcileSnapshot(ctx context.Context, snapshot *graphsync.Snapshot) (domain.EntrasyncResult, error)
+	SyncAllMachineDesiredRuleTargets(context.Context) error
 }
 
 // Service runs Entra snapshot synchronization.
@@ -63,15 +59,19 @@ func (service *Service) Run(ctx context.Context) {
 }
 
 // SyncOnce fetches a snapshot from Graph and reconciles it into storage.
-func (service *Service) SyncOnce(ctx context.Context) (Result, error) {
+func (service *Service) SyncOnce(ctx context.Context) (domain.EntrasyncResult, error) {
 	snapshot, err := service.client.Snapshot(ctx)
 	if err != nil {
-		return Result{}, fmt.Errorf("fetch graph snapshot: %w", err)
+		return domain.EntrasyncResult{}, fmt.Errorf("fetch graph snapshot: %w", err)
 	}
 
 	result, err := service.dataStore.ReconcileSnapshot(ctx, snapshot)
 	if err != nil {
-		return Result{}, fmt.Errorf("reconcile snapshot: %w", err)
+		return domain.EntrasyncResult{}, fmt.Errorf("reconcile snapshot: %w", err)
+	}
+	syncErr := service.dataStore.SyncAllMachineDesiredRuleTargets(ctx)
+	if syncErr != nil {
+		return domain.EntrasyncResult{}, fmt.Errorf("sync machine desired rule targets: %w", syncErr)
 	}
 
 	return result, nil

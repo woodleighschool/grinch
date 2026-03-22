@@ -148,6 +148,11 @@ updated AS (
     name,
     description,
     source,
+    (
+      SELECT COUNT(*)::INT4
+      FROM group_memberships
+      WHERE group_id = groups.id
+    ) AS member_count,
     created_at,
     updated_at
 )
@@ -161,6 +166,7 @@ SELECT
   updated.name,
   updated.description,
   updated.source,
+  COALESCE(updated.member_count, 0)::INT4 AS member_count,
   updated.created_at,
   updated.updated_at
 FROM (SELECT 1) AS marker
@@ -179,6 +185,7 @@ type UpdateGroupRow struct {
 	Name        pgtype.Text
 	Description pgtype.Text
 	Source      pgtype.Text
+	MemberCount int32
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
 }
@@ -192,6 +199,7 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Updat
 		&i.Name,
 		&i.Description,
 		&i.Source,
+		&i.MemberCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -221,6 +229,7 @@ RETURNING
   name,
   description,
   source,
+  0::INT4 AS member_count,
   created_at,
   updated_at
 `
@@ -232,19 +241,30 @@ type UpsertGroupParams struct {
 	Source      string
 }
 
-func (q *Queries) UpsertGroup(ctx context.Context, arg UpsertGroupParams) (Group, error) {
+type UpsertGroupRow struct {
+	ID          uuid.UUID
+	Name        string
+	Description string
+	Source      string
+	MemberCount int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) UpsertGroup(ctx context.Context, arg UpsertGroupParams) (UpsertGroupRow, error) {
 	row := q.db.QueryRow(ctx, upsertGroup,
 		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.Source,
 	)
-	var i Group
+	var i UpsertGroupRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Description,
 		&i.Source,
+		&i.MemberCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -3,9 +3,9 @@ import { RULE_POLICY_CHOICES } from "@/resources/rules/choices";
 import { EditableShowActions } from "@/resources/shared/actions";
 import { EventDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
 import {
-  GroupMembershipGroupLinkField,
-  GroupMembershipGroupSourceField,
-} from "@/resources/shared/groupMembershipFields";
+  MembershipGroupLinkField,
+  MembershipGroupSourceField,
+} from "@/resources/shared/membershipFields";
 import type { ReactElement } from "react";
 import {
   BooleanField,
@@ -66,13 +66,13 @@ export const MachineShow = (): ReactElement => (
         </ReferenceManyField>
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Groups">
-        <ReferenceManyField reference="group-memberships" target="machine_id" pagination={<Pagination />}>
+        <ReferenceManyField reference="memberships" target="machine_id" pagination={<Pagination />}>
           <DataTable bulkActionButtons={false}>
             <DataTable.Col source="group.name" label="Name">
-              <GroupMembershipGroupLinkField />
+              <MembershipGroupLinkField />
             </DataTable.Col>
             <DataTable.Col source="group.source" label="Source">
-              <GroupMembershipGroupSourceField />
+              <MembershipGroupSourceField />
             </DataTable.Col>
             <DataTable.Col source="kind" label="Membership" />
             <DataTable.Col source="member.name" label="Via" />

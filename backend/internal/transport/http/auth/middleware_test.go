@@ -18,10 +18,10 @@ func sessionAuthStub(next http.Handler) http.Handler {
 	})
 }
 
-func TestNewAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
+func TestAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
 	t.Parallel()
 
-	middleware := authhttp.NewAPIMiddleware(sessionAuthStub)
+	middleware := authhttp.APIMiddleware(sessionAuthStub)
 
 	called := false
 	handler := middleware(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
@@ -42,10 +42,10 @@ func TestNewAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
 	}
 }
 
-func TestNewAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
+func TestAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
 	t.Parallel()
 
-	middleware := authhttp.NewAPIMiddleware(func(next http.Handler) http.Handler {
+	middleware := authhttp.APIMiddleware(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			next.ServeHTTP(writer, request)
 		})

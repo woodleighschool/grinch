@@ -13,10 +13,8 @@ import (
 
 type Executable struct {
 	ID             uuid.UUID
-	Source         string
-	FileSha256     string
+	FileSHA256     string
 	FileName       string
-	FilePath       string
 	FileBundleID   string
 	FileBundlePath string
 	SigningID      string
@@ -43,7 +41,6 @@ type ExecutionEvent struct {
 type FileAccessEvent struct {
 	ID           uuid.UUID
 	MachineID    uuid.UUID
-	ExecutableID *uuid.UUID
 	RuleVersion  string
 	RuleName     string
 	Target       string
@@ -62,16 +59,6 @@ type Group struct {
 	UpdatedAt   time.Time
 }
 
-type GroupMembership struct {
-	ID         uuid.UUID
-	GroupID    uuid.UUID
-	MemberKind string
-	MemberID   uuid.UUID
-	Origin     string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-}
-
 type Machine struct {
 	MachineID            uuid.UUID
 	SerialNumber         string
@@ -88,28 +75,46 @@ type Machine struct {
 }
 
 type MachineSyncState struct {
-	MachineID               uuid.UUID
-	RulesHash               string
-	AppliedTargets          []byte
-	PendingTargets          []byte
-	ExpectedRulesHash       string
-	PendingPayloadRuleCount int64
-	PendingPreflightAt      *time.Time
-	LastRuleSyncSuccessAt   *time.Time
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	PendingFullSync         bool
-	ClientMode              string
-	BinaryRuleCount         int32
-	CertificateRuleCount    int32
-	CompilerRuleCount       int32
-	TransitiveRuleCount     int32
-	TeamidRuleCount         int32
-	SigningidRuleCount      int32
-	CdhashRuleCount         int32
-	RulesReceived           int32
-	RulesProcessed          int32
-	LastRuleSyncAttemptAt   *time.Time
+	MachineID                   uuid.UUID
+	RulesHash                   string
+	AppliedTargets              []byte
+	PendingTargets              []byte
+	PendingPayloadRuleCount     int64
+	PendingPreflightAt          *time.Time
+	LastRuleSyncSuccessAt       *time.Time
+	CreatedAt                   time.Time
+	UpdatedAt                   time.Time
+	PendingFullSync             bool
+	ClientMode                  string
+	BinaryRuleCount             int32
+	CertificateRuleCount        int32
+	CompilerRuleCount           int32
+	TransitiveRuleCount         int32
+	TeamIDRuleCount             int32
+	SigningIDRuleCount          int32
+	CDHashRuleCount             int32
+	RulesReceived               int32
+	RulesProcessed              int32
+	LastRuleSyncAttemptAt       *time.Time
+	PendingPayload              []byte
+	DesiredTargets              []byte
+	DesiredBinaryRuleCount      int32
+	DesiredCertificateRuleCount int32
+	DesiredTeamIDRuleCount      int32
+	DesiredSigningIDRuleCount   int32
+	DesiredCDHashRuleCount      int32
+	LastCleanSyncAt             *time.Time
+	LastReportedCountsMatchAt   *time.Time
+}
+
+type Membership struct {
+	ID         uuid.UUID
+	GroupID    uuid.UUID
+	MemberKind string
+	MemberID   uuid.UUID
+	Origin     string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type Rule struct {
@@ -118,9 +123,8 @@ type Rule struct {
 	Description   string
 	RuleType      string
 	Identifier    string
-	IdentifierKey pgtype.Text
 	CustomMessage string
-	CustomUrl     string
+	CustomURL     string
 	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time

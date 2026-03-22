@@ -8,9 +8,7 @@ export const ExecutableShow = (): ReactElement => (
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Overview">
         <TextField source="file_name" label="File Name" />
-        <TextField source="source" label="Source" />
         <TextField source="file_sha256" label="SHA-256" />
-        <TextField source="file_path" label="File Path" />
         <TextField source="cdhash" label="CDHash" />
         <TextField source="file_bundle_id" label="Bundle ID" />
         <TextField source="file_bundle_path" label="Bundle Path" />

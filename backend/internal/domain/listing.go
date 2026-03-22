@@ -19,7 +19,7 @@ type GroupListOptions struct {
 	ListOptions
 }
 
-type GroupMembershipListOptions struct {
+type MembershipListOptions struct {
 	ListOptions
 
 	GroupID   *uuid.UUID
@@ -49,8 +49,6 @@ type RuleMachineListOptions struct {
 
 type ExecutableListOptions struct {
 	ListOptions
-
-	Sources []ExecutableSource
 }
 
 type ExecutionEventListOptions struct {
@@ -65,9 +63,8 @@ type ExecutionEventListOptions struct {
 type FileAccessEventListOptions struct {
 	ListOptions
 
-	MachineID    *uuid.UUID
-	ExecutableID *uuid.UUID
-	Decisions    []FileAccessDecision
+	MachineID *uuid.UUID
+	Decisions []FileAccessDecision
 }
 
 type RuleListOptions struct {

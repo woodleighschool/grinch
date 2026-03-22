@@ -14,33 +14,28 @@ import (
 	"github.com/go-chi/chi/v5"
 	graphsync "github.com/woodleighschool/go-entrasync"
 
-	appauth "github.com/woodleighschool/grinch/internal/app/auth"
 	appentrasync "github.com/woodleighschool/grinch/internal/app/entrasync"
 	appevents "github.com/woodleighschool/grinch/internal/app/events"
-	appgroupmemberships "github.com/woodleighschool/grinch/internal/app/groupmemberships"
+	appfileaccessevents "github.com/woodleighschool/grinch/internal/app/fileaccessevents"
+	appgroups "github.com/woodleighschool/grinch/internal/app/groups"
+	appmemberships "github.com/woodleighschool/grinch/internal/app/memberships"
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
 	appsanta "github.com/woodleighschool/grinch/internal/app/santa"
 	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/platform/logging"
 	"github.com/woodleighschool/grinch/internal/store/postgres"
-	adminpostgres "github.com/woodleighschool/grinch/internal/store/postgres/admin"
-	entrasyncpostgres "github.com/woodleighschool/grinch/internal/store/postgres/entrasync"
-	eventspostgres "github.com/woodleighschool/grinch/internal/store/postgres/events"
-	groupmembershipspostgres "github.com/woodleighschool/grinch/internal/store/postgres/groupmemberships"
-	rulespostgres "github.com/woodleighschool/grinch/internal/store/postgres/rules"
-	santapostgres "github.com/woodleighschool/grinch/internal/store/postgres/santa"
+	apihttp "github.com/woodleighschool/grinch/internal/transport/http/api"
 	authhttp "github.com/woodleighschool/grinch/internal/transport/http/auth"
-	httpapi "github.com/woodleighschool/grinch/internal/transport/http/httpapi"
 	httprouter "github.com/woodleighschool/grinch/internal/transport/http/router"
-	"github.com/woodleighschool/grinch/internal/transport/http/synchttp"
+	synchttp "github.com/woodleighschool/grinch/internal/transport/http/sync"
 )
 
 const (
-	shutdownTimeout   = 10 * time.Second
-	readHeaderTimeout = 5 * time.Second
-	idleTimeout       = 2 * time.Minute
-	retentionInterval = 1 * time.Hour
 	frontendDistDir   = "/frontend"
+	idleTimeout       = 2 * time.Minute
+	readHeaderTimeout = 5 * time.Second
+	retentionInterval = 1 * time.Hour
+	shutdownTimeout   = 10 * time.Second
 )
 
 func main() {
@@ -51,6 +46,9 @@ func main() {
 }
 
 func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -68,51 +66,16 @@ func run() error {
 	}
 	defer store.Close()
 
-	stopContext, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	server, err := buildServer(stopContext, logger, cfg, store)
+	server, err := buildServer(ctx, logger, cfg, store)
 	if err != nil {
 		return err
 	}
 
-	if syncErr := maybeStartEntraSync(stopContext, logger, cfg, store); syncErr != nil {
-		return syncErr
+	if err = startEntraSync(ctx, logger, cfg, store); err != nil {
+		return err
 	}
 
-	serverErr := make(chan error, 1)
-	go func() {
-		logger.Info("starting server", "port", cfg.HTTP.Port)
-		if serveErr := server.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			serverErr <- serveErr
-			return
-		}
-		serverErr <- nil
-	}()
-
-	select {
-	case serveErr := <-serverErr:
-		if serveErr != nil {
-			return fmt.Errorf("serve: %w", serveErr)
-		}
-		return nil
-	case <-stopContext.Done():
-		logger.Info("shutdown signal received")
-	}
-
-	shutdownContext, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	if shutdownErr := server.Shutdown(shutdownContext); shutdownErr != nil {
-		return fmt.Errorf("shutdown: %w", shutdownErr)
-	}
-
-	if serveErr := <-serverErr; serveErr != nil {
-		return fmt.Errorf("serve after shutdown: %w", serveErr)
-	}
-
-	logger.Info("server stopped")
-	return nil
+	return serve(ctx, logger, server, cfg.HTTP.Port)
 }
 
 func buildServer(
@@ -121,22 +84,21 @@ func buildServer(
 	cfg config.Config,
 	store *postgres.Store,
 ) (*http.Server, error) {
-	adminStore := adminpostgres.New(store)
-	ruleService := apprules.New(rulespostgres.New(store))
-	groupMembershipService := appgroupmemberships.New(groupmembershipspostgres.New(store))
-	santaStore := santapostgres.New(store)
+	groupService := appgroups.New(store)
+	ruleService := apprules.New(store)
+	membershipService := appmemberships.New(store)
+	fileAccessEventService := appfileaccessevents.New(store)
+
 	syncService := appsanta.New(
 		logger,
-		santaStore,
-		cfg.Events,
+		store,
+		cfg.Events.DecisionAllowlist,
 		ruleService,
 	)
-	eventService := appevents.New(logger, eventspostgres.New(store), cfg.Events.RetentionDays)
-	syncHandler := synchttp.New(
-		syncService,
-		cfg.Sync.SharedSecret,
-	)
-	authService, err := appauth.New(appauth.Config{
+
+	eventService := appevents.New(logger, store, cfg.Events.RetentionDays)
+
+	authService, err := authhttp.New(authhttp.Config{
 		RootURL:            cfg.HTTP.BaseURL,
 		EntraTenantID:      cfg.Auth.EntraTenantID,
 		EntraClientID:      cfg.Auth.EntraClientID,
@@ -148,34 +110,40 @@ func buildServer(
 		return nil, fmt.Errorf("configure auth: %w", err)
 	}
 
-	apiAuthMiddleware := authhttp.NewAPIMiddleware(
-		authService.SessionAuthMiddleware(),
+	syncHandler := synchttp.New(
+		syncService,
+		cfg.Sync.SharedSecret,
 	)
-	apiHandler := httpapi.New(adminStore, ruleService, groupMembershipService)
 
-	server := &http.Server{
+	apiHandler := apihttp.New(
+		store,
+		groupService,
+		fileAccessEventService,
+		ruleService,
+		membershipService,
+	)
+
+	go eventService.RunRetention(ctx, retentionInterval)
+
+	return &http.Server{
+		Addr: cfg.HTTP.Addr(),
 		Handler: httprouter.New(
 			logger,
 			store.Ping,
 			syncHandler.RegisterRoutes,
 			authService.RegisterRoutes,
 			func(router chi.Router) {
-				router.Use(apiAuthMiddleware)
+				router.Use(authhttp.APIMiddleware(authService.SessionAuthMiddleware()))
 				apiHandler.RegisterRoutes(router)
 			},
 			frontendDistDir,
 		),
 		ReadHeaderTimeout: readHeaderTimeout,
 		IdleTimeout:       idleTimeout,
-		Addr:              cfg.HTTP.Addr(),
-	}
-
-	go eventService.RunRetention(ctx, retentionInterval)
-
-	return server, nil
+	}, nil
 }
 
-func maybeStartEntraSync(
+func startEntraSync(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg config.Config,
@@ -194,13 +162,60 @@ func maybeStartEntraSync(
 		return fmt.Errorf("configure entra graph client: %w", err)
 	}
 
-	entraSyncService := appentrasync.New(
+	service := appentrasync.New(
 		logger,
 		graphClient,
-		entrasyncpostgres.New(store),
+		store,
 		cfg.Entra.Interval,
 	)
 
-	go entraSyncService.Run(ctx)
+	go service.Run(ctx)
+
+	return nil
+}
+
+func serve(
+	ctx context.Context,
+	logger *slog.Logger,
+	server *http.Server,
+	port int,
+) error {
+	serverErr := make(chan error, 1)
+
+	go func() {
+		logger.Info("starting server", "port", port)
+
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+			return
+		}
+
+		serverErr <- nil
+	}()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			return fmt.Errorf("serve: %w", err)
+		}
+		return nil
+
+	case <-ctx.Done():
+		logger.InfoContext(ctx, "shutdown signal received")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("shutdown: %w", err)
+	}
+
+	if err := <-serverErr; err != nil {
+		return fmt.Errorf("serve after shutdown: %w", err)
+	}
+
+	logger.InfoContext(ctx, "server stopped")
 	return nil
 }

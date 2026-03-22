@@ -35,7 +35,7 @@ import {
 } from "react-admin";
 
 type Group = components["schemas"]["Group"];
-type GroupMembershipListItem = components["schemas"]["GroupMembershipListItem"];
+type MembershipListItem = components["schemas"]["MembershipListItem"];
 type MemberKind = components["schemas"]["MemberKind"];
 
 interface AddMemberDialogProperties {
@@ -55,7 +55,7 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
     }
 
     try {
-      await create("group-memberships", {
+      await create("memberships", {
         data: {
           group_id: groupID,
           member_kind: values.member_kind,
@@ -127,7 +127,7 @@ const AddMemberDialog = ({ groupID, open, onClose }: AddMemberDialogProperties):
 };
 
 const MemberKindField = (): ReactElement | undefined => {
-  const membership = useRecordContext<GroupMembershipListItem>();
+  const membership = useRecordContext<MembershipListItem>();
 
   if (!membership) {
     return undefined;
@@ -144,7 +144,7 @@ const MemberKindField = (): ReactElement | undefined => {
 };
 
 const MemberNameField = (): ReactElement | undefined => {
-  const membership = useRecordContext<GroupMembershipListItem>();
+  const membership = useRecordContext<MembershipListItem>();
 
   if (!membership) {
     return undefined;
@@ -186,7 +186,7 @@ export const GroupMembersTab = (): ReactElement | undefined => {
       </Stack>
 
       <ReferenceManyField
-        reference="group-memberships"
+        reference="memberships"
         target="group_id"
         perPage={25}
         pagination={<Pagination />}

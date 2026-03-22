@@ -14,7 +14,6 @@ import (
 
 const createExecutionEvent = `-- name: CreateExecutionEvent :one
 INSERT INTO execution_events (
-  id,
   machine_id,
   executable_id,
   decision,
@@ -32,8 +31,7 @@ VALUES (
   $5,
   $6,
   $7,
-  $8,
-  $9
+  $8
 )
 RETURNING
   id,
@@ -49,7 +47,6 @@ RETURNING
 `
 
 type CreateExecutionEventParams struct {
-	ID              uuid.UUID
 	MachineID       uuid.UUID
 	ExecutableID    uuid.UUID
 	Decision        string
@@ -62,7 +59,6 @@ type CreateExecutionEventParams struct {
 
 func (q *Queries) CreateExecutionEvent(ctx context.Context, arg CreateExecutionEventParams) (ExecutionEvent, error) {
 	row := q.db.QueryRow(ctx, createExecutionEvent,
-		arg.ID,
 		arg.MachineID,
 		arg.ExecutableID,
 		arg.Decision,
@@ -144,7 +140,7 @@ type GetExecutionEventRow struct {
 	Decision        string
 	FilePath        string
 	FileName        string
-	FileSha256      string
+	FileSHA256      string
 	FileBundleID    string
 	FileBundlePath  string
 	SigningID       string
@@ -169,7 +165,7 @@ func (q *Queries) GetExecutionEvent(ctx context.Context, id uuid.UUID) (GetExecu
 		&i.Decision,
 		&i.FilePath,
 		&i.FileName,
-		&i.FileSha256,
+		&i.FileSHA256,
 		&i.FileBundleID,
 		&i.FileBundlePath,
 		&i.SigningID,

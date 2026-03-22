@@ -1,4 +1,4 @@
--- name: CreateGroupMembership :one
+-- name: CreateMembership :one
 INSERT INTO group_memberships (
   id,
   group_id,
@@ -22,7 +22,7 @@ RETURNING
   created_at,
   updated_at;
 
--- name: AddSyncedGroupMembership :exec
+-- name: AddSyncedMembership :exec
 INSERT INTO group_memberships (
   id,
   group_id,
@@ -41,7 +41,7 @@ ON CONFLICT (group_id, member_kind, member_id) DO UPDATE SET
   origin = 'synced',
   updated_at = NOW();
 
--- name: GetGroupMembership :one
+-- name: GetMembership :one
 SELECT
   id,
   group_id,
@@ -53,7 +53,7 @@ SELECT
 FROM group_memberships
 WHERE id = $1;
 
--- name: GetPersistedGroupMembershipView :one
+-- name: GetPersistedMembershipView :one
 SELECT
   gm.id,
   g.id AS group_id,
@@ -61,10 +61,10 @@ SELECT
   g.source AS group_source,
   gm.member_kind,
   gm.member_id,
-  CASE
+  COALESCE(CASE
     WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
     ELSE NULLIF(m.hostname, '')
-  END AS member_name,
+  END, '')::TEXT AS member_name,
   gm.created_at,
   gm.updated_at
 FROM group_memberships AS gm
@@ -78,7 +78,7 @@ LEFT JOIN machines AS m
   AND m.machine_id = gm.member_id
 WHERE gm.id = $1;
 
--- name: DeleteGroupMembership :one
+-- name: DeleteMembership :one
 DELETE FROM group_memberships
 WHERE id = $1
 RETURNING

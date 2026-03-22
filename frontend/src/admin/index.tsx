@@ -58,6 +58,6 @@ export const App = (): ReactElement => (
     <Resource name="users" {...users} />
     <Resource name="groups" {...groups} />
     {/* Registered for reference and mutation hooks used from other resource screens. */}
-    <Resource name="group-memberships" />
+    <Resource name="memberships" />
   </Admin>
 );

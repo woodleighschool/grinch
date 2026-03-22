@@ -2,7 +2,7 @@ import {
   executablesApi,
   executionEventsApi,
   fileAccessEventsApi,
-  groupMembershipsApi,
+  membershipsApi,
   groupsApi,
   machineRulesApi,
   machinesApi,
@@ -35,8 +35,8 @@ import type {
   UpdateResult,
 } from "react-admin";
 
-type GroupMembershipCreateRequest = components["schemas"]["GroupMembershipCreateRequest"];
-type GroupMembershipListItem = components["schemas"]["GroupMembershipListItem"];
+type MembershipCreateRequest = components["schemas"]["MembershipCreateRequest"];
+type MembershipListItem = components["schemas"]["MembershipListItem"];
 type RecordShape = Record<string, unknown>;
 type QueryScalar = string | number | boolean;
 type QueryValue = QueryScalar | QueryScalar[];
@@ -124,10 +124,10 @@ const toListResult = (payload: { rows: unknown[]; total: number }): ListResult =
   total: payload.total,
 });
 
-const toGroupMembershipRecord = (item: GroupMembershipListItem): RaRecord => {
+const toMembershipRecord = (item: MembershipListItem): RaRecord => {
   const id = item.actual_membership_id ?? item.effective_membership_id;
   if (!id) {
-    throw new Error("group membership list item missing id");
+    throw new Error("membership list item missing id");
   }
 
   return {
@@ -136,8 +136,8 @@ const toGroupMembershipRecord = (item: GroupMembershipListItem): RaRecord => {
   };
 };
 
-const toGroupMembershipListResult = (payload: { rows: GroupMembershipListItem[]; total: number }): ListResult => ({
-  data: payload.rows.map((item): RaRecord => toGroupMembershipRecord(item)),
+const toMembershipListResult = (payload: { rows: MembershipListItem[]; total: number }): ListResult => ({
+  data: payload.rows.map((item): RaRecord => toMembershipRecord(item)),
   total: payload.total,
 });
 
@@ -154,7 +154,7 @@ type DeleteHandler = (id: Identifier) => Promise<void>;
 type ResourceName =
   | "users"
   | "groups"
-  | "group-memberships"
+  | "memberships"
   | "machines"
   | "machine-rules"
   | "executables"
@@ -170,11 +170,11 @@ const listHandlers: Record<ResourceName, ListHandler> = {
   groups: async (parameters, signal): Promise<ListResult> =>
     toListResult(await groupsApi.list(asListQuery(parameters), signal)),
 
-  "group-memberships": async (parameters, signal): Promise<ListResult> => {
+  memberships: async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
 
-    return toGroupMembershipListResult(
-      await groupMembershipsApi.list(
+    return toMembershipListResult(
+      await membershipsApi.list(
         asListQuery(parameters, {
           group_id: getOptionalString(filter.group_id),
           user_id: getOptionalString(filter.user_id),
@@ -288,8 +288,8 @@ const listHandlers: Record<ResourceName, ListHandler> = {
 const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   users: (id, signal): Promise<RaRecord> => usersApi.get(String(id), signal) as Promise<RaRecord>,
   groups: (id, signal): Promise<RaRecord> => groupsApi.get(String(id), signal) as Promise<RaRecord>,
-  "group-memberships": (id, signal): Promise<RaRecord> =>
-    groupMembershipsApi.get(String(id), signal) as Promise<RaRecord>,
+  memberships: (id, signal): Promise<RaRecord> =>
+    membershipsApi.get(String(id), signal) as Promise<RaRecord>,
   machines: (id, signal): Promise<RaRecord> => machinesApi.get(String(id), signal) as Promise<RaRecord>,
   executables: (id, signal): Promise<RaRecord> => executablesApi.get(String(id), signal) as Promise<RaRecord>,
   "execution-events": (id, signal): Promise<RaRecord> =>
@@ -302,8 +302,8 @@ const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
   rules: (data): Promise<RaRecord> => rulesApi.create(data) as Promise<RaRecord>,
   groups: (data): Promise<RaRecord> => groupsApi.create(data) as Promise<RaRecord>,
-  "group-memberships": (data): Promise<RaRecord> =>
-    groupMembershipsApi.create(data as GroupMembershipCreateRequest) as Promise<RaRecord>,
+  memberships: (data): Promise<RaRecord> =>
+    membershipsApi.create(data as MembershipCreateRequest) as Promise<RaRecord>,
 };
 
 const updateHandlers: Partial<Record<ResourceName, UpdateHandler>> = {
@@ -312,7 +312,7 @@ const updateHandlers: Partial<Record<ResourceName, UpdateHandler>> = {
 };
 
 const deleteHandlers: Partial<Record<ResourceName, DeleteHandler>> = {
-  "group-memberships": (id): Promise<void> => groupMembershipsApi.delete(String(id)),
+  memberships: (id): Promise<void> => membershipsApi.delete(String(id)),
   rules: (id): Promise<void> => rulesApi.delete(String(id)),
   groups: (id): Promise<void> => groupsApi.delete(String(id)),
   machines: (id): Promise<void> => machinesApi.delete(String(id)),

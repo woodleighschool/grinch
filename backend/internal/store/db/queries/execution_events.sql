@@ -1,6 +1,5 @@
 -- name: CreateExecutionEvent :one
 INSERT INTO execution_events (
-  id,
   machine_id,
   executable_id,
   decision,
@@ -18,8 +17,7 @@ VALUES (
   $5,
   $6,
   $7,
-  $8,
-  $9
+  $8
 )
 RETURNING
   id,

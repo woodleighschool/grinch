@@ -10,33 +10,6 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-type WriteInput struct {
-	CustomMessage string
-	CustomURL     string
-	Description   string
-	Enabled       bool
-	Identifier    string
-	Name          string
-	RuleType      domain.RuleType
-	Targets       TargetsWriteInput
-}
-
-type TargetsWriteInput struct {
-	Include []IncludeTargetWriteInput
-	Exclude []ExcludedGroupWriteInput
-}
-
-type IncludeTargetWriteInput struct {
-	SubjectKind   domain.RuleTargetSubjectKind
-	SubjectID     *uuid.UUID
-	Policy        domain.RulePolicy
-	CELExpression string
-}
-
-type ExcludedGroupWriteInput struct {
-	GroupID uuid.UUID
-}
-
 type Service struct {
 	store Store
 }
@@ -44,10 +17,11 @@ type Service struct {
 type Store interface {
 	ListRules(context.Context, domain.RuleListOptions) ([]domain.RuleSummary, int32, error)
 	GetRule(context.Context, uuid.UUID) (domain.Rule, error)
-	CreateRule(context.Context, WriteInput) (domain.Rule, error)
-	UpdateRule(context.Context, uuid.UUID, WriteInput) (domain.Rule, error)
+	CreateRule(context.Context, domain.RuleWriteInput) (domain.Rule, error)
+	UpdateRule(context.Context, uuid.UUID, domain.RuleWriteInput) (domain.Rule, error)
 	DeleteRule(context.Context, uuid.UUID) error
 	ListResolvedMachineRules(context.Context, uuid.UUID) ([]domain.MachineResolvedRule, error)
+	SyncAllMachineDesiredRuleTargets(context.Context) error
 }
 
 func New(store Store) *Service {
@@ -65,26 +39,52 @@ func (service *Service) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule,
 	return service.store.GetRule(ctx, id)
 }
 
-func (service *Service) CreateRule(ctx context.Context, input WriteInput) (domain.Rule, error) {
+func (service *Service) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
 	normalized := normalizeInput(input)
 	if validationErr := validateInput(normalized); validationErr != nil {
 		return domain.Rule{}, validationErr
 	}
 
-	return service.store.CreateRule(ctx, normalized)
+	rule, err := service.store.CreateRule(ctx, normalized)
+	if err != nil {
+		return domain.Rule{}, err
+	}
+	syncErr := service.store.SyncAllMachineDesiredRuleTargets(ctx)
+	if syncErr != nil {
+		return domain.Rule{}, syncErr
+	}
+
+	return rule, nil
 }
 
-func (service *Service) UpdateRule(ctx context.Context, id uuid.UUID, input WriteInput) (domain.Rule, error) {
+func (service *Service) UpdateRule(
+	ctx context.Context,
+	id uuid.UUID,
+	input domain.RuleWriteInput,
+) (domain.Rule, error) {
 	normalized := normalizeInput(input)
 	if validationErr := validateInput(normalized); validationErr != nil {
 		return domain.Rule{}, validationErr
 	}
 
-	return service.store.UpdateRule(ctx, id, normalized)
+	rule, err := service.store.UpdateRule(ctx, id, normalized)
+	if err != nil {
+		return domain.Rule{}, err
+	}
+	syncErr := service.store.SyncAllMachineDesiredRuleTargets(ctx)
+	if syncErr != nil {
+		return domain.Rule{}, syncErr
+	}
+
+	return rule, nil
 }
 
 func (service *Service) DeleteRule(ctx context.Context, id uuid.UUID) error {
-	return service.store.DeleteRule(ctx, id)
+	if err := service.store.DeleteRule(ctx, id); err != nil {
+		return err
+	}
+
+	return service.store.SyncAllMachineDesiredRuleTargets(ctx)
 }
 
 func (service *Service) ResolveMachineRuleTargets(
@@ -94,7 +94,7 @@ func (service *Service) ResolveMachineRuleTargets(
 	return service.store.ListResolvedMachineRules(ctx, machineID)
 }
 
-func normalizeInput(input WriteInput) WriteInput {
+func normalizeInput(input domain.RuleWriteInput) domain.RuleWriteInput {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.Identifier = strings.TrimSpace(input.Identifier)
@@ -110,7 +110,7 @@ func normalizeInput(input WriteInput) WriteInput {
 	return input
 }
 
-func validateInput(input WriteInput) *domain.ValidationError {
+func validateInput(input domain.RuleWriteInput) *domain.ValidationError {
 	err := &domain.ValidationError{
 		Code:   "validation_error",
 		Detail: "Rule is invalid.",
@@ -138,7 +138,7 @@ func validateInput(input WriteInput) *domain.ValidationError {
 	return err
 }
 
-func validateIncludeTarget(index int, target IncludeTargetWriteInput, err *domain.ValidationError) {
+func validateIncludeTarget(index int, target domain.IncludeRuleTargetWriteInput, err *domain.ValidationError) {
 	validateTargetSubject(fmt.Sprintf("targets.include[%d]", index), target.SubjectKind, target.SubjectID, err)
 	if target.Policy == "" {
 		err.Add(fmt.Sprintf("targets.include[%d].policy", index), "is required for include targets", "required")
@@ -156,7 +156,7 @@ func validateIncludeTarget(index int, target IncludeTargetWriteInput, err *domai
 	}
 }
 
-func validateExcludedGroup(index int, group ExcludedGroupWriteInput, err *domain.ValidationError) {
+func validateExcludedGroup(index int, group domain.ExcludedGroupWriteInput, err *domain.ValidationError) {
 	if group.GroupID == uuid.Nil {
 		err.Add(fmt.Sprintf("targets.exclude[%d].group_id", index), "is required", "required")
 	}

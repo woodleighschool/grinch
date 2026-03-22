@@ -59,8 +59,23 @@ SELECT
   m.santa_version,
   m.primary_user,
   m.primary_user_groups_raw,
-  rs.pending_preflight_at,
-  rs.last_rule_sync_attempt_at,
+  machine_rule_sync_status(
+    rs.pending_preflight_at,
+    rs.desired_targets,
+    rs.applied_targets,
+    rs.desired_binary_rule_count,
+    rs.binary_rule_count,
+    rs.desired_certificate_rule_count,
+    rs.certificate_rule_count,
+    rs.desired_teamid_rule_count,
+    rs.teamid_rule_count,
+    rs.desired_signingid_rule_count,
+    rs.signingid_rule_count,
+    rs.desired_cdhash_rule_count,
+    rs.cdhash_rule_count,
+    rs.last_clean_sync_at,
+    rs.last_reported_counts_match_at
+  ) AS rule_sync_status,
   COALESCE(rs.client_mode, 'unknown') AS client_mode,
   COALESCE(rs.binary_rule_count, 0)::INT4 AS binary_rule_count,
   COALESCE(rs.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
@@ -80,6 +95,20 @@ LEFT JOIN users AS u
   ON u.upn = m.primary_user
   AND m.primary_user <> ''
 WHERE m.machine_id = $1;
+
+-- name: ListMachineIDs :many
+SELECT machine_id
+FROM machines
+ORDER BY machine_id ASC;
+
+-- name: ListMachineIDsByPrimaryUserID :many
+SELECT m.machine_id
+FROM machines AS m
+JOIN users AS u
+  ON u.upn = m.primary_user
+WHERE u.id = $1
+  AND m.primary_user <> ''
+ORDER BY m.machine_id ASC;
 
 -- name: ListMachines :many
 SELECT

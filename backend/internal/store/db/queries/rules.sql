@@ -157,7 +157,6 @@ SELECT
   r.name,
   r.rule_type,
   r.identifier,
-  r.identifier_key,
   r.custom_message,
   r.custom_url,
   wi.policy,
@@ -169,7 +168,7 @@ LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
   AND r.enabled = true
-ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC;
+ORDER BY r.rule_type ASC, r.identifier ASC, r.id ASC;
 
 -- name: CreateRuleTarget :exec
 INSERT INTO rule_targets (

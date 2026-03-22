@@ -5,7 +5,10 @@ import (
 	"strings"
 )
 
-var ErrGroupReadOnly = errors.New("group read-only")
+var (
+	ErrGroupReadOnly = errors.New("group read-only")
+	ErrInvalidSort   = errors.New("invalid sort")
+)
 
 type FieldError struct {
 	Field   string

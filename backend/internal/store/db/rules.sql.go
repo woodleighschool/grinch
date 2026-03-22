@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -54,24 +53,11 @@ type CreateRuleParams struct {
 	RuleType      string
 	Identifier    string
 	CustomMessage string
-	CustomUrl     string
+	CustomURL     string
 	Enabled       bool
 }
 
-type CreateRuleRow struct {
-	ID            uuid.UUID
-	Name          string
-	Description   string
-	RuleType      string
-	Identifier    string
-	CustomMessage string
-	CustomUrl     string
-	Enabled       bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-}
-
-func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (CreateRuleRow, error) {
+func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (Rule, error) {
 	row := q.db.QueryRow(ctx, createRule,
 		arg.ID,
 		arg.Name,
@@ -79,10 +65,10 @@ func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (CreateR
 		arg.RuleType,
 		arg.Identifier,
 		arg.CustomMessage,
-		arg.CustomUrl,
+		arg.CustomURL,
 		arg.Enabled,
 	)
-	var i CreateRuleRow
+	var i Rule
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -90,7 +76,7 @@ func (q *Queries) CreateRule(ctx context.Context, arg CreateRuleParams) (CreateR
 		&i.RuleType,
 		&i.Identifier,
 		&i.CustomMessage,
-		&i.CustomUrl,
+		&i.CustomURL,
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -184,22 +170,9 @@ FROM rules
 WHERE id = $1
 `
 
-type GetRuleRow struct {
-	ID            uuid.UUID
-	Name          string
-	Description   string
-	RuleType      string
-	Identifier    string
-	CustomMessage string
-	CustomUrl     string
-	Enabled       bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-}
-
-func (q *Queries) GetRule(ctx context.Context, id uuid.UUID) (GetRuleRow, error) {
+func (q *Queries) GetRule(ctx context.Context, id uuid.UUID) (Rule, error) {
 	row := q.db.QueryRow(ctx, getRule, id)
-	var i GetRuleRow
+	var i Rule
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -207,7 +180,7 @@ func (q *Queries) GetRule(ctx context.Context, id uuid.UUID) (GetRuleRow, error)
 		&i.RuleType,
 		&i.Identifier,
 		&i.CustomMessage,
-		&i.CustomUrl,
+		&i.CustomURL,
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -297,7 +270,6 @@ SELECT
   r.name,
   r.rule_type,
   r.identifier,
-  r.identifier_key,
   r.custom_message,
   r.custom_url,
   wi.policy,
@@ -309,7 +281,7 @@ LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
   AND r.enabled = true
-ORDER BY r.rule_type ASC, r.identifier_key ASC, r.id ASC
+ORDER BY r.rule_type ASC, r.identifier ASC, r.id ASC
 `
 
 type ListResolvedRulesForMachineRow struct {
@@ -317,9 +289,8 @@ type ListResolvedRulesForMachineRow struct {
 	Name          string
 	RuleType      string
 	Identifier    string
-	IdentifierKey pgtype.Text
 	CustomMessage string
-	CustomUrl     string
+	CustomURL     string
 	Policy        pgtype.Text
 	CelExpression string
 }
@@ -338,9 +309,8 @@ func (q *Queries) ListResolvedRulesForMachine(ctx context.Context, memberID uuid
 			&i.Name,
 			&i.RuleType,
 			&i.Identifier,
-			&i.IdentifierKey,
 			&i.CustomMessage,
-			&i.CustomUrl,
+			&i.CustomURL,
 			&i.Policy,
 			&i.CelExpression,
 		); err != nil {
@@ -450,24 +420,11 @@ type UpdateRuleParams struct {
 	RuleType      string
 	Identifier    string
 	CustomMessage string
-	CustomUrl     string
+	CustomURL     string
 	Enabled       bool
 }
 
-type UpdateRuleRow struct {
-	ID            uuid.UUID
-	Name          string
-	Description   string
-	RuleType      string
-	Identifier    string
-	CustomMessage string
-	CustomUrl     string
-	Enabled       bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-}
-
-func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (UpdateRuleRow, error) {
+func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (Rule, error) {
 	row := q.db.QueryRow(ctx, updateRule,
 		arg.ID,
 		arg.Name,
@@ -475,10 +432,10 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (UpdateR
 		arg.RuleType,
 		arg.Identifier,
 		arg.CustomMessage,
-		arg.CustomUrl,
+		arg.CustomURL,
 		arg.Enabled,
 	)
-	var i UpdateRuleRow
+	var i Rule
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -486,7 +443,7 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (UpdateR
 		&i.RuleType,
 		&i.Identifier,
 		&i.CustomMessage,
-		&i.CustomUrl,
+		&i.CustomURL,
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,

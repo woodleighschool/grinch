@@ -32,173 +32,74 @@ const (
 	FileAccessDecisionAuditOnly              FileAccessDecision = "audit_only"
 )
 
-func ParsePrincipalSource(value string) (PrincipalSource, error) {
-	switch PrincipalSource(value) {
-	case PrincipalSourceLocal:
-		return PrincipalSourceLocal, nil
-	case PrincipalSourceEntra:
-		return PrincipalSourceEntra, nil
-	default:
-		return "", fmt.Errorf("unsupported source %q", value)
+func parseEnum[T ~string](value, kind string, valid ...T) (T, error) {
+	for _, v := range valid {
+		if T(value) == v {
+			return v, nil
+		}
 	}
+	var zero T
+	return zero, fmt.Errorf("unsupported %s %q", kind, value)
 }
 
-func ParseExecutableSource(value string) (ExecutableSource, error) {
-	switch ExecutableSource(value) {
-	case ExecutableSourceEvent:
-		return ExecutableSourceEvent, nil
-	case ExecutableSourceProcess:
-		return ExecutableSourceProcess, nil
-	default:
-		return "", fmt.Errorf("unsupported executable source %q", value)
-	}
+func ParsePrincipalSource(value string) (PrincipalSource, error) {
+	return parseEnum(value, "source", PrincipalSourceLocal, PrincipalSourceEntra)
 }
 
 func ParseMemberKind(value string) (MemberKind, error) {
-	switch MemberKind(value) {
-	case MemberKindUser:
-		return MemberKindUser, nil
-	case MemberKindMachine:
-		return MemberKindMachine, nil
-	default:
-		return "", fmt.Errorf("unsupported member kind %q", value)
-	}
+	return parseEnum(value, "member kind", MemberKindUser, MemberKindMachine)
 }
 
 func ParseRuleType(value string) (RuleType, error) {
-	switch RuleType(value) {
-	case RuleTypeBinary:
-		return RuleTypeBinary, nil
-	case RuleTypeCertificate:
-		return RuleTypeCertificate, nil
-	case RuleTypeTeamID:
-		return RuleTypeTeamID, nil
-	case RuleTypeSigningID:
-		return RuleTypeSigningID, nil
-	case RuleTypeCDHash:
-		return RuleTypeCDHash, nil
-	default:
-		return "", fmt.Errorf("unsupported rule type %q", value)
-	}
+	return parseEnum(value, "rule type",
+		RuleTypeBinary, RuleTypeCertificate, RuleTypeTeamID, RuleTypeSigningID, RuleTypeCDHash,
+	)
 }
 
 func ParseRulePolicy(value string) (RulePolicy, error) {
-	switch RulePolicy(value) {
-	case RulePolicyAllowlist:
-		return RulePolicyAllowlist, nil
-	case RulePolicyBlocklist:
-		return RulePolicyBlocklist, nil
-	case RulePolicySilentBlocklist:
-		return RulePolicySilentBlocklist, nil
-	case RulePolicyCEL:
-		return RulePolicyCEL, nil
-	default:
-		return "", fmt.Errorf("unsupported rule policy %q", value)
-	}
+	return parseEnum(value, "rule policy",
+		RulePolicyAllowlist, RulePolicyBlocklist, RulePolicySilentBlocklist, RulePolicyCEL,
+	)
 }
 
 func ParseRuleTargetAssignment(value string) (RuleTargetAssignment, error) {
-	switch RuleTargetAssignment(value) {
-	case RuleTargetAssignmentInclude:
-		return RuleTargetAssignmentInclude, nil
-	case RuleTargetAssignmentExclude:
-		return RuleTargetAssignmentExclude, nil
-	default:
-		return "", fmt.Errorf("unsupported rule target assignment %q", value)
-	}
+	return parseEnum(value, "rule target assignment",
+		RuleTargetAssignmentInclude, RuleTargetAssignmentExclude,
+	)
 }
 
 func ParseRuleTargetSubjectKind(value string) (RuleTargetSubjectKind, error) {
-	switch RuleTargetSubjectKind(value) {
-	case RuleTargetSubjectKindGroup:
-		return RuleTargetSubjectKindGroup, nil
-	case RuleTargetSubjectKindAllDevices:
-		return RuleTargetSubjectKindAllDevices, nil
-	case RuleTargetSubjectKindAllUsers:
-		return RuleTargetSubjectKindAllUsers, nil
-	default:
-		return "", fmt.Errorf("unsupported rule target subject kind %q", value)
-	}
+	return parseEnum(value, "rule target subject kind",
+		RuleTargetSubjectKindGroup, RuleTargetSubjectKindAllDevices, RuleTargetSubjectKindAllUsers,
+	)
 }
 
 func ParseMachineRuleSyncStatus(value string) (MachineRuleSyncStatus, error) {
-	switch MachineRuleSyncStatus(value) {
-	case MachineRuleSyncStatusSynced:
-		return MachineRuleSyncStatusSynced, nil
-	case MachineRuleSyncStatusPending:
-		return MachineRuleSyncStatusPending, nil
-	case MachineRuleSyncStatusIssue:
-		return MachineRuleSyncStatusIssue, nil
-	default:
-		return "", fmt.Errorf("unsupported machine rule sync status %q", value)
-	}
+	return parseEnum(value, "machine rule sync status",
+		MachineRuleSyncStatusSynced, MachineRuleSyncStatusPending, MachineRuleSyncStatusIssue,
+	)
 }
 
 func ParseMachineClientMode(value string) (MachineClientMode, error) {
-	switch MachineClientMode(value) {
-	case MachineClientModeUnknown:
-		return MachineClientModeUnknown, nil
-	case MachineClientModeMonitor:
-		return MachineClientModeMonitor, nil
-	case MachineClientModeLockdown:
-		return MachineClientModeLockdown, nil
-	case MachineClientModeStandalone:
-		return MachineClientModeStandalone, nil
-	default:
-		return "", fmt.Errorf("unsupported machine client mode %q", value)
-	}
+	return parseEnum(value, "machine client mode",
+		MachineClientModeUnknown, MachineClientModeMonitor, MachineClientModeLockdown, MachineClientModeStandalone,
+	)
 }
 
 func ParseEventDecision(value string) (EventDecision, error) {
-	switch EventDecision(value) {
-	case EventDecisionUnknown:
-		return EventDecisionUnknown, nil
-	case EventDecisionAllowUnknown:
-		return EventDecisionAllowUnknown, nil
-	case EventDecisionAllowBinary:
-		return EventDecisionAllowBinary, nil
-	case EventDecisionAllowCertificate:
-		return EventDecisionAllowCertificate, nil
-	case EventDecisionAllowScope:
-		return EventDecisionAllowScope, nil
-	case EventDecisionAllowTeamID:
-		return EventDecisionAllowTeamID, nil
-	case EventDecisionAllowSigningID:
-		return EventDecisionAllowSigningID, nil
-	case EventDecisionAllowCDHash:
-		return EventDecisionAllowCDHash, nil
-	case EventDecisionBlockUnknown:
-		return EventDecisionBlockUnknown, nil
-	case EventDecisionBlockBinary:
-		return EventDecisionBlockBinary, nil
-	case EventDecisionBlockCertificate:
-		return EventDecisionBlockCertificate, nil
-	case EventDecisionBlockScope:
-		return EventDecisionBlockScope, nil
-	case EventDecisionBlockTeamID:
-		return EventDecisionBlockTeamID, nil
-	case EventDecisionBlockSigningID:
-		return EventDecisionBlockSigningID, nil
-	case EventDecisionBlockCDHash:
-		return EventDecisionBlockCDHash, nil
-	case EventDecisionBundleBinary:
-		return EventDecisionBundleBinary, nil
-	default:
-		return "", fmt.Errorf("unsupported event decision %q", value)
-	}
+	return parseEnum(value, "event decision",
+		EventDecisionUnknown, EventDecisionAllowUnknown, EventDecisionAllowBinary,
+		EventDecisionAllowCertificate, EventDecisionAllowScope, EventDecisionAllowTeamID,
+		EventDecisionAllowSigningID, EventDecisionAllowCDHash,
+		EventDecisionBlockUnknown, EventDecisionBlockBinary, EventDecisionBlockCertificate,
+		EventDecisionBlockScope, EventDecisionBlockTeamID, EventDecisionBlockSigningID,
+		EventDecisionBlockCDHash, EventDecisionBundleBinary,
+	)
 }
 
 func ParseFileAccessDecision(value string) (FileAccessDecision, error) {
-	switch FileAccessDecision(value) {
-	case FileAccessDecisionUnknown:
-		return FileAccessDecisionUnknown, nil
-	case FileAccessDecisionDenied:
-		return FileAccessDecisionDenied, nil
-	case FileAccessDecisionDeniedInvalidSignature:
-		return FileAccessDecisionDeniedInvalidSignature, nil
-	case FileAccessDecisionAuditOnly:
-		return FileAccessDecisionAuditOnly, nil
-	default:
-		return "", fmt.Errorf("unsupported file access decision %q", value)
-	}
+	return parseEnum(value, "file access decision",
+		FileAccessDecisionUnknown, FileAccessDecisionDenied,
+		FileAccessDecisionDeniedInvalidSignature, FileAccessDecisionAuditOnly,
+	)
 }

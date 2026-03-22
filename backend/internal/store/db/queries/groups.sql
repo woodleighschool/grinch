@@ -21,6 +21,7 @@ RETURNING
   name,
   description,
   source,
+  0::INT4 AS member_count,
   created_at,
   updated_at;
 
@@ -43,6 +44,11 @@ updated AS (
     name,
     description,
     source,
+    (
+      SELECT COUNT(*)::INT4
+      FROM group_memberships
+      WHERE group_id = groups.id
+    ) AS member_count,
     created_at,
     updated_at
 )
@@ -56,6 +62,7 @@ SELECT
   updated.name,
   updated.description,
   updated.source,
+  COALESCE(updated.member_count, 0)::INT4 AS member_count,
   updated.created_at,
   updated.updated_at
 FROM (SELECT 1) AS marker

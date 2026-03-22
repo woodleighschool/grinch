@@ -12,7 +12,7 @@ import (
 	uuid "github.com/google/uuid"
 )
 
-const addSyncedGroupMembership = `-- name: AddSyncedGroupMembership :exec
+const addSyncedMembership = `-- name: AddSyncedMembership :exec
 INSERT INTO group_memberships (
   id,
   group_id,
@@ -32,15 +32,15 @@ ON CONFLICT (group_id, member_kind, member_id) DO UPDATE SET
   updated_at = NOW()
 `
 
-type AddSyncedGroupMembershipParams struct {
+type AddSyncedMembershipParams struct {
 	ID         uuid.UUID
 	GroupID    uuid.UUID
 	MemberKind string
 	MemberID   uuid.UUID
 }
 
-func (q *Queries) AddSyncedGroupMembership(ctx context.Context, arg AddSyncedGroupMembershipParams) error {
-	_, err := q.db.Exec(ctx, addSyncedGroupMembership,
+func (q *Queries) AddSyncedMembership(ctx context.Context, arg AddSyncedMembershipParams) error {
+	_, err := q.db.Exec(ctx, addSyncedMembership,
 		arg.ID,
 		arg.GroupID,
 		arg.MemberKind,
@@ -49,7 +49,7 @@ func (q *Queries) AddSyncedGroupMembership(ctx context.Context, arg AddSyncedGro
 	return err
 }
 
-const createGroupMembership = `-- name: CreateGroupMembership :one
+const createMembership = `-- name: CreateMembership :one
 INSERT INTO group_memberships (
   id,
   group_id,
@@ -74,7 +74,7 @@ RETURNING
   updated_at
 `
 
-type CreateGroupMembershipParams struct {
+type CreateMembershipParams struct {
 	ID         uuid.UUID
 	GroupID    uuid.UUID
 	MemberKind string
@@ -82,15 +82,15 @@ type CreateGroupMembershipParams struct {
 	Origin     string
 }
 
-func (q *Queries) CreateGroupMembership(ctx context.Context, arg CreateGroupMembershipParams) (GroupMembership, error) {
-	row := q.db.QueryRow(ctx, createGroupMembership,
+func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, createMembership,
 		arg.ID,
 		arg.GroupID,
 		arg.MemberKind,
 		arg.MemberID,
 		arg.Origin,
 	)
-	var i GroupMembership
+	var i Membership
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -103,7 +103,7 @@ func (q *Queries) CreateGroupMembership(ctx context.Context, arg CreateGroupMemb
 	return i, err
 }
 
-const deleteGroupMembership = `-- name: DeleteGroupMembership :one
+const deleteMembership = `-- name: DeleteMembership :one
 DELETE FROM group_memberships
 WHERE id = $1
 RETURNING
@@ -116,9 +116,9 @@ RETURNING
   updated_at
 `
 
-func (q *Queries) DeleteGroupMembership(ctx context.Context, id uuid.UUID) (GroupMembership, error) {
-	row := q.db.QueryRow(ctx, deleteGroupMembership, id)
-	var i GroupMembership
+func (q *Queries) DeleteMembership(ctx context.Context, id uuid.UUID) (Membership, error) {
+	row := q.db.QueryRow(ctx, deleteMembership, id)
+	var i Membership
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -131,7 +131,7 @@ func (q *Queries) DeleteGroupMembership(ctx context.Context, id uuid.UUID) (Grou
 	return i, err
 }
 
-const getGroupMembership = `-- name: GetGroupMembership :one
+const getMembership = `-- name: GetMembership :one
 SELECT
   id,
   group_id,
@@ -144,9 +144,9 @@ FROM group_memberships
 WHERE id = $1
 `
 
-func (q *Queries) GetGroupMembership(ctx context.Context, id uuid.UUID) (GroupMembership, error) {
-	row := q.db.QueryRow(ctx, getGroupMembership, id)
-	var i GroupMembership
+func (q *Queries) GetMembership(ctx context.Context, id uuid.UUID) (Membership, error) {
+	row := q.db.QueryRow(ctx, getMembership, id)
+	var i Membership
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -159,7 +159,7 @@ func (q *Queries) GetGroupMembership(ctx context.Context, id uuid.UUID) (GroupMe
 	return i, err
 }
 
-const getPersistedGroupMembershipView = `-- name: GetPersistedGroupMembershipView :one
+const getPersistedMembershipView = `-- name: GetPersistedMembershipView :one
 SELECT
   gm.id,
   g.id AS group_id,
@@ -167,10 +167,10 @@ SELECT
   g.source AS group_source,
   gm.member_kind,
   gm.member_id,
-  CASE
+  COALESCE(CASE
     WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
     ELSE NULLIF(m.hostname, '')
-  END AS member_name,
+  END, '')::TEXT AS member_name,
   gm.created_at,
   gm.updated_at
 FROM group_memberships AS gm
@@ -185,21 +185,21 @@ LEFT JOIN machines AS m
 WHERE gm.id = $1
 `
 
-type GetPersistedGroupMembershipViewRow struct {
+type GetPersistedMembershipViewRow struct {
 	ID          uuid.UUID
 	GroupID     uuid.UUID
 	GroupName   string
 	GroupSource string
 	MemberKind  string
 	MemberID    uuid.UUID
-	MemberName  interface{}
+	MemberName  string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
-func (q *Queries) GetPersistedGroupMembershipView(ctx context.Context, id uuid.UUID) (GetPersistedGroupMembershipViewRow, error) {
-	row := q.db.QueryRow(ctx, getPersistedGroupMembershipView, id)
-	var i GetPersistedGroupMembershipViewRow
+func (q *Queries) GetPersistedMembershipView(ctx context.Context, id uuid.UUID) (GetPersistedMembershipViewRow, error) {
+	row := q.db.QueryRow(ctx, getPersistedMembershipView, id)
+	var i GetPersistedMembershipViewRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,

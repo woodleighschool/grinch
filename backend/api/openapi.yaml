@@ -20,7 +20,6 @@ paths:
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
         - $ref: '#/components/parameters/IdsFilter'
-        - $ref: '#/components/parameters/ExecutableSourceFilter'
       responses:
         '200':
           description: Executable list.
@@ -115,7 +114,6 @@ paths:
         - $ref: '#/components/parameters/Order'
         - $ref: '#/components/parameters/IdsFilter'
         - $ref: '#/components/parameters/MachineIdFilter'
-        - $ref: '#/components/parameters/ExecutableIdFilter'
         - $ref: '#/components/parameters/FileAccessDecisionFilter'
       responses:
         '200':
@@ -153,79 +151,6 @@ paths:
       responses:
         '204':
           description: File access event deleted.
-        default:
-          $ref: '#/components/responses/Problem'
-  /group-memberships:
-    get:
-      operationId: listGroupMemberships
-      tags:
-        - group-memberships
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/GroupIdFilter'
-        - $ref: '#/components/parameters/UserIdFilter'
-        - $ref: '#/components/parameters/MachineIdFilter'
-      responses:
-        '200':
-          description: Group membership list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupMembershipListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
-    post:
-      operationId: createGroupMembership
-      tags:
-        - group-memberships
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GroupMembershipCreateRequest'
-      responses:
-        '201':
-          description: Group membership created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupMembership'
-        default:
-          $ref: '#/components/responses/Problem'
-  /group-memberships/{id}:
-    get:
-      operationId: getGroupMembership
-      tags:
-        - group-memberships
-      parameters:
-        - $ref: '#/components/parameters/GroupMembershipId'
-      responses:
-        '200':
-          description: Group membership detail.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupMembership'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
-    delete:
-      operationId: deleteGroupMembership
-      tags:
-        - group-memberships
-      parameters:
-        - $ref: '#/components/parameters/GroupMembershipId'
-      responses:
-        '204':
-          description: Group membership deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
   /groups:
@@ -394,6 +319,79 @@ paths:
       responses:
         '204':
           description: Machine deleted.
+        default:
+          $ref: '#/components/responses/Problem'
+  /memberships:
+    get:
+      operationId: listMemberships
+      tags:
+        - memberships
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+        - $ref: '#/components/parameters/GroupIdFilter'
+        - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/MachineIdFilter'
+      responses:
+        '200':
+          description: Membership list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipListResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createMembership
+      tags:
+        - memberships
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipCreateRequest'
+      responses:
+        '201':
+          description: Membership created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Membership'
+        default:
+          $ref: '#/components/responses/Problem'
+  /memberships/{id}:
+    get:
+      operationId: getMembership
+      tags:
+        - memberships
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+      responses:
+        '200':
+          description: Membership detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Membership'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteMembership
+      tags:
+        - memberships
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+      responses:
+        '204':
+          description: Membership deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
   /rule-machines:
@@ -654,7 +652,7 @@ components:
       schema:
         type: string
         format: uuid
-    GroupMembershipId:
+    MembershipId:
       name: id
       in: path
       required: true
@@ -698,15 +696,6 @@ components:
         type: array
         items:
           $ref: '#/components/schemas/MachineClientMode'
-    ExecutableSourceFilter:
-      name: source[]
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          $ref: '#/components/schemas/ExecutableSource'
     EventDecisionFilter:
       name: decision[]
       in: query
@@ -808,15 +797,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExecutableSummary'
-    ExecutableSource:
-      x-go-type: domain.ExecutableSource
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: string
-      enum:
-        - event
-        - process
     ExecutableSummary:
       x-go-type: domain.ExecutableSummary
       x-go-type-import:
@@ -825,10 +805,8 @@ components:
       type: object
       required:
         - id
-        - source
         - file_sha256
         - file_name
-        - file_path
         - file_bundle_id
         - file_bundle_path
         - signing_id
@@ -839,13 +817,9 @@ components:
         id:
           type: string
           format: uuid
-        source:
-          $ref: '#/components/schemas/ExecutableSource'
         file_sha256:
           type: string
         file_name:
-          type: string
-        file_path:
           type: string
         file_bundle_id:
           type: string
@@ -1040,10 +1014,6 @@ components:
         machine_id:
           type: string
           format: uuid
-        executable_id:
-          type: string
-          format: uuid
-          nullable: true
         rule_version:
           type: string
         rule_name:
@@ -1095,18 +1065,26 @@ components:
       required:
         - pid
         - file_path
-        - executable_id
         - file_name
+        - file_sha256
+        - signing_id
+        - team_id
+        - cdhash
       properties:
         pid:
           type: integer
           format: int32
         file_path:
           type: string
-        executable_id:
-          type: string
-          format: uuid
         file_name:
+          type: string
+        file_sha256:
+          type: string
+        signing_id:
+          type: string
+        team_id:
+          type: string
+        cdhash:
           type: string
     FileAccessEventSummary:
       x-go-type: domain.FileAccessEventSummary
@@ -1117,7 +1095,6 @@ components:
       required:
         - id
         - machine_id
-        - executable_id
         - decision
         - rule_name
         - target
@@ -1134,10 +1111,6 @@ components:
         machine_id:
           type: string
           format: uuid
-        executable_id:
-          type: string
-          format: uuid
-          nullable: true
         decision:
           $ref: '#/components/schemas/FileAccessDecision'
         rule_name:
@@ -1216,138 +1189,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Group'
-    GroupMembership:
-      x-go-type: domain.GroupMembership
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - id
-        - kind
-        - group
-        - member
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: '#/components/schemas/GroupMembershipKind'
-        group:
-          $ref: '#/components/schemas/GroupMembershipGroup'
-        member:
-          $ref: '#/components/schemas/GroupMembershipMember'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    GroupMembershipCreateRequest:
-      type: object
-      required:
-        - group_id
-        - member_kind
-        - member_id
-      properties:
-        group_id:
-          type: string
-          format: uuid
-        member_kind:
-          $ref: '#/components/schemas/MemberKind'
-        member_id:
-          type: string
-          format: uuid
-    GroupMembershipGroup:
-      x-go-type: domain.GroupMembershipGroup
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - id
-        - name
-        - source
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        source:
-          $ref: '#/components/schemas/Source'
-    GroupMembershipKind:
-      x-go-type: domain.GroupMembershipKind
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: string
-      enum:
-        - actual
-        - effective
-    GroupMembershipListItem:
-      x-go-type: domain.GroupMembershipListItem
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - kind
-        - group
-        - member
-        - created_at
-        - updated_at
-      properties:
-        actual_membership_id:
-          type: string
-          format: uuid
-          nullable: true
-        effective_membership_id:
-          type: string
-        kind:
-          $ref: '#/components/schemas/GroupMembershipKind'
-        group:
-          $ref: '#/components/schemas/GroupMembershipGroup'
-        member:
-          $ref: '#/components/schemas/GroupMembershipMember'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    GroupMembershipListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/GroupMembershipListItem'
-    GroupMembershipMember:
-      x-go-type: domain.GroupMembershipMember
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - kind
-        - id
-      properties:
-        kind:
-          $ref: '#/components/schemas/MemberKind'
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
     IncludeRuleTarget:
       x-go-type: domain.IncludeRuleTarget
       x-go-type-import:
@@ -1583,6 +1424,138 @@ components:
       enum:
         - user
         - machine
+    Membership:
+      x-go-type: domain.Membership
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - id
+        - kind
+        - group
+        - member
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/MembershipKind'
+        group:
+          $ref: '#/components/schemas/MembershipGroup'
+        member:
+          $ref: '#/components/schemas/MembershipMember'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MembershipCreateRequest:
+      type: object
+      required:
+        - group_id
+        - member_kind
+        - member_id
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        member_kind:
+          $ref: '#/components/schemas/MemberKind'
+        member_id:
+          type: string
+          format: uuid
+    MembershipGroup:
+      x-go-type: domain.MembershipGroup
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - id
+        - name
+        - source
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        source:
+          $ref: '#/components/schemas/Source'
+    MembershipKind:
+      x-go-type: domain.MembershipKind
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: string
+      enum:
+        - actual
+        - effective
+    MembershipListItem:
+      x-go-type: domain.MembershipListItem
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - kind
+        - group
+        - member
+        - created_at
+        - updated_at
+      properties:
+        actual_membership_id:
+          type: string
+          format: uuid
+          nullable: true
+        effective_membership_id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/MembershipKind'
+        group:
+          $ref: '#/components/schemas/MembershipGroup'
+        member:
+          $ref: '#/components/schemas/MembershipMember'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MembershipListResponse:
+      type: object
+      required:
+        - total
+        - rows
+      properties:
+        total:
+          type: integer
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/MembershipListItem'
+    MembershipMember:
+      x-go-type: domain.MembershipMember
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: object
+      required:
+        - kind
+        - id
+      properties:
+        kind:
+          $ref: '#/components/schemas/MemberKind'
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
     Problem:
       type: object
       required:
@@ -1598,7 +1571,6 @@ components:
           type: string
         status:
           type: integer
-          format: int32
         detail:
           type: string
         code:

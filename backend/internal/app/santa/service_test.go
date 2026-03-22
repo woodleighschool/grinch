@@ -14,15 +14,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/woodleighschool/grinch/internal/app/santa"
-	"github.com/woodleighschool/grinch/internal/app/santa/snapshot"
-	"github.com/woodleighschool/grinch/internal/config"
 	"github.com/woodleighschool/grinch/internal/domain"
+	santamodel "github.com/woodleighschool/grinch/internal/santa/model"
 )
 
 type fakeDataStore struct {
-	ruleSyncStates map[uuid.UUID]santa.MachineSyncState
+	ruleSyncStates map[uuid.UUID]santamodel.MachineSyncState
 	upsertErr      error
-	upsertMachine  santa.MachineUpsert
+	upsertMachine  santamodel.MachineUpsert
 	upsertCalls    int
 }
 
@@ -30,14 +29,14 @@ type fakeRuleResolver struct {
 	resolvedTargets []domain.MachineResolvedRule
 }
 
-func (store *fakeDataStore) UpsertMachine(_ context.Context, machine santa.MachineUpsert) error {
+func (store *fakeDataStore) UpsertMachine(_ context.Context, machine santamodel.MachineUpsert) error {
 	store.upsertCalls++
 	store.upsertMachine = machine
 	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santa.MachineSyncState)
+		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
 	}
 	if _, exists := store.ruleSyncStates[machine.MachineID]; !exists {
-		store.ruleSyncStates[machine.MachineID] = santa.MachineSyncState{MachineID: machine.MachineID}
+		store.ruleSyncStates[machine.MachineID] = santamodel.MachineSyncState{MachineID: machine.MachineID}
 	}
 	return store.upsertErr
 }
@@ -45,49 +44,60 @@ func (store *fakeDataStore) UpsertMachine(_ context.Context, machine santa.Machi
 func (store *fakeDataStore) GetMachineSyncState(
 	_ context.Context,
 	machineID uuid.UUID,
-) (santa.MachineSyncState, error) {
+) (santamodel.MachineSyncState, error) {
 	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santa.MachineSyncState)
+		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
 	}
 	state, exists := store.ruleSyncStates[machineID]
 	if !exists {
-		state = santa.MachineSyncState{MachineID: machineID}
+		state = santamodel.MachineSyncState{MachineID: machineID}
 		store.ruleSyncStates[machineID] = state
 	}
 	return state, nil
 }
 
-func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending santa.PendingSnapshotWrite) error {
+func (store *fakeDataStore) SyncMachineDesiredRuleTargets(context.Context, uuid.UUID) error {
+	return nil
+}
+
+func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending santamodel.PendingSnapshotWrite) error {
 	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santa.MachineSyncState)
+		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
 	}
 
-	store.ruleSyncStates[pending.MachineID] = santa.MachineSyncState{
-		MachineID:               pending.MachineID,
-		RulesHash:               pending.RulesHash,
-		AppliedTargets:          slices.Clone(pending.AppliedTargets),
-		PendingTargets:          slices.Clone(pending.PendingTargets),
-		ExpectedRulesHash:       pending.ExpectedRulesHash,
-		PendingPayloadRuleCount: pending.PendingPayloadRuleCount,
-		PendingFullSync:         pending.PendingFullSync,
-		PendingPreflightAt:      &pending.PendingPreflightAt,
-		ClientMode:              pending.ClientMode,
-		BinaryRuleCount:         pending.BinaryRuleCount,
-		CertificateRuleCount:    pending.CertificateRuleCount,
-		CompilerRuleCount:       pending.CompilerRuleCount,
-		TransitiveRuleCount:     pending.TransitiveRuleCount,
-		TeamIDRuleCount:         pending.TeamIDRuleCount,
-		SigningIDRuleCount:      pending.SigningIDRuleCount,
-		CDHashRuleCount:         pending.CDHashRuleCount,
-		RulesReceived:           pending.RulesReceived,
-		RulesProcessed:          pending.RulesProcessed,
-		LastRuleSyncAttemptAt:   pending.LastRuleSyncAttemptAt,
-		LastRuleSyncSuccessAt:   pending.LastRuleSyncSuccessAt,
+	store.ruleSyncStates[pending.MachineID] = santamodel.MachineSyncState{
+		MachineID:                   pending.MachineID,
+		RulesHash:                   pending.RulesHash,
+		DesiredTargets:              slices.Clone(pending.DesiredTargets),
+		AppliedTargets:              slices.Clone(pending.AppliedTargets),
+		PendingTargets:              slices.Clone(pending.PendingTargets),
+		PendingPayload:              slices.Clone(pending.PendingPayload),
+		PendingPayloadRuleCount:     pending.PendingPayloadRuleCount,
+		PendingFullSync:             pending.PendingFullSync,
+		PendingPreflightAt:          &pending.PendingPreflightAt,
+		DesiredBinaryRuleCount:      pending.DesiredBinaryRuleCount,
+		DesiredCertificateRuleCount: pending.DesiredCertificateRuleCount,
+		DesiredTeamIDRuleCount:      pending.DesiredTeamIDRuleCount,
+		DesiredSigningIDRuleCount:   pending.DesiredSigningIDRuleCount,
+		DesiredCDHashRuleCount:      pending.DesiredCDHashRuleCount,
+		ClientMode:                  pending.ClientMode,
+		BinaryRuleCount:             pending.BinaryRuleCount,
+		CertificateRuleCount:        pending.CertificateRuleCount,
+		CompilerRuleCount:           pending.CompilerRuleCount,
+		TransitiveRuleCount:         pending.TransitiveRuleCount,
+		TeamIDRuleCount:             pending.TeamIDRuleCount,
+		SigningIDRuleCount:          pending.SigningIDRuleCount,
+		CDHashRuleCount:             pending.CDHashRuleCount,
+		RulesReceived:               pending.RulesReceived,
+		RulesProcessed:              pending.RulesProcessed,
+		LastRuleSyncAttemptAt:       pending.LastRuleSyncAttemptAt,
+		LastRuleSyncSuccessAt:       pending.LastRuleSyncSuccessAt,
+		LastReportedCountsMatchAt:   pending.LastReportedCountsMatchAt,
 	}
 	return nil
 }
 
-func (store *fakeDataStore) RecordPostflight(_ context.Context, write santa.PostflightWrite) error {
+func (store *fakeDataStore) RecordPostflight(_ context.Context, write santamodel.PostflightWrite) error {
 	state := store.ruleSyncStates[write.MachineID]
 	state.RulesHash = strings.TrimSpace(write.RulesHash)
 	state.RulesReceived = write.RulesReceived
@@ -103,13 +113,17 @@ func (store *fakeDataStore) PromotePendingSnapshot(
 	completedAt time.Time,
 ) error {
 	state := store.ruleSyncStates[machineID]
+	pendingFullSync := state.PendingFullSync
 	state.AppliedTargets = slices.Clone(state.PendingTargets)
 	state.PendingTargets = nil
-	state.ExpectedRulesHash = ""
+	state.PendingPayload = nil
 	state.PendingPayloadRuleCount = 0
 	state.PendingFullSync = false
 	state.PendingPreflightAt = nil
 	state.LastRuleSyncSuccessAt = &completedAt
+	if pendingFullSync {
+		state.LastCleanSyncAt = &completedAt
+	}
 	store.ruleSyncStates[machineID] = state
 	return nil
 }
@@ -117,11 +131,10 @@ func (store *fakeDataStore) PromotePendingSnapshot(
 func (store *fakeDataStore) IngestEvents(
 	context.Context,
 	uuid.UUID,
-	[]*syncv1.Event,
-	[]*syncv1.FileAccessEvent,
-	map[domain.EventDecision]struct{},
-) (int, error) {
-	return 0, nil
+	[]santamodel.ExecutionEventWrite,
+	[]santamodel.FileAccessEventWrite,
+) error {
+	return nil
 }
 
 func (resolver *fakeRuleResolver) ResolveMachineRuleTargets(
@@ -132,7 +145,7 @@ func (resolver *fakeRuleResolver) ResolveMachineRuleTargets(
 }
 
 func newService(store *fakeDataStore, resolver *fakeRuleResolver) *santa.Service {
-	return santa.New(testLogger(), store, config.EventsConfig{}, resolver)
+	return santa.New(testLogger(), store, nil, resolver)
 }
 
 func testLogger() *slog.Logger {
@@ -194,30 +207,29 @@ func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 	}
 }
 
-func TestHandlePreflight_ReturnsNormalWhenClientMatchesAcknowledgedHash(t *testing.T) {
+func TestHandlePreflight_ReturnsNormalWhenManagedCountsMatch(t *testing.T) {
 	machineID := uuid.New()
-	acknowledged := storedTarget(domain.MachineRuleTarget{
-		RuleType:      domain.RuleTypeBinary,
-		Identifier:    "com.example.existing",
-		IdentifierKey: "com.example.existing",
-		Policy:        domain.RulePolicyAllowlist,
-	})
+	acknowledgedTarget := domain.MachineRuleTarget{
+		RuleType:   domain.RuleTypeBinary,
+		Identifier: "com.example.existing",
+		Policy:     domain.RulePolicyAllowlist,
+	}
+	acknowledged := storedTarget(acknowledgedTarget)
 	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santa.MachineSyncState{
+		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
 				MachineID:      machineID,
-				AppliedTargets: []santa.StoredRuleTarget{acknowledged},
+				AppliedTargets: []santamodel.AppliedRuleTarget{acknowledged},
 			},
 		},
 	}
 	service := newService(store, &fakeRuleResolver{
 		resolvedTargets: []domain.MachineResolvedRule{
-			resolvedTarget(uuid.New(), "Existing", acknowledged.MachineRuleTarget),
+			resolvedTarget(uuid.New(), "Existing", acknowledgedTarget),
 			resolvedTarget(uuid.New(), "Cert", domain.MachineRuleTarget{
-				RuleType:      domain.RuleTypeCertificate,
-				Identifier:    "ABCD",
-				IdentifierKey: "abcd",
-				Policy:        domain.RulePolicyBlocklist,
+				RuleType:   domain.RuleTypeCertificate,
+				Identifier: "ABCD",
+				Policy:     domain.RulePolicyBlocklist,
 			}),
 		},
 	})
@@ -226,8 +238,9 @@ func TestHandlePreflight_ReturnsNormalWhenClientMatchesAcknowledgedHash(t *testi
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
-			MachineId: machineID.String(),
-			RulesHash: snapshot.SantaRulesHash([]santa.StoredRuleTarget{acknowledged}),
+			MachineId:            machineID.String(),
+			BinaryRuleCount:      1,
+			CertificateRuleCount: 1,
 		}.Build(),
 	)
 	if err != nil {
@@ -238,30 +251,65 @@ func TestHandlePreflight_ReturnsNormalWhenClientMatchesAcknowledgedHash(t *testi
 	}
 }
 
-func TestHandlePreflight_ReturnsCleanWhenClientHashDiverges(t *testing.T) {
+func TestHandlePreflight_ReturnsNormalWhenDesiredRulesChangedEvenIfManagedCountsDiverge(t *testing.T) {
 	machineID := uuid.New()
-	acknowledged := storedTarget(domain.MachineRuleTarget{
-		RuleType:      domain.RuleTypeBinary,
-		Identifier:    "com.example.binary",
-		IdentifierKey: "com.example.binary",
-		Policy:        domain.RulePolicyAllowlist,
-	})
 	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santa.MachineSyncState{
+		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
-				MachineID:      machineID,
-				AppliedTargets: []santa.StoredRuleTarget{acknowledged},
+				MachineID: machineID,
 			},
 		},
 	}
 
-	service := newService(store, &fakeRuleResolver{})
+	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
+		resolvedTarget(uuid.New(), "Binary", domain.MachineRuleTarget{
+			RuleType:   domain.RuleTypeBinary,
+			Identifier: "com.example.binary",
+			Policy:     domain.RulePolicyAllowlist,
+		}),
+	}})
 	response, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
-			MachineId: machineID.String(),
-			RulesHash: "different-client-state",
+			MachineId:       machineID.String(),
+			BinaryRuleCount: 0,
+		}.Build(),
+	)
+	if err != nil {
+		t.Fatalf("HandlePreflight() error = %v", err)
+	}
+	if response.GetSyncType() != syncv1.SyncType_NORMAL {
+		t.Fatalf("SyncType = %v, want NORMAL", response.GetSyncType())
+	}
+}
+
+func TestHandlePreflight_ReturnsCleanWhenAppliedMatchesDesiredAndReportedCountsDiverge(t *testing.T) {
+	machineID := uuid.New()
+	target := domain.MachineRuleTarget{
+		RuleType:   domain.RuleTypeBinary,
+		Identifier: "com.example.binary",
+		Policy:     domain.RulePolicyAllowlist,
+	}
+	applied := storedTarget(target)
+	store := &fakeDataStore{
+		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
+			machineID: {
+				MachineID:      machineID,
+				AppliedTargets: []santamodel.AppliedRuleTarget{applied},
+			},
+		},
+	}
+
+	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
+		resolvedTarget(uuid.New(), "Binary", target),
+	}})
+	response, err := service.HandlePreflight(
+		context.Background(),
+		machineID,
+		syncv1.PreflightRequest_builder{
+			MachineId:       machineID.String(),
+			BinaryRuleCount: 0,
 		}.Build(),
 	)
 	if err != nil {
@@ -275,37 +323,35 @@ func TestHandlePreflight_ReturnsCleanWhenClientHashDiverges(t *testing.T) {
 func TestHandleRuleDownload_ReturnsChangedRulesAndRemovalsDuringNormalSync(t *testing.T) {
 	machineID := uuid.New()
 	removed := storedTarget(domain.MachineRuleTarget{
-		RuleType:      domain.RuleTypeBinary,
-		Identifier:    "com.example.removed",
-		IdentifierKey: "com.example.removed",
-		Policy:        domain.RulePolicyAllowlist,
+		RuleType:   domain.RuleTypeBinary,
+		Identifier: "com.example.removed",
+		Policy:     domain.RulePolicyAllowlist,
 	})
 	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santa.MachineSyncState{
+		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
 				MachineID:      machineID,
-				AppliedTargets: []santa.StoredRuleTarget{removed},
+				AppliedTargets: []santamodel.AppliedRuleTarget{removed},
 			},
 		},
 	}
 	service := newService(store, &fakeRuleResolver{
 		resolvedTargets: []domain.MachineResolvedRule{
 			resolvedTarget(uuid.New(), "Cert", domain.MachineRuleTarget{
-				RuleType:      domain.RuleTypeCertificate,
-				Identifier:    "ABCD",
-				IdentifierKey: "abcd",
-				Policy:        domain.RulePolicyBlocklist,
+				RuleType:   domain.RuleTypeCertificate,
+				Identifier: "ABCD",
+				Policy:     domain.RulePolicyBlocklist,
 			}),
 		},
 	})
 
-	ackHash := snapshot.SantaRulesHash([]santa.StoredRuleTarget{removed})
 	if _, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
-			MachineId: machineID.String(),
-			RulesHash: ackHash,
+			MachineId:            machineID.String(),
+			BinaryRuleCount:      0,
+			CertificateRuleCount: 1,
 		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
@@ -334,13 +380,12 @@ func TestHandleRuleDownload_ReturnsChangedRulesAndRemovalsDuringNormalSync(t *te
 	}
 }
 
-func TestHandlePostflight_PromotesPendingSnapshotOnMatchingHashAndProcessedCount(t *testing.T) {
+func TestHandlePostflight_PromotesPendingSnapshotOnMatchingProcessedCount(t *testing.T) {
 	machineID := uuid.New()
 	target := domain.MachineRuleTarget{
-		RuleType:      domain.RuleTypeBinary,
-		Identifier:    "com.example.binary",
-		IdentifierKey: "com.example.binary",
-		Policy:        domain.RulePolicyAllowlist,
+		RuleType:   domain.RuleTypeBinary,
+		Identifier: "com.example.binary",
+		Policy:     domain.RulePolicyAllowlist,
 	}
 	store := &fakeDataStore{}
 	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
@@ -355,14 +400,13 @@ func TestHandlePostflight_PromotesPendingSnapshotOnMatchingHashAndProcessedCount
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
 
-	pendingState := store.ruleSyncStates[machineID]
 	if _, err := service.HandlePostflight(
 		context.Background(),
 		machineID,
 		syncv1.PostflightRequest_builder{
 			MachineId:      machineID.String(),
 			SyncType:       syncv1.SyncType_NORMAL,
-			RulesHash:      pendingState.ExpectedRulesHash,
+			RulesHash:      "ignored-client-rules-hash",
 			RulesProcessed: 1,
 		}.Build(),
 	); err != nil {
@@ -372,9 +416,6 @@ func TestHandlePostflight_PromotesPendingSnapshotOnMatchingHashAndProcessedCount
 	updated := store.ruleSyncStates[machineID]
 	if len(updated.AppliedTargets) != 1 {
 		t.Fatalf("len(AppliedTargets) = %d, want 1", len(updated.AppliedTargets))
-	}
-	if updated.ExpectedRulesHash != "" {
-		t.Fatalf("ExpectedRulesHash = %q, want empty", updated.ExpectedRulesHash)
 	}
 	if updated.PendingFullSync {
 		t.Fatalf("PendingFullSync = true, want false")
@@ -387,13 +428,12 @@ func TestHandlePostflight_PromotesPendingSnapshotOnMatchingHashAndProcessedCount
 	}
 }
 
-func TestHandlePostflight_LeavesPendingSnapshotOnHashMismatch(t *testing.T) {
+func TestHandlePostflight_LeavesPendingSnapshotOnProcessedCountMismatch(t *testing.T) {
 	machineID := uuid.New()
 	target := domain.MachineRuleTarget{
-		RuleType:      domain.RuleTypeBinary,
-		Identifier:    "com.example.binary",
-		IdentifierKey: "com.example.binary",
-		Policy:        domain.RulePolicyAllowlist,
+		RuleType:   domain.RuleTypeBinary,
+		Identifier: "com.example.binary",
+		Policy:     domain.RulePolicyAllowlist,
 	}
 	store := &fakeDataStore{}
 	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
@@ -408,15 +448,14 @@ func TestHandlePostflight_LeavesPendingSnapshotOnHashMismatch(t *testing.T) {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
 
-	before := store.ruleSyncStates[machineID]
 	if _, err := service.HandlePostflight(
 		context.Background(),
 		machineID,
 		syncv1.PostflightRequest_builder{
 			MachineId:      machineID.String(),
 			SyncType:       syncv1.SyncType_NORMAL,
-			RulesHash:      "wrong-hash",
-			RulesProcessed: 1,
+			RulesHash:      "ignored-client-rules-hash",
+			RulesProcessed: 0,
 		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePostflight() error = %v", err)
@@ -426,15 +465,8 @@ func TestHandlePostflight_LeavesPendingSnapshotOnHashMismatch(t *testing.T) {
 	if len(after.AppliedTargets) != 0 {
 		t.Fatalf("len(AppliedTargets) = %d, want 0", len(after.AppliedTargets))
 	}
-	if after.ExpectedRulesHash != before.ExpectedRulesHash {
-		t.Fatalf(
-			"ExpectedRulesHash = %q, want %q",
-			after.ExpectedRulesHash,
-			before.ExpectedRulesHash,
-		)
-	}
-	if after.RulesHash != "wrong-hash" {
-		t.Fatalf("RulesHash = %q, want wrong-hash", after.RulesHash)
+	if after.RulesHash != "ignored-client-rules-hash" {
+		t.Fatalf("RulesHash = %q, want ignored-client-rules-hash", after.RulesHash)
 	}
 	if after.LastRuleSyncAttemptAt == nil {
 		t.Fatal("LastRuleSyncAttemptAt = nil, want timestamp")
@@ -451,7 +483,6 @@ func TestHandleRuleDownload_AllowsEmptyPendingSnapshot(t *testing.T) {
 		machineID,
 		syncv1.PreflightRequest_builder{
 			MachineId: machineID.String(),
-			RulesHash: "stale-client-hash",
 		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
@@ -480,20 +511,18 @@ func TestHandlePostflight_PromotesEmptyPendingSnapshot(t *testing.T) {
 		machineID,
 		syncv1.PreflightRequest_builder{
 			MachineId: machineID.String(),
-			RulesHash: "stale-client-hash",
 		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
 
-	pendingState := store.ruleSyncStates[machineID]
 	if _, err := service.HandlePostflight(
 		context.Background(),
 		machineID,
 		syncv1.PostflightRequest_builder{
 			MachineId:      machineID.String(),
 			SyncType:       syncv1.SyncType_CLEAN,
-			RulesHash:      pendingState.ExpectedRulesHash,
+			RulesHash:      "ignored-client-rules-hash",
 			RulesProcessed: 0,
 		}.Build(),
 	); err != nil {
@@ -512,71 +541,11 @@ func TestHandlePostflight_PromotesEmptyPendingSnapshot(t *testing.T) {
 	}
 }
 
-func TestSantaRulesHash_IgnoresCustomFieldsAndUsesStableOrdering(t *testing.T) {
-	base := []santa.StoredRuleTarget{
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeCertificate,
-			Identifier:    "BBBB",
-			IdentifierKey: "bbbb",
-			Policy:        domain.RulePolicyBlocklist,
-			CustomMessage: "ignored-message",
-			CustomURL:     "https://ignored.example",
-		}),
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeBinary,
-			Identifier:    "AAAA",
-			IdentifierKey: "aaaa",
-			Policy:        domain.RulePolicyCEL,
-			CELExpression: "machine.serial == 'abc'",
-		}),
-	}
-	reordered := []santa.StoredRuleTarget{
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeBinary,
-			Identifier:    "AAAA",
-			IdentifierKey: "aaaa",
-			Policy:        domain.RulePolicyCEL,
-			CELExpression: "machine.serial == 'abc'",
-		}),
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeCertificate,
-			Identifier:    "BBBB",
-			IdentifierKey: "bbbb",
-			Policy:        domain.RulePolicyBlocklist,
-		}),
-	}
-
-	if snapshot.SantaRulesHash(base) != snapshot.SantaRulesHash(reordered) {
-		t.Fatalf("SantaRulesHash() changed for ordering/custom-field-only differences")
-	}
-}
-
-func TestSantaRulesHash_MatchesObservedClientHashForSigningIDAndTeamID(t *testing.T) {
-	targets := []santa.StoredRuleTarget{
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeSigningID,
-			Identifier:    "KL8N8XSYF4:com.brave.Browser",
-			IdentifierKey: "kl8n8xsyf4:com.brave.browser",
-			Policy:        domain.RulePolicyBlocklist,
-		}),
-		storedTarget(domain.MachineRuleTarget{
-			RuleType:      domain.RuleTypeTeamID,
-			Identifier:    "KHRWM533LU",
-			IdentifierKey: "khrwm533lu",
-			Policy:        domain.RulePolicyBlocklist,
-		}),
-	}
-
-	const expected = "afcb46a9d4c7c0bf3d0387b3c63bafb1"
-	if actual := snapshot.SantaRulesHash(targets); actual != expected {
-		t.Fatalf("SantaRulesHash() = %q, want %q", actual, expected)
-	}
-}
-
-func storedTarget(target domain.MachineRuleTarget) santa.StoredRuleTarget {
-	return santa.StoredRuleTarget{
-		MachineRuleTarget: target,
-		PayloadHash:       testPayloadHash(target),
+func storedTarget(target domain.MachineRuleTarget) santamodel.AppliedRuleTarget {
+	return santamodel.AppliedRuleTarget{
+		RuleType:    target.RuleType,
+		Identifier:  target.Identifier,
+		PayloadHash: testPayloadHash(target),
 	}
 }
 

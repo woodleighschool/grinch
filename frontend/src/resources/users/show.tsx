@@ -1,9 +1,9 @@
 import { ShowActions } from "@/resources/shared/actions";
 import { EventDecisionField } from "@/resources/shared/decisionField";
 import {
-  GroupMembershipGroupLinkField,
-  GroupMembershipGroupSourceField,
-} from "@/resources/shared/groupMembershipFields";
+  MembershipGroupLinkField,
+  MembershipGroupSourceField,
+} from "@/resources/shared/membershipFields";
 import type { ReactElement } from "react";
 import {
   DataTable,
@@ -27,13 +27,13 @@ export const UserShow = (): ReactElement => (
         <DateField source="updated_at" label="Updated" showTime />
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Groups">
-        <ReferenceManyField reference="group-memberships" target="user_id" pagination={<Pagination />}>
+        <ReferenceManyField reference="memberships" target="user_id" pagination={<Pagination />}>
           <DataTable bulkActionButtons={false}>
             <DataTable.Col source="group.name" label="Name">
-              <GroupMembershipGroupLinkField />
+              <MembershipGroupLinkField />
             </DataTable.Col>
             <DataTable.Col source="group.source" label="Source">
-              <GroupMembershipGroupSourceField />
+              <MembershipGroupSourceField />
             </DataTable.Col>
           </DataTable>
         </ReferenceManyField>

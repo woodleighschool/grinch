@@ -231,14 +231,3 @@ CREATE INDEX IF NOT EXISTS file_access_events_decision_created_idx
 CREATE INDEX IF NOT EXISTS file_access_events_executable_created_idx
   ON file_access_events (executable_id, created_at DESC);
 
--- +goose Down
-DROP TABLE IF EXISTS file_access_events;
-DROP TABLE IF EXISTS execution_events;
-DROP TABLE IF EXISTS executables;
-DROP TABLE IF EXISTS machine_rule_sync_states;
-DROP TABLE IF EXISTS rule_targets;
-DROP TABLE IF EXISTS rules;
-DROP TABLE IF EXISTS group_memberships;
-DROP TABLE IF EXISTS groups;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS machines;

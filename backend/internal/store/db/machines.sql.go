@@ -33,8 +33,23 @@ SELECT
   m.santa_version,
   m.primary_user,
   m.primary_user_groups_raw,
-  rs.pending_preflight_at,
-  rs.last_rule_sync_attempt_at,
+  machine_rule_sync_status(
+    rs.pending_preflight_at,
+    rs.desired_targets,
+    rs.applied_targets,
+    rs.desired_binary_rule_count,
+    rs.binary_rule_count,
+    rs.desired_certificate_rule_count,
+    rs.certificate_rule_count,
+    rs.desired_teamid_rule_count,
+    rs.teamid_rule_count,
+    rs.desired_signingid_rule_count,
+    rs.signingid_rule_count,
+    rs.desired_cdhash_rule_count,
+    rs.cdhash_rule_count,
+    rs.last_clean_sync_at,
+    rs.last_reported_counts_match_at
+  ) AS rule_sync_status,
   COALESCE(rs.client_mode, 'unknown') AS client_mode,
   COALESCE(rs.binary_rule_count, 0)::INT4 AS binary_rule_count,
   COALESCE(rs.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
@@ -57,29 +72,28 @@ WHERE m.machine_id = $1
 `
 
 type GetMachineRow struct {
-	MachineID             uuid.UUID
-	SerialNumber          string
-	Hostname              string
-	ModelIdentifier       string
-	OsVersion             string
-	OsBuild               string
-	SantaVersion          string
-	PrimaryUser           string
-	PrimaryUserGroupsRaw  []byte
-	PendingPreflightAt    *time.Time
-	LastRuleSyncAttemptAt *time.Time
-	ClientMode            string
-	BinaryRuleCount       int32
-	CertificateRuleCount  int32
-	CompilerRuleCount     int32
-	TransitiveRuleCount   int32
-	TeamidRuleCount       int32
-	SigningidRuleCount    int32
-	CdhashRuleCount       int32
-	LastSeenAt            time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	PrimaryUserID         *uuid.UUID
+	MachineID            uuid.UUID
+	SerialNumber         string
+	Hostname             string
+	ModelIdentifier      string
+	OsVersion            string
+	OsBuild              string
+	SantaVersion         string
+	PrimaryUser          string
+	PrimaryUserGroupsRaw []byte
+	RuleSyncStatus       string
+	ClientMode           string
+	BinaryRuleCount      int32
+	CertificateRuleCount int32
+	CompilerRuleCount    int32
+	TransitiveRuleCount  int32
+	TeamIDRuleCount      int32
+	SigningIDRuleCount   int32
+	CDHashRuleCount      int32
+	LastSeenAt           time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	PrimaryUserID        *uuid.UUID
 }
 
 func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachineRow, error) {
@@ -95,22 +109,77 @@ func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachi
 		&i.SantaVersion,
 		&i.PrimaryUser,
 		&i.PrimaryUserGroupsRaw,
-		&i.PendingPreflightAt,
-		&i.LastRuleSyncAttemptAt,
+		&i.RuleSyncStatus,
 		&i.ClientMode,
 		&i.BinaryRuleCount,
 		&i.CertificateRuleCount,
 		&i.CompilerRuleCount,
 		&i.TransitiveRuleCount,
-		&i.TeamidRuleCount,
-		&i.SigningidRuleCount,
-		&i.CdhashRuleCount,
+		&i.TeamIDRuleCount,
+		&i.SigningIDRuleCount,
+		&i.CDHashRuleCount,
 		&i.LastSeenAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PrimaryUserID,
 	)
 	return i, err
+}
+
+const listMachineIDs = `-- name: ListMachineIDs :many
+SELECT machine_id
+FROM machines
+ORDER BY machine_id ASC
+`
+
+func (q *Queries) ListMachineIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listMachineIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var machine_id uuid.UUID
+		if err := rows.Scan(&machine_id); err != nil {
+			return nil, err
+		}
+		items = append(items, machine_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMachineIDsByPrimaryUserID = `-- name: ListMachineIDsByPrimaryUserID :many
+SELECT m.machine_id
+FROM machines AS m
+JOIN users AS u
+  ON u.upn = m.primary_user
+WHERE u.id = $1
+  AND m.primary_user <> ''
+ORDER BY m.machine_id ASC
+`
+
+func (q *Queries) ListMachineIDsByPrimaryUserID(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listMachineIDsByPrimaryUserID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var machine_id uuid.UUID
+		if err := rows.Scan(&machine_id); err != nil {
+			return nil, err
+		}
+		items = append(items, machine_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMachines = `-- name: ListMachines :many

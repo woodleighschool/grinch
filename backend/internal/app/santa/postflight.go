@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/woodleighschool/grinch/internal/app/santa/protocol"
-	"github.com/woodleighschool/grinch/internal/app/santa/snapshot"
+	"github.com/woodleighschool/grinch/internal/santa/model"
+	"github.com/woodleighschool/grinch/internal/santa/snapshot"
 )
 
 // HandlePostflight promotes the pending snapshot only after the client reports
-// the expected final rules hash and processed count for the frozen payload.
+// it processed the frozen payload for this sync cycle.
 func (service *Service) HandlePostflight(
 	ctx context.Context,
 	machineID uuid.UUID,
@@ -29,18 +29,19 @@ func (service *Service) HandlePostflight(
 		return nil, stateErr
 	}
 
-	recordErr := service.dataStore.RecordPostflight(ctx, PostflightWrite{
+	recordErr := service.dataStore.RecordPostflight(ctx, model.PostflightWrite{
 		MachineID:             machineID,
 		RulesHash:             request.GetRulesHash(),
-		RulesReceived:         protocol.SafeCount(request.GetRulesReceived()),
-		RulesProcessed:        protocol.SafeCount(request.GetRulesProcessed()),
+		RulesReceived:         snapshot.SafeCount(request.GetRulesReceived()),
+		RulesProcessed:        snapshot.SafeCount(request.GetRulesProcessed()),
 		LastRuleSyncAttemptAt: now,
 	})
 	if recordErr != nil {
 		return nil, recordErr
 	}
 
-	if !snapshot.PostflightMatchesSnapshot(request, snapshotState) {
+	if snapshotState.PendingPreflightAt == nil ||
+		int64(request.GetRulesProcessed()) != snapshotState.PendingPayloadRuleCount {
 		return syncv1.PostflightResponse_builder{}.Build(), nil
 	}
 
