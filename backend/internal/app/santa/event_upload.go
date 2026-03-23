@@ -164,7 +164,7 @@ func mapProcessChain(processes []*syncv1.Process) ([]model.ProcessWrite, error) 
 			FilePath:     process.GetFilePath(),
 			FileSHA256:   process.GetFileSha256(),
 			SigningID:    process.GetSigningId(),
-			TeamID:       process.GetTeamId(),
+			TeamID:       normalizeTeamID(process.GetTeamId()),
 			CDHash:       process.GetCdhash(),
 			SigningChain: signingChain,
 		})
@@ -262,6 +262,13 @@ func marshalSigningChain(certificates []*syncv1.Certificate) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func normalizeTeamID(s string) string {
+	if s == "<unknown team id>" {
+		return ""
+	}
+	return s
 }
 
 func normalizeStrings(s []string) []string {
