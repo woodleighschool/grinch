@@ -220,7 +220,12 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/MachineIdFilter'
+        - name: machine_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Machine rules list.
@@ -345,7 +350,12 @@ paths:
         - $ref: '#/components/parameters/Search'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/RuleIdFilter'
+        - name: rule_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Rule machines list.

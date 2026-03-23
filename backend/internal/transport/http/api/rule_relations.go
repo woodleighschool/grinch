@@ -11,11 +11,6 @@ func (handler *Server) ListMachineRules(
 	request *http.Request,
 	params ListMachineRulesParams,
 ) {
-	if params.MachineId == nil {
-		writeError(writer, badRequestError("machine_id is required"))
-		return
-	}
-
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
 		writeError(writer, err)
@@ -24,7 +19,7 @@ func (handler *Server) ListMachineRules(
 
 	items, total, err := handler.store.ListMachineRules(request.Context(), domain.MachineRuleListOptions{
 		ListOptions: listOptions,
-		MachineID:   params.MachineId,
+		MachineID:   &params.MachineId,
 	})
 	if err != nil {
 		writeError(writer, err)
@@ -42,11 +37,6 @@ func (handler *Server) ListRuleMachines(
 	request *http.Request,
 	params ListRuleMachinesParams,
 ) {
-	if params.RuleId == nil {
-		writeError(writer, badRequestError("rule_id is required"))
-		return
-	}
-
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
 		writeError(writer, err)
@@ -55,7 +45,7 @@ func (handler *Server) ListRuleMachines(
 
 	items, total, err := handler.store.ListRuleMachines(request.Context(), domain.RuleMachineListOptions{
 		ListOptions: listOptions,
-		RuleID:      params.RuleId,
+		RuleID:      &params.RuleId,
 	})
 	if err != nil {
 		writeError(writer, err)

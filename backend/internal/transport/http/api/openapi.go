@@ -540,7 +540,7 @@ type ListMachineRulesParams struct {
 	// Sort Sort field name.
 	Sort      *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
 	Order     *ListMachineRulesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	MachineId *MachineIdFilter             `form:"machine_id,omitempty" json:"machine_id,omitempty"`
+	MachineId openapi_types.UUID           `form:"machine_id" json:"machine_id"`
 }
 
 // ListMachineRulesParamsOrder defines parameters for ListMachineRules.
@@ -590,7 +590,7 @@ type ListRuleMachinesParams struct {
 	// Sort Sort field name.
 	Sort   *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
 	Order  *ListRuleMachinesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	RuleId *RuleIdFilter                `form:"rule_id,omitempty" json:"rule_id,omitempty"`
+	RuleId openapi_types.UUID           `form:"rule_id" json:"rule_id"`
 }
 
 // ListRuleMachinesParamsOrder defines parameters for ListRuleMachines.
@@ -1554,9 +1554,16 @@ func (siw *ServerInterfaceWrapper) ListMachineRules(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// ------------- Optional query parameter "machine_id" -------------
+	// ------------- Required query parameter "machine_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if paramValue := r.URL.Query().Get("machine_id"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "machine_id"})
+		return
+	}
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "machine_id", Err: err})
 		return
@@ -1957,9 +1964,16 @@ func (siw *ServerInterfaceWrapper) ListRuleMachines(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// ------------- Optional query parameter "rule_id" -------------
+	// ------------- Required query parameter "rule_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "rule_id", r.URL.Query(), &params.RuleId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if paramValue := r.URL.Query().Get("rule_id"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "rule_id"})
+		return
+	}
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "rule_id", r.URL.Query(), &params.RuleId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
 		return

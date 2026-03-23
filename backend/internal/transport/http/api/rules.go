@@ -60,9 +60,7 @@ func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	input := decodeRuleWriteRequest(body)
-
-	rule, err := handler.rules.CreateRule(request.Context(), input)
+	rule, err := handler.rules.CreateRule(request.Context(), decodeRuleWriteRequest(body))
 	if err != nil {
 		writeError(writer, err)
 		return
@@ -88,9 +86,7 @@ func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	input := decodeRuleWriteRequest(body)
-
-	updated, err := handler.rules.UpdateRule(request.Context(), id, input)
+	updated, err := handler.rules.UpdateRule(request.Context(), id, decodeRuleWriteRequest(body))
 	if err != nil {
 		writeError(writer, err)
 		return
@@ -114,6 +110,21 @@ func decodeRuleWriteRequest(body ruleWriteRequestBody) domain.RuleWriteInput {
 		enabled = *body.Enabled
 	}
 
+	include := make([]domain.IncludeRuleTargetWriteInput, 0, len(body.Targets.Include))
+	for _, t := range body.Targets.Include {
+		include = append(include, domain.IncludeRuleTargetWriteInput{
+			SubjectKind:   t.SubjectKind,
+			SubjectID:     t.SubjectID,
+			Policy:        t.Policy,
+			CELExpression: t.CELExpression,
+		})
+	}
+
+	exclude := make([]domain.ExcludedGroupWriteInput, 0, len(body.Targets.Exclude))
+	for _, t := range body.Targets.Exclude {
+		exclude = append(exclude, domain.ExcludedGroupWriteInput{GroupID: t.GroupID})
+	}
+
 	return domain.RuleWriteInput{
 		CustomMessage: optionalString(body.CustomMessage),
 		CustomURL:     optionalString(body.CustomURL),
@@ -122,25 +133,9 @@ func decodeRuleWriteRequest(body ruleWriteRequestBody) domain.RuleWriteInput {
 		Identifier:    body.Identifier,
 		Name:          body.Name,
 		RuleType:      body.RuleType,
-		Targets:       decodeRuleTargets(body.Targets),
+		Targets: domain.RuleTargetsWriteInput{
+			Include: include,
+			Exclude: exclude,
+		},
 	}
-}
-
-func decodeRuleTargets(targets domain.RuleTargets) domain.RuleTargetsWriteInput {
-	include := make([]domain.IncludeRuleTargetWriteInput, 0, len(targets.Include))
-	for _, target := range targets.Include {
-		include = append(include, domain.IncludeRuleTargetWriteInput{
-			SubjectKind:   target.SubjectKind,
-			SubjectID:     target.SubjectID,
-			Policy:        target.Policy,
-			CELExpression: target.CELExpression,
-		})
-	}
-
-	exclude := make([]domain.ExcludedGroupWriteInput, 0, len(targets.Exclude))
-	for _, target := range targets.Exclude {
-		exclude = append(exclude, domain.ExcludedGroupWriteInput{GroupID: target.GroupID})
-	}
-
-	return domain.RuleTargetsWriteInput{Include: include, Exclude: exclude}
 }

@@ -178,8 +178,10 @@ func writeValidationErrors(w http.ResponseWriter, root string, fields []domain.F
 func writeError(w http.ResponseWriter, err error) {
 	var validationErr *domain.ValidationError
 
+	var badReqErr badRequestError
+
 	switch {
-	case isNotFound(err):
+	case errors.Is(err, pgx.ErrNoRows):
 		w.WriteHeader(http.StatusNotFound)
 		return
 
@@ -187,7 +189,7 @@ func writeError(w http.ResponseWriter, err error) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 
-	case errors.Is(err, domain.ErrInvalidSort), isBadRequestError(err):
+	case errors.Is(err, domain.ErrInvalidSort), errors.As(err, &badReqErr):
 		w.WriteHeader(http.StatusBadRequest)
 		return
 
@@ -210,15 +212,6 @@ func writeError(w http.ResponseWriter, err error) {
 	}
 
 	w.WriteHeader(http.StatusInternalServerError)
-}
-
-func isNotFound(err error) bool {
-	return errors.Is(err, pgx.ErrNoRows)
-}
-
-func isBadRequestError(err error) bool {
-	var reqErr badRequestError
-	return errors.As(err, &reqErr)
 }
 
 func (e badRequestError) Error() string {
