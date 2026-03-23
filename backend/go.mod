@@ -8,14 +8,14 @@ tool (
 )
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260320155918-251ad97cbbf5.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260323172028-b4f2e69d54fb.1
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-pkgz/auth/v2 v2.1.1
 	github.com/go-pkgz/rest v1.21.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
-	github.com/jackc/pgx/v5 v5.9.0
+	github.com/jackc/pgx/v5 v5.9.1
 	github.com/oapi-codegen/runtime v1.3.0
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/woodleighschool/go-entrasync v0.1.0
