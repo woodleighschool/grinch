@@ -50,7 +50,7 @@ type CreateRuleParams struct {
 	ID            uuid.UUID
 	Name          string
 	Description   string
-	RuleType      string
+	RuleType      RuleType
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
@@ -110,11 +110,11 @@ VALUES (
 type CreateRuleTargetParams struct {
 	ID            uuid.UUID
 	RuleID        uuid.UUID
-	SubjectKind   string
+	SubjectKind   RuleTargetSubjectKind
 	SubjectID     *uuid.UUID
-	Assignment    string
+	Assignment    RuleTargetAssignment
 	Priority      pgtype.Int4
-	Policy        pgtype.Text
+	Policy        NullRulePolicy
 	CelExpression string
 }
 
@@ -189,29 +189,27 @@ func (q *Queries) GetRule(ctx context.Context, id uuid.UUID) (Rule, error) {
 }
 
 const listResolvedRulesForMachine = `-- name: ListResolvedRulesForMachine :many
-WITH effective_groups AS (
-  SELECT gm.group_id
-  FROM group_memberships AS gm
-  WHERE gm.member_kind = 'machine'
-    AND gm.member_id = $1
-  UNION
-  SELECT gm.group_id
-  FROM group_memberships AS gm
-  JOIN users AS u
-    ON u.id = gm.member_id
-    AND gm.member_kind = 'user'
-  JOIN machines AS m
-    ON m.primary_user = u.upn
-  WHERE m.machine_id = $1
-    AND m.primary_user <> ''
-),
-machine_user AS (
+WITH machine_user AS (
   SELECT u.id
   FROM machines AS m
   JOIN users AS u
-    ON u.upn = m.primary_user
-  WHERE m.machine_id = $1
-    AND m.primary_user <> ''
+    ON u.upn = NULLIF(m.primary_user, '')
+  WHERE m.id = $1
+),
+effective_groups AS (
+  SELECT gmm.group_id
+  FROM group_machine_memberships AS gmm
+  WHERE gmm.machine_id = $1
+
+  UNION
+
+  SELECT gum.group_id
+  FROM machines AS m
+  JOIN users AS u
+    ON u.upn = NULLIF(m.primary_user, '')
+  JOIN group_user_memberships AS gum
+    ON gum.user_id = u.id
+  WHERE m.id = $1
 ),
 matching_targets AS (
   SELECT
@@ -280,23 +278,23 @@ JOIN winning_includes AS wi
 LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
-  AND r.enabled = true
+  AND r.enabled = TRUE
 ORDER BY r.rule_type ASC, r.identifier ASC, r.id ASC
 `
 
 type ListResolvedRulesForMachineRow struct {
 	ID            uuid.UUID
 	Name          string
-	RuleType      string
+	RuleType      RuleType
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
-	Policy        pgtype.Text
+	Policy        NullRulePolicy
 	CelExpression string
 }
 
-func (q *Queries) ListResolvedRulesForMachine(ctx context.Context, memberID uuid.UUID) ([]ListResolvedRulesForMachineRow, error) {
-	rows, err := q.db.Query(ctx, listResolvedRulesForMachine, memberID)
+func (q *Queries) ListResolvedRulesForMachine(ctx context.Context, machineID uuid.UUID) ([]ListResolvedRulesForMachineRow, error) {
+	rows, err := q.db.Query(ctx, listResolvedRulesForMachine, machineID)
 	if err != nil {
 		return nil, err
 	}
@@ -351,11 +349,11 @@ ORDER BY
 `
 
 type ListRuleTargetsByRuleRow struct {
-	SubjectKind   string
+	SubjectKind   RuleTargetSubjectKind
 	SubjectID     *uuid.UUID
-	Assignment    string
+	Assignment    RuleTargetAssignment
 	Priority      pgtype.Int4
-	Policy        pgtype.Text
+	Policy        NullRulePolicy
 	CelExpression string
 	SubjectName   string
 }
@@ -391,15 +389,15 @@ func (q *Queries) ListRuleTargetsByRule(ctx context.Context, ruleID uuid.UUID) (
 const updateRule = `-- name: UpdateRule :one
 UPDATE rules
 SET
-  name = $2,
-  description = $3,
-  rule_type = $4,
-  identifier = $5,
-  custom_message = $6,
-  custom_url = $7,
-  enabled = $8,
+  name = $1,
+  description = $2,
+  rule_type = $3,
+  identifier = $4,
+  custom_message = $5,
+  custom_url = $6,
+  enabled = $7,
   updated_at = NOW()
-WHERE id = $1
+WHERE id = $8
 RETURNING
   id,
   name,
@@ -414,19 +412,18 @@ RETURNING
 `
 
 type UpdateRuleParams struct {
-	ID            uuid.UUID
 	Name          string
 	Description   string
-	RuleType      string
+	RuleType      RuleType
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
 	Enabled       bool
+	ID            uuid.UUID
 }
 
 func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (Rule, error) {
 	row := q.db.QueryRow(ctx, updateRule,
-		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.RuleType,
@@ -434,6 +431,7 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (Rule, e
 		arg.CustomMessage,
 		arg.CustomURL,
 		arg.Enabled,
+		arg.ID,
 	)
 	var i Rule
 	err := row.Scan(

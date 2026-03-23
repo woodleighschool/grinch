@@ -48,7 +48,7 @@ type CreateFileAccessEventParams struct {
 	RuleVersion  string
 	RuleName     string
 	Target       string
-	Decision     string
+	Decision     FileAccessDecision
 	ProcessChain []byte
 	OccurredAt   *time.Time
 }
@@ -93,8 +93,8 @@ DELETE FROM file_access_events
 WHERE created_at < $1
 `
 
-func (q *Queries) DeleteFileAccessEventsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteFileAccessEventsBefore, createdAt)
+func (q *Queries) DeleteFileAccessEventsBefore(ctx context.Context, beforeCreatedAt time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteFileAccessEventsBefore, beforeCreatedAt)
 	if err != nil {
 		return 0, err
 	}

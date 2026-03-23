@@ -9,13 +9,13 @@ INSERT INTO file_access_events (
   occurred_at
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7
+  sqlc.arg(machine_id),
+  sqlc.arg(rule_version),
+  sqlc.arg(rule_name),
+  sqlc.arg(target),
+  sqlc.arg(decision),
+  sqlc.arg(process_chain),
+  sqlc.arg(occurred_at)
 )
 RETURNING
   id,
@@ -40,12 +40,12 @@ SELECT
   occurred_at,
   created_at
 FROM file_access_events
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: DeleteFileAccessEvent :exec
 DELETE FROM file_access_events
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: DeleteFileAccessEventsBefore :execrows
 DELETE FROM file_access_events
-WHERE created_at < $1;
+WHERE created_at < sqlc.arg(before_created_at);

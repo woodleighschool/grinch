@@ -30,6 +30,20 @@ type Server struct {
 	rules            *apprules.Service
 }
 
+type problemSpec struct {
+	Type        string
+	Title       string
+	Code        string
+	Detail      string
+	FieldErrors []domain.FieldError
+}
+
+type apiErrorOptions struct {
+	NotFoundMessage string
+}
+
+type badRequestError string
+
 func New(
 	store *postgres.Store,
 	groups *appgroups.Service,
@@ -46,11 +60,11 @@ func New(
 	}
 }
 
-func (handler *Server) RegisterRoutes(router chi.Router) {
-	_ = HandlerWithOptions(handler, ChiServerOptions{
-		BaseRouter: router,
-		ErrorHandlerFunc: func(writer http.ResponseWriter, _ *http.Request, _ error) {
-			WriteProblem(writer, http.StatusBadRequest, ProblemSpec{
+func (s *Server) RegisterRoutes(r chi.Router) {
+	_ = HandlerWithOptions(s, ChiServerOptions{
+		BaseRouter: r,
+		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
+			writeProblem(w, http.StatusBadRequest, problemSpec{
 				Type:   "urn:grinch:problem:invalid-request",
 				Title:  "Invalid request",
 				Code:   "invalid_request",
@@ -68,22 +82,25 @@ func parseListOptions[T ~string, O ~string](
 	order *O,
 	ids *IdsFilter,
 ) (domain.ListOptions, error) {
-	resolvedLimit := int32(0)
+	var resolvedLimit int32
 	if limit != nil {
 		resolvedLimit = *limit
 	}
-	resolvedOffset := int32(0)
+
+	var resolvedOffset int32
 	if offset != nil {
 		resolvedOffset = *offset
 	}
+
 	switch {
 	case limit != nil && resolvedLimit < 1:
 		return domain.ListOptions{}, badRequestError("limit must be >= 1")
 	case resolvedOffset < 0:
 		return domain.ListOptions{}, badRequestError("offset must be >= 0")
 	}
+
 	return domain.ListOptions{
-		IDs:    optionalUUIDs(ids),
+		IDs:    cloneUUIDs(ids),
 		Limit:  resolvedLimit,
 		Offset: resolvedOffset,
 		Search: optionalString(search),
@@ -92,76 +109,77 @@ func parseListOptions[T ~string, O ~string](
 	}, nil
 }
 
-func optionalString[T ~string](value *T) string {
-	if value == nil {
+func optionalString[T ~string](v *T) string {
+	if v == nil {
 		return ""
 	}
-	return string(*value)
+	return string(*v)
 }
 
-func optionalUUIDs(values *IdsFilter) []uuid.UUID {
-	if values == nil {
+func cloneUUIDs(v *IdsFilter) []uuid.UUID {
+	if v == nil {
 		return nil
 	}
-	ids := make([]uuid.UUID, 0, len(*values))
-	ids = append(ids, *values...)
-	return ids
+
+	out := make([]uuid.UUID, len(*v))
+	copy(out, *v)
+
+	return out
 }
 
-func optionalBools(values *EnabledFilter) []bool {
-	if values == nil {
+func cloneBools(v *EnabledFilter) []bool {
+	if v == nil {
 		return nil
 	}
-	result := make([]bool, 0, len(*values))
-	result = append(result, (*values)...)
-	return result
+
+	out := make([]bool, len(*v))
+	copy(out, *v)
+
+	return out
 }
 
 func parseOptionalValues[T any, V ~string](values *[]V, parse func(string) (T, error)) ([]T, error) {
 	if values == nil {
 		return nil, nil
 	}
-	result := make([]T, 0, len(*values))
-	for _, value := range *values {
-		parsed, err := parse(string(value))
+
+	out := make([]T, 0, len(*values))
+	for _, v := range *values {
+		parsed, err := parse(string(v))
 		if err != nil {
 			return nil, badRequestError(err.Error())
 		}
-		result = append(result, parsed)
+		out = append(out, parsed)
 	}
-	return result, nil
+
+	return out, nil
 }
 
-func decodeJSONBody(request *http.Request, dst any) error {
-	decoder := json.NewDecoder(io.LimitReader(request.Body, maxJSONBodyBytes))
-	if err := decoder.Decode(dst); err != nil {
+func decodeJSONBody(r *http.Request, dst any) error {
+	dec := json.NewDecoder(io.LimitReader(r.Body, maxJSONBodyBytes))
+
+	if err := dec.Decode(dst); err != nil {
 		if errors.Is(err, io.EOF) {
 			return badRequestError("request body is required")
 		}
 		return badRequestError("request body is invalid")
 	}
+
 	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		return badRequestError("request body must contain a single JSON object")
 	}
+
 	return nil
 }
 
-func writeJSON(writer http.ResponseWriter, statusCode int, payload any) {
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(statusCode)
-	_ = json.NewEncoder(writer).Encode(payload)
+func writeJSON(w http.ResponseWriter, statusCode int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
-type ProblemSpec struct {
-	Type        string
-	Title       string
-	Code        string
-	Detail      string
-	FieldErrors []domain.FieldError
-}
-
-func WriteProblem(writer http.ResponseWriter, statusCode int, spec ProblemSpec) {
+func writeProblem(w http.ResponseWriter, statusCode int, spec problemSpec) {
 	problem := Problem{
 		Type:   spec.Type,
 		Title:  spec.Title,
@@ -169,6 +187,7 @@ func WriteProblem(writer http.ResponseWriter, statusCode int, spec ProblemSpec) 
 		Detail: spec.Detail,
 		Code:   spec.Code,
 	}
+
 	if len(spec.FieldErrors) > 0 {
 		fieldErrors := make([]FieldError, 0, len(spec.FieldErrors))
 		for _, fieldErr := range spec.FieldErrors {
@@ -184,46 +203,43 @@ func WriteProblem(writer http.ResponseWriter, statusCode int, spec ProblemSpec) 
 		}
 		problem.FieldErrors = &fieldErrors
 	}
-	writeJSON(writer, statusCode, problem)
+
+	writeJSON(w, statusCode, problem)
 }
 
-func isNotFound(err error) bool {
-	return errors.Is(err, pgx.ErrNoRows)
-}
-
-type apiErrorOptions struct {
-	NotFoundMessage string
-}
-
-func writeClassifiedError(writer http.ResponseWriter, err error, options apiErrorOptions) {
+func writeClassifiedError(w http.ResponseWriter, err error, opts apiErrorOptions) {
 	var validationErr *domain.ValidationError
+
 	switch {
-	case options.NotFoundMessage != "" && isNotFound(err):
-		WriteProblem(writer, http.StatusNotFound, ProblemSpec{
+	case opts.NotFoundMessage != "" && isNotFound(err):
+		writeProblem(w, http.StatusNotFound, problemSpec{
 			Type:   "urn:grinch:problem:not-found",
 			Title:  "Not found",
 			Code:   "not_found",
-			Detail: options.NotFoundMessage,
+			Detail: opts.NotFoundMessage,
 		})
 		return
+
 	case errors.Is(err, domain.ErrGroupReadOnly):
-		WriteProblem(writer, http.StatusForbidden, ProblemSpec{
+		writeProblem(w, http.StatusForbidden, problemSpec{
 			Type:   "urn:grinch:problem:forbidden",
 			Title:  "Forbidden",
 			Code:   "forbidden",
 			Detail: "Entra groups are read-only.",
 		})
 		return
+
 	case errors.Is(err, domain.ErrInvalidSort), isBadRequestError(err):
-		WriteProblem(writer, http.StatusBadRequest, ProblemSpec{
+		writeProblem(w, http.StatusBadRequest, problemSpec{
 			Type:   "urn:grinch:problem:invalid-request",
 			Title:  "Invalid request",
 			Code:   "invalid_request",
 			Detail: err.Error(),
 		})
 		return
+
 	case errors.As(err, &validationErr):
-		WriteProblem(writer, http.StatusUnprocessableEntity, ProblemSpec{
+		writeProblem(w, http.StatusUnprocessableEntity, problemSpec{
 			Type:        "urn:grinch:problem:validation-error",
 			Title:       "Validation failed",
 			Code:        validationErr.Code,
@@ -237,15 +253,16 @@ func writeClassifiedError(writer http.ResponseWriter, err error, options apiErro
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case pgerrcode.UniqueViolation:
-			WriteProblem(writer, http.StatusConflict, ProblemSpec{
+			writeProblem(w, http.StatusConflict, problemSpec{
 				Type:   "urn:grinch:problem:conflict",
 				Title:  "Conflict",
 				Code:   "conflict",
 				Detail: "Resource already exists.",
 			})
 			return
+
 		case pgerrcode.ForeignKeyViolation:
-			WriteProblem(writer, http.StatusUnprocessableEntity, ProblemSpec{
+			writeProblem(w, http.StatusUnprocessableEntity, problemSpec{
 				Type:   "urn:grinch:problem:validation-error",
 				Title:  "Validation failed",
 				Code:   "validation_error",
@@ -255,7 +272,7 @@ func writeClassifiedError(writer http.ResponseWriter, err error, options apiErro
 		}
 	}
 
-	WriteProblem(writer, http.StatusInternalServerError, ProblemSpec{
+	writeProblem(w, http.StatusInternalServerError, problemSpec{
 		Type:   "urn:grinch:problem:internal-error",
 		Title:  "Internal server error",
 		Code:   "internal_error",
@@ -263,13 +280,15 @@ func writeClassifiedError(writer http.ResponseWriter, err error, options apiErro
 	})
 }
 
-func isBadRequestError(err error) bool {
-	var requestErr badRequestError
-	return errors.As(err, &requestErr)
+func isNotFound(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
 }
 
-type badRequestError string
+func isBadRequestError(err error) bool {
+	var reqErr badRequestError
+	return errors.As(err, &reqErr)
+}
 
-func (err badRequestError) Error() string {
-	return string(err)
+func (e badRequestError) Error() string {
+	return string(e)
 }

@@ -10,14 +10,14 @@ INSERT INTO execution_events (
   occurred_at
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8
+  sqlc.arg(machine_id),
+  sqlc.arg(executable_id),
+  sqlc.arg(decision),
+  sqlc.arg(file_path),
+  sqlc.arg(executing_user),
+  sqlc.arg(logged_in_users),
+  sqlc.arg(current_sessions),
+  sqlc.arg(occurred_at)
 )
 RETURNING
   id,
@@ -53,13 +53,14 @@ SELECT
   ee.occurred_at,
   ee.created_at
 FROM execution_events AS ee
-JOIN executables AS x ON x.id = ee.executable_id
-WHERE ee.id = $1;
+JOIN executables AS x
+  ON x.id = ee.executable_id
+WHERE ee.id = sqlc.arg(id);
 
 -- name: DeleteExecutionEvent :exec
 DELETE FROM execution_events
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: DeleteExecutionEventsBefore :execrows
 DELETE FROM execution_events
-WHERE created_at < $1;
+WHERE created_at < sqlc.arg(before_created_at);

@@ -216,9 +216,6 @@ func (e ListUsersParamsOrder) Valid() bool {
 	}
 }
 
-// EventDecision defines model for EventDecision.
-type EventDecision = domain.EventDecision
-
 // ExcludedGroup defines model for ExcludedGroup.
 type ExcludedGroup = domain.ExcludedGroup
 
@@ -233,6 +230,9 @@ type ExecutableListResponse struct {
 
 // ExecutableSummary defines model for ExecutableSummary.
 type ExecutableSummary = domain.ExecutableSummary
+
+// ExecutionDecision defines model for ExecutionDecision.
+type ExecutionDecision = domain.ExecutionDecision
 
 // ExecutionEvent defines model for ExecutionEvent.
 type ExecutionEvent = domain.ExecutionEvent
@@ -332,16 +332,10 @@ type MembershipCreateRequest struct {
 // MembershipGroup defines model for MembershipGroup.
 type MembershipGroup = domain.MembershipGroup
 
-// MembershipKind defines model for MembershipKind.
-type MembershipKind = domain.MembershipKind
-
-// MembershipListItem defines model for MembershipListItem.
-type MembershipListItem = domain.MembershipListItem
-
 // MembershipListResponse defines model for MembershipListResponse.
 type MembershipListResponse struct {
-	Rows  []MembershipListItem `json:"rows"`
-	Total int32                `json:"total"`
+	Rows  []Membership `json:"rows"`
+	Total int32        `json:"total"`
 }
 
 // MembershipMember defines model for MembershipMember.
@@ -425,11 +419,11 @@ type UserListResponse struct {
 // EnabledFilter defines model for EnabledFilter.
 type EnabledFilter = []bool
 
-// EventDecisionFilter defines model for EventDecisionFilter.
-type EventDecisionFilter = []EventDecision
-
 // ExecutableIdFilter defines model for ExecutableIdFilter.
 type ExecutableIdFilter = openapi_types.UUID
+
+// ExecutionDecisionFilter defines model for ExecutionDecisionFilter.
+type ExecutionDecisionFilter = []ExecutionDecision
 
 // FileAccessDecisionFilter defines model for FileAccessDecisionFilter.
 type FileAccessDecisionFilter = []FileAccessDecision
@@ -519,7 +513,7 @@ type ListExecutionEventsParams struct {
 	MachineId    *MachineIdFilter                `form:"machine_id,omitempty" json:"machine_id,omitempty"`
 	UserId       *UserIdFilter                   `form:"user_id,omitempty" json:"user_id,omitempty"`
 	ExecutableId *ExecutableIdFilter             `form:"executable_id,omitempty" json:"executable_id,omitempty"`
-	Decision     *EventDecisionFilter            `form:"decision[],omitempty" json:"decision[],omitempty"`
+	Decision     *ExecutionDecisionFilter        `form:"decision[],omitempty" json:"decision[],omitempty"`
 }
 
 // ListExecutionEventsParamsOrder defines parameters for ListExecutionEvents.

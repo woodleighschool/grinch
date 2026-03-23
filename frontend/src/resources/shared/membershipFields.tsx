@@ -4,7 +4,7 @@ import { SourceField } from "@/resources/shared/sourceField";
 import type { ReactElement } from "react";
 import { useRecordContext } from "react-admin";
 
-type MembershipListItem = components["schemas"]["MembershipListItem"];
+type MembershipListItem = components["schemas"]["Membership"];
 type MembershipGroupRecord = Pick<MembershipListItem, "group">;
 
 export const MembershipGroupLinkField = (): ReactElement | undefined => {

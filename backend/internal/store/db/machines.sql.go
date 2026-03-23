@@ -14,7 +14,7 @@ import (
 
 const deleteMachine = `-- name: DeleteMachine :exec
 DELETE FROM machines
-WHERE machine_id = $1
+WHERE id = $1
 `
 
 func (q *Queries) DeleteMachine(ctx context.Context, machineID uuid.UUID) error {
@@ -24,7 +24,7 @@ func (q *Queries) DeleteMachine(ctx context.Context, machineID uuid.UUID) error 
 
 const getMachine = `-- name: GetMachine :one
 SELECT
-  m.machine_id,
+  m.id,
   m.serial_number,
   m.hostname,
   m.model_identifier,
@@ -32,47 +32,44 @@ SELECT
   m.os_build,
   m.santa_version,
   m.primary_user,
-  m.primary_user_groups_raw,
+  m.primary_user_groups,
   machine_rule_sync_status(
-    rs.pending_preflight_at,
-    rs.desired_targets,
-    rs.applied_targets,
-    rs.desired_binary_rule_count,
-    rs.binary_rule_count,
-    rs.desired_certificate_rule_count,
-    rs.certificate_rule_count,
-    rs.desired_teamid_rule_count,
-    rs.teamid_rule_count,
-    rs.desired_signingid_rule_count,
-    rs.signingid_rule_count,
-    rs.desired_cdhash_rule_count,
-    rs.cdhash_rule_count,
-    rs.last_clean_sync_at,
-    rs.last_reported_counts_match_at
+    ms.pending_preflight_at,
+    ms.desired_targets,
+    ms.applied_targets,
+    ms.desired_binary_rule_count,
+    ms.binary_rule_count,
+    ms.desired_certificate_rule_count,
+    ms.certificate_rule_count,
+    ms.desired_teamid_rule_count,
+    ms.teamid_rule_count,
+    ms.desired_signingid_rule_count,
+    ms.signingid_rule_count,
+    ms.desired_cdhash_rule_count,
+    ms.cdhash_rule_count,
+    ms.last_clean_sync_at,
+    ms.last_reported_counts_match_at
   ) AS rule_sync_status,
-  COALESCE(rs.client_mode, 'unknown') AS client_mode,
-  COALESCE(rs.binary_rule_count, 0)::INT4 AS binary_rule_count,
-  COALESCE(rs.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
-  COALESCE(rs.compiler_rule_count, 0)::INT4 AS compiler_rule_count,
-  COALESCE(rs.transitive_rule_count, 0)::INT4 AS transitive_rule_count,
-  COALESCE(rs.teamid_rule_count, 0)::INT4 AS teamid_rule_count,
-  COALESCE(rs.signingid_rule_count, 0)::INT4 AS signingid_rule_count,
-  COALESCE(rs.cdhash_rule_count, 0)::INT4 AS cdhash_rule_count,
+  m.client_mode,
+  COALESCE(ms.binary_rule_count, 0)::INT4 AS binary_rule_count,
+  COALESCE(ms.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
+  COALESCE(ms.teamid_rule_count, 0)::INT4 AS teamid_rule_count,
+  COALESCE(ms.signingid_rule_count, 0)::INT4 AS signingid_rule_count,
+  COALESCE(ms.cdhash_rule_count, 0)::INT4 AS cdhash_rule_count,
   m.last_seen_at,
   m.created_at,
   m.updated_at,
   u.id AS primary_user_id
 FROM machines AS m
-LEFT JOIN machine_sync_states AS rs
-  ON rs.machine_id = m.machine_id
+LEFT JOIN machine_sync_states AS ms
+  ON ms.machine_id = m.id
 LEFT JOIN users AS u
-  ON u.upn = m.primary_user
-  AND m.primary_user <> ''
-WHERE m.machine_id = $1
+  ON u.upn = NULLIF(m.primary_user, '')
+WHERE m.id = $1
 `
 
 type GetMachineRow struct {
-	MachineID            uuid.UUID
+	ID                   uuid.UUID
 	SerialNumber         string
 	Hostname             string
 	ModelIdentifier      string
@@ -80,13 +77,11 @@ type GetMachineRow struct {
 	OsBuild              string
 	SantaVersion         string
 	PrimaryUser          string
-	PrimaryUserGroupsRaw []byte
+	PrimaryUserGroups    []string
 	RuleSyncStatus       string
-	ClientMode           string
+	ClientMode           SantaClientMode
 	BinaryRuleCount      int32
 	CertificateRuleCount int32
-	CompilerRuleCount    int32
-	TransitiveRuleCount  int32
 	TeamIDRuleCount      int32
 	SigningIDRuleCount   int32
 	CDHashRuleCount      int32
@@ -100,7 +95,7 @@ func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachi
 	row := q.db.QueryRow(ctx, getMachine, machineID)
 	var i GetMachineRow
 	err := row.Scan(
-		&i.MachineID,
+		&i.ID,
 		&i.SerialNumber,
 		&i.Hostname,
 		&i.ModelIdentifier,
@@ -108,13 +103,11 @@ func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachi
 		&i.OsBuild,
 		&i.SantaVersion,
 		&i.PrimaryUser,
-		&i.PrimaryUserGroupsRaw,
+		&i.PrimaryUserGroups,
 		&i.RuleSyncStatus,
 		&i.ClientMode,
 		&i.BinaryRuleCount,
 		&i.CertificateRuleCount,
-		&i.CompilerRuleCount,
-		&i.TransitiveRuleCount,
 		&i.TeamIDRuleCount,
 		&i.SigningIDRuleCount,
 		&i.CDHashRuleCount,
@@ -127,9 +120,9 @@ func (q *Queries) GetMachine(ctx context.Context, machineID uuid.UUID) (GetMachi
 }
 
 const listMachineIDs = `-- name: ListMachineIDs :many
-SELECT machine_id
+SELECT id
 FROM machines
-ORDER BY machine_id ASC
+ORDER BY id ASC
 `
 
 func (q *Queries) ListMachineIDs(ctx context.Context) ([]uuid.UUID, error) {
@@ -140,11 +133,11 @@ func (q *Queries) ListMachineIDs(ctx context.Context) ([]uuid.UUID, error) {
 	defer rows.Close()
 	var items []uuid.UUID
 	for rows.Next() {
-		var machine_id uuid.UUID
-		if err := rows.Scan(&machine_id); err != nil {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, machine_id)
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -153,28 +146,27 @@ func (q *Queries) ListMachineIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 const listMachineIDsByPrimaryUserID = `-- name: ListMachineIDsByPrimaryUserID :many
-SELECT m.machine_id
+SELECT m.id
 FROM machines AS m
 JOIN users AS u
-  ON u.upn = m.primary_user
+  ON u.upn = NULLIF(m.primary_user, '')
 WHERE u.id = $1
-  AND m.primary_user <> ''
-ORDER BY m.machine_id ASC
+ORDER BY m.id ASC
 `
 
-func (q *Queries) ListMachineIDsByPrimaryUserID(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listMachineIDsByPrimaryUserID, id)
+func (q *Queries) ListMachineIDsByPrimaryUserID(ctx context.Context, primaryUserID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listMachineIDsByPrimaryUserID, primaryUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var items []uuid.UUID
 	for rows.Next() {
-		var machine_id uuid.UUID
-		if err := rows.Scan(&machine_id); err != nil {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, machine_id)
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -184,7 +176,7 @@ func (q *Queries) ListMachineIDsByPrimaryUserID(ctx context.Context, id uuid.UUI
 
 const listMachines = `-- name: ListMachines :many
 SELECT
-  m.machine_id,
+  m.id,
   m.serial_number,
   m.hostname,
   m.model_identifier,
@@ -192,43 +184,42 @@ SELECT
   m.os_build,
   m.santa_version,
   m.primary_user,
-  m.primary_user_groups_raw,
+  m.primary_user_groups,
   m.last_seen_at,
   m.created_at,
   m.updated_at,
   u.id AS primary_user_id
 FROM machines AS m
 LEFT JOIN users AS u
-  ON u.upn = m.primary_user
-  AND m.primary_user <> ''
+  ON u.upn = NULLIF(m.primary_user, '')
 ORDER BY m.last_seen_at DESC
-LIMIT $1
-OFFSET $2
+LIMIT $2
+OFFSET $1
 `
 
 type ListMachinesParams struct {
-	Limit  int32
-	Offset int32
+	OffsetCount int32
+	LimitCount  int32
 }
 
 type ListMachinesRow struct {
-	MachineID            uuid.UUID
-	SerialNumber         string
-	Hostname             string
-	ModelIdentifier      string
-	OsVersion            string
-	OsBuild              string
-	SantaVersion         string
-	PrimaryUser          string
-	PrimaryUserGroupsRaw []byte
-	LastSeenAt           time.Time
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	PrimaryUserID        *uuid.UUID
+	ID                uuid.UUID
+	SerialNumber      string
+	Hostname          string
+	ModelIdentifier   string
+	OsVersion         string
+	OsBuild           string
+	SantaVersion      string
+	PrimaryUser       string
+	PrimaryUserGroups []string
+	LastSeenAt        time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	PrimaryUserID     *uuid.UUID
 }
 
 func (q *Queries) ListMachines(ctx context.Context, arg ListMachinesParams) ([]ListMachinesRow, error) {
-	rows, err := q.db.Query(ctx, listMachines, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listMachines, arg.OffsetCount, arg.LimitCount)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +228,7 @@ func (q *Queries) ListMachines(ctx context.Context, arg ListMachinesParams) ([]L
 	for rows.Next() {
 		var i ListMachinesRow
 		if err := rows.Scan(
-			&i.MachineID,
+			&i.ID,
 			&i.SerialNumber,
 			&i.Hostname,
 			&i.ModelIdentifier,
@@ -245,7 +236,7 @@ func (q *Queries) ListMachines(ctx context.Context, arg ListMachinesParams) ([]L
 			&i.OsBuild,
 			&i.SantaVersion,
 			&i.PrimaryUser,
-			&i.PrimaryUserGroupsRaw,
+			&i.PrimaryUserGroups,
 			&i.LastSeenAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -263,7 +254,7 @@ func (q *Queries) ListMachines(ctx context.Context, arg ListMachinesParams) ([]L
 
 const upsertMachine = `-- name: UpsertMachine :one
 INSERT INTO machines (
-  machine_id,
+  id,
   serial_number,
   hostname,
   model_identifier,
@@ -271,7 +262,8 @@ INSERT INTO machines (
   os_build,
   santa_version,
   primary_user,
-  primary_user_groups_raw,
+  primary_user_groups,
+  client_mode,
   last_seen_at
 )
 VALUES (
@@ -284,9 +276,11 @@ VALUES (
   $7,
   $8,
   $9,
-  $10
+  $10,
+  $11
 )
-ON CONFLICT (machine_id) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE
+SET
   serial_number = EXCLUDED.serial_number,
   hostname = EXCLUDED.hostname,
   model_identifier = EXCLUDED.model_identifier,
@@ -294,11 +288,12 @@ ON CONFLICT (machine_id) DO UPDATE SET
   os_build = EXCLUDED.os_build,
   santa_version = EXCLUDED.santa_version,
   primary_user = EXCLUDED.primary_user,
-  primary_user_groups_raw = EXCLUDED.primary_user_groups_raw,
+  primary_user_groups = EXCLUDED.primary_user_groups,
+  client_mode = EXCLUDED.client_mode,
   last_seen_at = EXCLUDED.last_seen_at,
   updated_at = NOW()
 RETURNING
-  machine_id,
+  id,
   serial_number,
   hostname,
   model_identifier,
@@ -306,23 +301,25 @@ RETURNING
   os_build,
   santa_version,
   primary_user,
-  primary_user_groups_raw,
+  primary_user_groups,
+  client_mode,
   last_seen_at,
   created_at,
   updated_at
 `
 
 type UpsertMachineParams struct {
-	MachineID            uuid.UUID
-	SerialNumber         string
-	Hostname             string
-	ModelIdentifier      string
-	OsVersion            string
-	OsBuild              string
-	SantaVersion         string
-	PrimaryUser          string
-	PrimaryUserGroupsRaw []byte
-	LastSeenAt           time.Time
+	MachineID         uuid.UUID
+	SerialNumber      string
+	Hostname          string
+	ModelIdentifier   string
+	OsVersion         string
+	OsBuild           string
+	SantaVersion      string
+	PrimaryUser       string
+	PrimaryUserGroups []string
+	ClientMode        SantaClientMode
+	LastSeenAt        time.Time
 }
 
 func (q *Queries) UpsertMachine(ctx context.Context, arg UpsertMachineParams) (Machine, error) {
@@ -335,12 +332,13 @@ func (q *Queries) UpsertMachine(ctx context.Context, arg UpsertMachineParams) (M
 		arg.OsBuild,
 		arg.SantaVersion,
 		arg.PrimaryUser,
-		arg.PrimaryUserGroupsRaw,
+		arg.PrimaryUserGroups,
+		arg.ClientMode,
 		arg.LastSeenAt,
 	)
 	var i Machine
 	err := row.Scan(
-		&i.MachineID,
+		&i.ID,
 		&i.SerialNumber,
 		&i.Hostname,
 		&i.ModelIdentifier,
@@ -348,7 +346,8 @@ func (q *Queries) UpsertMachine(ctx context.Context, arg UpsertMachineParams) (M
 		&i.OsBuild,
 		&i.SantaVersion,
 		&i.PrimaryUser,
-		&i.PrimaryUserGroupsRaw,
+		&i.PrimaryUserGroups,
+		&i.ClientMode,
 		&i.LastSeenAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,

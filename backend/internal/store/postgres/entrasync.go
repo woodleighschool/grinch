@@ -15,7 +15,7 @@ import (
 func (store *Store) ReconcileSnapshot(
 	ctx context.Context,
 	snapshot *graphsync.Snapshot,
-) (domain.EntrasyncResult, error) {
+) (domain.EntraSyncResult, error) {
 	if snapshot == nil {
 		snapshot = &graphsync.Snapshot{
 			Users:   []graphsync.User{},
@@ -51,7 +51,7 @@ func (store *Store) ReconcileSnapshot(
 		return upsertMemberships(ctx, queries, snapshot.Members)
 	})
 	if err != nil {
-		return domain.EntrasyncResult{}, err
+		return domain.EntraSyncResult{}, err
 	}
 
 	membershipCount := 0
@@ -59,7 +59,7 @@ func (store *Store) ReconcileSnapshot(
 		membershipCount += len(memberIDs)
 	}
 
-	return domain.EntrasyncResult{
+	return domain.EntraSyncResult{
 		Users:       len(snapshot.Users),
 		Groups:      len(snapshot.Groups),
 		Memberships: membershipCount,
@@ -72,7 +72,7 @@ func upsertEntraUsers(ctx context.Context, queries *db.Queries, users []graphsyn
 			ID:          user.ID,
 			Upn:         user.UPN,
 			DisplayName: user.DisplayName,
-			Source:      string(domain.PrincipalSourceEntra),
+			Source:      db.PrincipalSource(domain.PrincipalSourceEntra),
 		})
 		if err != nil {
 			return fmt.Errorf("upsert user %q: %w", user.ID, err)
@@ -88,7 +88,7 @@ func upsertEntraGroups(ctx context.Context, queries *db.Queries, groups []graphs
 			ID:          group.ID,
 			Name:        group.DisplayName,
 			Description: group.Description,
-			Source:      string(domain.PrincipalSourceEntra),
+			Source:      db.PrincipalSource(domain.PrincipalSourceEntra),
 		})
 		if err != nil {
 			return fmt.Errorf("upsert group %q: %w", group.ID, err)
@@ -99,23 +99,30 @@ func upsertEntraGroups(ctx context.Context, queries *db.Queries, groups []graphs
 }
 
 func upsertMemberships(ctx context.Context, queries *db.Queries, membersByGroup map[uuid.UUID][]uuid.UUID) error {
+	total := 0
+	for _, memberIDs := range membersByGroup {
+		total += len(memberIDs)
+	}
+
+	if total == 0 {
+		return nil
+	}
+
+	groupIDs := make([]uuid.UUID, 0, total)
+	userIDs := make([]uuid.UUID, 0, total)
+
 	for groupID, memberIDs := range membersByGroup {
 		for _, memberID := range memberIDs {
-			membershipID, err := uuid.NewV7()
-			if err != nil {
-				return fmt.Errorf("create synced membership id: %w", err)
-			}
-
-			err = queries.AddSyncedMembership(ctx, db.AddSyncedMembershipParams{
-				ID:         membershipID,
-				GroupID:    groupID,
-				MemberKind: string(domain.MemberKindUser),
-				MemberID:   memberID,
-			})
-			if err != nil {
-				return fmt.Errorf("add member %q to group %q: %w", memberID, groupID, err)
-			}
+			groupIDs = append(groupIDs, groupID)
+			userIDs = append(userIDs, memberID)
 		}
+	}
+
+	if err := queries.BulkUpsertSyncedUserMemberships(ctx, db.BulkUpsertSyncedUserMembershipsParams{
+		GroupIds: groupIDs,
+		UserIds:  userIDs,
+	}); err != nil {
+		return fmt.Errorf("bulk upsert synced memberships: %w", err)
 	}
 
 	return nil

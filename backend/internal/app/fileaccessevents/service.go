@@ -25,17 +25,17 @@ func New(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (service *Service) ListFileAccessEvents(
+func (s *Service) ListFileAccessEvents(
 	ctx context.Context,
-	options domain.FileAccessEventListOptions,
+	opts domain.FileAccessEventListOptions,
 ) ([]domain.FileAccessEventSummary, int32, error) {
-	return service.store.ListFileAccessEvents(ctx, options)
+	return s.store.ListFileAccessEvents(ctx, opts)
 }
 
-func (service *Service) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domain.FileAccessEvent, error) {
-	return service.store.GetFileAccessEvent(ctx, id)
+func (s *Service) GetFileAccessEvent(ctx context.Context, id uuid.UUID) (domain.FileAccessEvent, error) {
+	return s.store.GetFileAccessEvent(ctx, id)
 }
 
-func (service *Service) DeleteFileAccessEvent(ctx context.Context, id uuid.UUID) error {
-	return service.store.DeleteFileAccessEvent(ctx, id)
+func (s *Service) DeleteFileAccessEvent(ctx context.Context, id uuid.UUID) error {
+	return s.store.DeleteFileAccessEvent(ctx, id)
 }

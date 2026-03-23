@@ -62,7 +62,7 @@ paths:
         - $ref: '#/components/parameters/MachineIdFilter'
         - $ref: '#/components/parameters/UserIdFilter'
         - $ref: '#/components/parameters/ExecutableIdFilter'
-        - $ref: '#/components/parameters/EventDecisionFilter'
+        - $ref: '#/components/parameters/ExecutionDecisionFilter'
       responses:
         '200':
           description: Execution event list.
@@ -696,7 +696,7 @@ components:
         type: array
         items:
           $ref: '#/components/schemas/MachineClientMode'
-    EventDecisionFilter:
+    ExecutionDecisionFilter:
       name: decision[]
       in: query
       style: form
@@ -704,7 +704,7 @@ components:
       schema:
         type: array
         items:
-          $ref: '#/components/schemas/EventDecision'
+          $ref: '#/components/schemas/ExecutionDecision'
     FileAccessDecisionFilter:
       name: decision[]
       in: query
@@ -728,29 +728,6 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
-    EventDecision:
-      x-go-type: domain.EventDecision
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: string
-      enum:
-        - unknown
-        - allow_unknown
-        - allow_binary
-        - allow_certificate
-        - allow_scope
-        - allow_team_id
-        - allow_signing_id
-        - allow_cd_hash
-        - block_unknown
-        - block_binary
-        - block_certificate
-        - block_scope
-        - block_team_id
-        - block_signing_id
-        - block_cd_hash
-        - bundle_binary
     ExcludedGroup:
       x-go-type: domain.ExcludedGroup
       x-go-type-import:
@@ -834,6 +811,29 @@ components:
         created_at:
           type: string
           format: date-time
+    ExecutionDecision:
+      x-go-type: domain.ExecutionDecision
+      x-go-type-import:
+        name: domain
+        path: github.com/woodleighschool/grinch/internal/domain
+      type: string
+      enum:
+        - unknown
+        - allow_unknown
+        - allow_binary
+        - allow_certificate
+        - allow_scope
+        - allow_team_id
+        - allow_signing_id
+        - allow_cd_hash
+        - block_unknown
+        - block_binary
+        - block_certificate
+        - block_scope
+        - block_team_id
+        - block_signing_id
+        - block_cd_hash
+        - bundle_binary
     ExecutionEvent:
       x-go-type: domain.ExecutionEvent
       x-go-type-import:
@@ -870,7 +870,7 @@ components:
           type: string
           format: uuid
         decision:
-          $ref: '#/components/schemas/EventDecision'
+          $ref: '#/components/schemas/ExecutionDecision'
         file_path:
           type: string
         file_name:
@@ -950,7 +950,7 @@ components:
           type: string
           format: uuid
         decision:
-          $ref: '#/components/schemas/EventDecision'
+          $ref: '#/components/schemas/ExecutionDecision'
         file_path:
           type: string
         file_name:
@@ -1230,8 +1230,6 @@ components:
         - client_mode
         - binary_rule_count
         - certificate_rule_count
-        - compiler_rule_count
-        - transitive_rule_count
         - teamid_rule_count
         - signingid_rule_count
         - cdhash_rule_count
@@ -1268,12 +1266,6 @@ components:
           type: integer
           format: int32
         certificate_rule_count:
-          type: integer
-          format: int32
-        compiler_rule_count:
-          type: integer
-          format: int32
-        transitive_rule_count:
           type: integer
           format: int32
         teamid_rule_count:
@@ -1432,7 +1424,6 @@ components:
       type: object
       required:
         - id
-        - kind
         - group
         - member
         - created_at
@@ -1441,8 +1432,6 @@ components:
         id:
           type: string
           format: uuid
-        kind:
-          $ref: '#/components/schemas/MembershipKind'
         group:
           $ref: '#/components/schemas/MembershipGroup'
         member:
@@ -1486,46 +1475,6 @@ components:
           type: string
         source:
           $ref: '#/components/schemas/Source'
-    MembershipKind:
-      x-go-type: domain.MembershipKind
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: string
-      enum:
-        - actual
-        - effective
-    MembershipListItem:
-      x-go-type: domain.MembershipListItem
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - kind
-        - group
-        - member
-        - created_at
-        - updated_at
-      properties:
-        actual_membership_id:
-          type: string
-          format: uuid
-          nullable: true
-        effective_membership_id:
-          type: string
-        kind:
-          $ref: '#/components/schemas/MembershipKind'
-        group:
-          $ref: '#/components/schemas/MembershipGroup'
-        member:
-          $ref: '#/components/schemas/MembershipMember'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
     MembershipListResponse:
       type: object
       required:
@@ -1538,7 +1487,7 @@ components:
         rows:
           type: array
           items:
-            $ref: '#/components/schemas/MembershipListItem'
+            $ref: '#/components/schemas/Membership'
     MembershipMember:
       x-go-type: domain.MembershipMember
       x-go-type-import:

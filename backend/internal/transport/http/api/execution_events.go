@@ -24,7 +24,7 @@ func (handler *Server) ListExecutionEvents(
 		return
 	}
 
-	decisions, err := parseOptionalValues(params.Decision, domain.ParseEventDecision)
+	decisions, err := parseOptionalValues(params.Decision, domain.ParseExecutionDecision)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

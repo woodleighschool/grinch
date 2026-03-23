@@ -2,7 +2,6 @@ package santa
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -16,53 +15,47 @@ import (
 // HandlePreflight snapshots machine state and freezes the next pending sync
 // snapshot. Later stages read that stored snapshot instead of recomputing live
 // state.
-func (service *Service) HandlePreflight(
+func (s *Service) HandlePreflight(
 	ctx context.Context,
 	machineID uuid.UUID,
-	request *syncv1.PreflightRequest,
+	req *syncv1.PreflightRequest,
 ) (*syncv1.PreflightResponse, error) {
-	primaryUserGroupsRaw, err := json.Marshal(request.GetPrimaryUserGroups())
-	if err != nil {
-		return nil, fmt.Errorf("marshal primary user groups: %w", err)
-	}
-
-	err = service.dataStore.UpsertMachine(ctx, model.MachineUpsert{
-		MachineID:            machineID,
-		SerialNumber:         request.GetSerialNumber(),
-		Hostname:             request.GetHostname(),
-		ModelIdentifier:      request.GetModelIdentifier(),
-		OSVersion:            request.GetOsVersion(),
-		OSBuild:              request.GetOsBuild(),
-		SantaVersion:         request.GetSantaVersion(),
-		PrimaryUser:          request.GetPrimaryUser(),
-		PrimaryUserGroupsRaw: primaryUserGroupsRaw,
-		LastSeenAt:           time.Now().UTC(),
+	err := s.dataStore.UpsertMachine(ctx, model.MachineUpsert{
+		MachineID:         machineID,
+		SerialNumber:      req.GetSerialNumber(),
+		Hostname:          req.GetHostname(),
+		ModelIdentifier:   req.GetModelIdentifier(),
+		OSVersion:         req.GetOsVersion(),
+		OSBuild:           req.GetOsBuild(),
+		SantaVersion:      req.GetSantaVersion(),
+		PrimaryUser:       req.GetPrimaryUser(),
+		PrimaryUserGroups: normalizeStrings(req.GetPrimaryUserGroups()),
+		ClientMode:        snapshot.MachineClientModeFromProto(req.GetClientMode()),
+		LastSeenAt:        time.Now().UTC(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("upsert machine: %w", err)
 	}
-	syncErr := service.dataStore.SyncMachineDesiredRuleTargets(ctx, machineID)
-	if syncErr != nil {
-		return nil, fmt.Errorf("sync machine desired rule targets: %w", syncErr)
+
+	if err = s.dataStore.UpdateMachineDesiredTargets(ctx, machineID); err != nil {
+		return nil, fmt.Errorf("sync machine desired rule targets: %w", err)
 	}
 
 	pendingSnapshot, err := snapshot.PreparePendingSnapshot(
 		ctx,
-		service.dataStore,
-		service.ruleResolver,
+		s.dataStore,
+		s.ruleResolver,
 		machineID,
-		request,
+		req,
 		time.Now().UTC(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("prepare pending rule snapshot: %w", err)
 	}
 
-	syncType := snapshot.MapPendingFullSync(pendingSnapshot.FullSync)
-	response := syncv1.PreflightResponse_builder{
-		ClientMode: request.GetClientMode(),
+	syncType := snapshot.SyncTypeFromPendingFullSync(pendingSnapshot.FullSync)
+	return syncv1.PreflightResponse_builder{
+		ClientMode: req.GetClientMode(),
 		SyncType:   &syncType,
-	}.Build()
-
-	return response, nil
+	}.Build(), nil
 }

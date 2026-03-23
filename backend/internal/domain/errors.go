@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"errors"
-	"strings"
-)
+import "errors"
 
 var (
 	ErrGroupReadOnly = errors.New("group read-only")
@@ -26,7 +23,7 @@ func (err *ValidationError) Error() string {
 	if err == nil {
 		return ""
 	}
-	if strings.TrimSpace(err.Detail) != "" {
+	if err.Detail != "" {
 		return err.Detail
 	}
 	if len(err.FieldErrors) > 0 {

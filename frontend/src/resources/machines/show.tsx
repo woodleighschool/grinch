@@ -1,11 +1,8 @@
 import { CLIENT_MODE_CHOICES, RULE_SYNC_STATUS_CHOICES } from "@/resources/machines/choices";
 import { RULE_POLICY_CHOICES } from "@/resources/rules/choices";
 import { EditableShowActions } from "@/resources/shared/actions";
-import { EventDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
-import {
-  MembershipGroupLinkField,
-  MembershipGroupSourceField,
-} from "@/resources/shared/membershipFields";
+import { ExecutionDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
+import { MembershipGroupLinkField, MembershipGroupSourceField } from "@/resources/shared/membershipFields";
 import type { ReactElement } from "react";
 import {
   BooleanField,
@@ -39,8 +36,6 @@ export const MachineShow = (): ReactElement => (
         <SelectField source="client_mode" label="Client Mode" choices={CLIENT_MODE_CHOICES} />
         <NumberField source="binary_rule_count" label="Binary Rules" />
         <NumberField source="certificate_rule_count" label="Certificate Rules" />
-        <NumberField source="compiler_rule_count" label="Compiler Rules" />
-        <NumberField source="transitive_rule_count" label="Transitive Rules" />
         <NumberField source="teamid_rule_count" label="Team ID Rules" />
         <NumberField source="signingid_rule_count" label="Signing ID Rules" />
         <NumberField source="cdhash_rule_count" label="CD Hash Rules" />
@@ -74,8 +69,6 @@ export const MachineShow = (): ReactElement => (
             <DataTable.Col source="group.source" label="Source">
               <MembershipGroupSourceField />
             </DataTable.Col>
-            <DataTable.Col source="kind" label="Membership" />
-            <DataTable.Col source="member.name" label="Via" />
           </DataTable>
         </ReferenceManyField>
       </TabbedShowLayout.Tab>
@@ -87,7 +80,7 @@ export const MachineShow = (): ReactElement => (
             </DataTable.Col>
             <DataTable.Col source="file_name" label="File" />
             <DataTable.Col source="decision" label="Decision">
-              <EventDecisionField />
+              <ExecutionDecisionField />
             </DataTable.Col>
             <DataTable.Col source="signing_id" label="Signing ID" />
           </DataTable>

@@ -19,90 +19,14 @@ import (
 )
 
 const (
-	protobufContentType    = "application/x-protobuf"
-	maxRequestBodyBytes    = 16 << 20
-	sharedSecretHeaderName = "X-Grinch-Shared-Secret" //nolint:gosec // fixed internal protocol header name, not a credential value.
+	protobufContentType = "application/x-protobuf"
+	maxRequestBodyBytes = 16 << 20
+
+	sharedSecretHeaderName = "X-Grinch-Shared-Secret" //nolint:gosec // Fixed protocol header name.
 )
 
-var errSyncUnauthorized = errors.New("sync authentication failed")
+var errUnauthorized = errors.New("sync authentication failed")
 
-func (handler *Handler) preflight(writer http.ResponseWriter, request *http.Request) {
-	message := &syncv1.PreflightRequest{}
-	if err := handler.decodeRequest(request, message); err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	machineID, err := parseMachineID(chi.URLParam(request, "machine_id"))
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	response, err := handler.service.HandlePreflight(request.Context(), machineID, message)
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	handler.writeResponse(writer, response)
-}
-
-func (handler *Handler) eventUpload(writer http.ResponseWriter, request *http.Request) {
-	message := &syncv1.EventUploadRequest{}
-	if err := handler.decodeRequest(request, message); err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	machineID, err := parseMachineID(chi.URLParam(request, "machine_id"))
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	response, err := handler.service.HandleEventUpload(request.Context(), machineID, message)
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	handler.writeResponse(writer, response)
-}
-
-func (handler *Handler) ruleDownload(writer http.ResponseWriter, request *http.Request) {
-	message := &syncv1.RuleDownloadRequest{}
-	if err := handler.decodeRequest(request, message); err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	machineID, err := parseMachineID(chi.URLParam(request, "machine_id"))
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	response, err := handler.service.HandleRuleDownload(request.Context(), machineID, message)
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	handler.writeResponse(writer, response)
-}
-
-func (handler *Handler) postflight(writer http.ResponseWriter, request *http.Request) {
-	message := &syncv1.PostflightRequest{}
-	if err := handler.decodeRequest(request, message); err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	machineID, err := parseMachineID(chi.URLParam(request, "machine_id"))
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	response, err := handler.service.HandlePostflight(request.Context(), machineID, message)
-	if err != nil {
-		handler.fail(writer, err)
-		return
-	}
-	handler.writeResponse(writer, response)
-}
-
-// Service captures the sync stage behavior used by HTTP handlers.
 type Service interface {
 	HandlePreflight(context.Context, uuid.UUID, *syncv1.PreflightRequest) (*syncv1.PreflightResponse, error)
 	HandleEventUpload(context.Context, uuid.UUID, *syncv1.EventUploadRequest) (*syncv1.EventUploadResponse, error)
@@ -110,13 +34,11 @@ type Service interface {
 	HandlePostflight(context.Context, uuid.UUID, *syncv1.PostflightRequest) (*syncv1.PostflightResponse, error)
 }
 
-// Handler serves syncv1 stage endpoints with proto+gzip transport.
 type Handler struct {
 	service      Service
 	sharedSecret string
 }
 
-// New returns a sync handler that can register stage routes on an existing chi router.
 func New(service Service, sharedSecret string) *Handler {
 	return &Handler{
 		service:      service,
@@ -124,99 +46,182 @@ func New(service Service, sharedSecret string) *Handler {
 	}
 }
 
-// RegisterRoutes registers /sync stage endpoints onto the provided router.
-func (handler *Handler) RegisterRoutes(router chi.Router) {
-	router.Post("/preflight/{machine_id}", handler.preflight)
-	router.Post("/eventupload/{machine_id}", handler.eventUpload)
-	router.Post("/ruledownload/{machine_id}", handler.ruleDownload)
-	router.Post("/postflight/{machine_id}", handler.postflight)
+func (h *Handler) RegisterRoutes(r chi.Router) {
+	r.Post("/preflight/{machine_id}", h.preflight)
+	r.Post("/eventupload/{machine_id}", h.eventUpload)
+	r.Post("/ruledownload/{machine_id}", h.ruleDownload)
+	r.Post("/postflight/{machine_id}", h.postflight)
 }
 
-func (handler *Handler) decodeRequest(request *http.Request, message proto.Message) error {
-	if !handler.authenticate(request) {
-		return errSyncUnauthorized
+func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) {
+	msg := &syncv1.PreflightRequest{}
+	if err := h.decodeRequest(r, msg); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	resp, err := h.service.HandlePreflight(r.Context(), machineID, msg)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	h.writeProtoResponse(w, resp)
+}
+
+func (h *Handler) eventUpload(w http.ResponseWriter, r *http.Request) {
+	msg := &syncv1.EventUploadRequest{}
+	if err := h.decodeRequest(r, msg); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	resp, err := h.service.HandleEventUpload(r.Context(), machineID, msg)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	h.writeProtoResponse(w, resp)
+}
+
+func (h *Handler) ruleDownload(w http.ResponseWriter, r *http.Request) {
+	msg := &syncv1.RuleDownloadRequest{}
+	if err := h.decodeRequest(r, msg); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	resp, err := h.service.HandleRuleDownload(r.Context(), machineID, msg)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	h.writeProtoResponse(w, resp)
+}
+
+func (h *Handler) postflight(w http.ResponseWriter, r *http.Request) {
+	msg := &syncv1.PostflightRequest{}
+	if err := h.decodeRequest(r, msg); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	resp, err := h.service.HandlePostflight(r.Context(), machineID, msg)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	h.writeProtoResponse(w, resp)
+}
+
+func (h *Handler) decodeRequest(r *http.Request, msg proto.Message) error {
+	if !h.authenticate(r) {
+		return errUnauthorized
 	}
 
-	reader, err := gzip.NewReader(request.Body)
+	gr, err := gzip.NewReader(r.Body)
 	if err != nil {
 		return fmt.Errorf("%w: new gzip reader: %w", appsanta.ErrInvalidSyncRequest, err)
 	}
-	defer reader.Close()
+	defer gr.Close()
 
-	payload, err := io.ReadAll(io.LimitReader(reader, maxRequestBodyBytes))
+	payload, err := io.ReadAll(io.LimitReader(gr, maxRequestBodyBytes))
 	if err != nil {
 		return fmt.Errorf("%w: read request body: %w", appsanta.ErrInvalidSyncRequest, err)
 	}
-	if unmarshalErr := proto.Unmarshal(payload, message); unmarshalErr != nil {
-		return fmt.Errorf("%w: unmarshal proto: %w", appsanta.ErrInvalidSyncRequest, unmarshalErr)
+
+	if err = proto.Unmarshal(payload, msg); err != nil {
+		return fmt.Errorf("%w: unmarshal proto: %w", appsanta.ErrInvalidSyncRequest, err)
 	}
 
 	return nil
 }
 
-func (handler *Handler) writeResponse(writer http.ResponseWriter, message proto.Message) {
-	payload, err := marshalGzippedProto(message)
+func (h *Handler) writeProtoResponse(w http.ResponseWriter, msg proto.Message) {
+	payload, err := marshalCompressedProto(msg)
 	if err != nil {
-		writeSyncError(writer, http.StatusInternalServerError)
+		writeStatusOnly(w, http.StatusInternalServerError)
 		return
 	}
 
-	writer.Header().Set("Content-Type", protobufContentType)
-	writer.Header().Set("Content-Encoding", "gzip")
-	writer.WriteHeader(http.StatusOK)
-	//nolint:gosec // Writing the buffered protobuf response is the intended /sync success path.
-	_, _ = writer.Write(payload)
+	w.Header().Set("Content-Type", protobufContentType)
+	w.Header().Set("Content-Encoding", "gzip")
+	w.WriteHeader(http.StatusOK)
+
+	//nolint:gosec // Buffered protobuf response body is the intended sync success path.
+	_, _ = w.Write(payload)
 }
 
-func (handler *Handler) authenticate(request *http.Request) bool {
-	if handler.sharedSecret == "" {
+func (h *Handler) writeError(w http.ResponseWriter, err error) {
+	writeStatusOnly(w, statusCodeForError(err))
+}
+
+func (h *Handler) authenticate(r *http.Request) bool {
+	if h.sharedSecret == "" {
 		return true
 	}
 
-	headerValue := request.Header.Get(sharedSecretHeaderName)
-	return subtle.ConstantTimeCompare([]byte(headerValue), []byte(handler.sharedSecret)) == 1
+	got := r.Header.Get(sharedSecretHeaderName)
+	return subtle.ConstantTimeCompare([]byte(got), []byte(h.sharedSecret)) == 1
 }
 
-func (handler *Handler) fail(writer http.ResponseWriter, err error) {
-	statusCode := http.StatusInternalServerError
+func statusCodeForError(err error) int {
 	switch {
-	case errors.Is(err, errSyncUnauthorized):
-		statusCode = http.StatusUnauthorized
+	case errors.Is(err, errUnauthorized):
+		return http.StatusUnauthorized
 	case errors.Is(err, appsanta.ErrInvalidSyncRequest):
-		statusCode = http.StatusBadRequest
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
 	}
-	writeSyncError(writer, statusCode)
 }
 
-func writeSyncError(writer http.ResponseWriter, statusCode int) {
-	writer.Header().Del("Content-Type")
-	writer.Header().Del("Content-Encoding")
-	writer.WriteHeader(statusCode)
+func writeStatusOnly(w http.ResponseWriter, statusCode int) {
+	w.Header().Del("Content-Type")
+	w.Header().Del("Content-Encoding")
+	w.WriteHeader(statusCode)
 }
 
 func parseMachineID(raw string) (uuid.UUID, error) {
-	parsed, err := uuid.Parse(raw)
+	id, err := uuid.Parse(raw)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%w: parse machine_id %q: %w", appsanta.ErrInvalidSyncRequest, raw, err)
 	}
 
-	return parsed, nil
+	return id, nil
 }
 
-func marshalGzippedProto(message proto.Message) ([]byte, error) {
-	payload, err := proto.Marshal(message)
+func marshalCompressedProto(msg proto.Message) ([]byte, error) {
+	payload, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	var buffer bytes.Buffer
-	writer := gzip.NewWriter(&buffer)
-	if _, writeErr := writer.Write(payload); writeErr != nil {
-		return nil, writeErr
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	if _, err = zw.Write(payload); err != nil {
+		_ = zw.Close()
+		return nil, err
 	}
-	if closeErr := writer.Close(); closeErr != nil {
-		return nil, closeErr
+	if err = zw.Close(); err != nil {
+		return nil, err
 	}
 
-	return buffer.Bytes(), nil
+	return buf.Bytes(), nil
 }

@@ -1,5 +1,5 @@
-// Package events owns event-lifecycle app concerns that are not part of the
-// Santa sync protocol itself, such as retention cleanup.
+// Package events owns event-lifecycle concerns outside the Santa sync protocol,
+// such as retention cleanup.
 package events
 
 import (
@@ -14,26 +14,24 @@ type Store interface {
 }
 
 type Service struct {
-	logger        *slog.Logger
+	logger *slog.Logger
+	store  Store
+
 	retentionDays int
-	store         Store
 }
 
 func New(logger *slog.Logger, store Store, retentionDays int) *Service {
 	return &Service{
 		logger:        logger,
-		retentionDays: retentionDays,
 		store:         store,
+		retentionDays: retentionDays,
 	}
 }
 
-func (service *Service) CleanupExpiredEvents(ctx context.Context) (int64, error) {
-	if service.retentionDays <= 0 {
-		return 0, nil
-	}
+func (s *Service) CleanupExpiredEvents(ctx context.Context) (int64, error) {
+	cutoff := time.Now().UTC().AddDate(0, 0, -s.retentionDays)
 
-	cutoff := time.Now().UTC().AddDate(0, 0, -service.retentionDays)
-	deleted, err := service.store.DeleteEventsBefore(ctx, cutoff)
+	deleted, err := s.store.DeleteEventsBefore(ctx, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("delete events before %s: %w", cutoff.Format(time.RFC3339), err)
 	}
@@ -41,8 +39,8 @@ func (service *Service) CleanupExpiredEvents(ctx context.Context) (int64, error)
 	return deleted, nil
 }
 
-func (service *Service) RunRetention(ctx context.Context, interval time.Duration) {
-	service.cleanupAndLog(ctx)
+func (s *Service) RunRetention(ctx context.Context, interval time.Duration) {
+	s.runCleanup(ctx)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -50,38 +48,33 @@ func (service *Service) RunRetention(ctx context.Context, interval time.Duration
 	for {
 		select {
 		case <-ctx.Done():
-			service.logger.InfoContext(ctx, "event retention worker stopped")
+			s.logger.InfoContext(ctx, "event retention worker stopped")
 			return
 		case <-ticker.C:
-			service.cleanupAndLog(ctx)
+			s.runCleanup(ctx)
 		}
 	}
 }
 
-func (service *Service) cleanupAndLog(ctx context.Context) {
-	started := time.Now()
+func (s *Service) runCleanup(ctx context.Context) {
+	start := time.Now()
 
-	deleted, err := service.CleanupExpiredEvents(ctx)
+	deleted, err := s.CleanupExpiredEvents(ctx)
 	if err != nil {
-		service.logger.ErrorContext(
+		s.logger.ErrorContext(
 			ctx,
 			"event retention cleanup failed",
-			"error",
-			err,
-			"duration",
-			time.Since(started),
+			"error", err,
+			"duration", time.Since(start),
 		)
 		return
 	}
 
-	service.logger.InfoContext(
+	s.logger.InfoContext(
 		ctx,
 		"event retention cleanup complete",
-		"retention_days",
-		service.retentionDays,
-		"deleted",
-		deleted,
-		"duration",
-		time.Since(started),
+		"retention_days", s.retentionDays,
+		"deleted", deleted,
+		"duration", time.Since(start),
 	)
 }

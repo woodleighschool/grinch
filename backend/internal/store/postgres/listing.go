@@ -1,13 +1,18 @@
 package postgres
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/woodleighschool/grinch/internal/domain"
+)
+
+const (
+	sortDirectionAsc  = "ASC"
+	sortDirectionDesc = "DESC"
 )
 
 func searchPattern(search string) string {
@@ -18,55 +23,54 @@ func searchPattern(search string) string {
 	return "%" + search + "%"
 }
 
-func nullableUUID(id *uuid.UUID) any {
-	if id == nil {
-		return nil
-	}
-
-	return *id
-}
-
 func toStrings[T ~string](values []T) []string {
 	if len(values) == 0 {
 		return nil
 	}
 
-	result := make([]string, 0, len(values))
+	out := make([]string, 0, len(values))
 	for _, value := range values {
-		result = append(result, string(value))
+		out = append(out, string(value))
 	}
 
-	return result
+	return out
 }
 
-func orderBy(sort string, order string, allowed map[string]string, fallback []string) (string, error) {
-	term := strings.TrimSpace(sort)
-	if term == "" {
-		return strings.Join(fallback, ", "), nil
+func orderBy(
+	sortField string,
+	sortOrder string,
+	allowed map[string]string,
+	defaultOrder []string,
+) (string, error) {
+	if len(defaultOrder) == 0 {
+		return "", errors.New("default order is required")
 	}
 
-	column, ok := allowed[term]
+	if sortField == "" {
+		return strings.Join(defaultOrder, ", "), nil
+	}
+
+	sortColumn, ok := allowed[sortField]
 	if !ok {
-		return "", fmt.Errorf("%w field %q", domain.ErrInvalidSort, term)
+		return "", fmt.Errorf("%w field %q", domain.ErrInvalidSort, sortField)
 	}
 
-	direction := "ASC"
-	if strings.EqualFold(strings.TrimSpace(order), "desc") {
-		direction = "DESC"
+	sortDirection := sortDirectionAsc
+	if strings.EqualFold(sortOrder, "desc") {
+		sortDirection = sortDirectionDesc
 	}
 
-	orderParts := make([]string, 0, len(fallback)+1)
-	orderParts = append(orderParts, column+" "+direction)
+	parts := make([]string, 0, len(defaultOrder)+1)
+	parts = append(parts, sortColumn+" "+sortDirection)
 
-	for _, defaultPart := range fallback {
-		defaultColumn := strings.TrimSpace(strings.Split(defaultPart, " ")[0])
-		if defaultColumn == column {
-			continue
+	for _, tiebreaker := range defaultOrder {
+		tiebreakerColumn, _, _ := strings.Cut(tiebreaker, " ")
+		if tiebreakerColumn != sortColumn {
+			parts = append(parts, tiebreaker)
 		}
-		orderParts = append(orderParts, defaultPart)
 	}
 
-	return strings.Join(orderParts, ", "), nil
+	return strings.Join(parts, ", "), nil
 }
 
 func collectRows[T any](
@@ -75,13 +79,15 @@ func collectRows[T any](
 ) ([]T, int32, error) {
 	defer rows.Close()
 
-	var items []T
 	var total int32
+	items := make([]T, 0)
+
 	for rows.Next() {
 		item, rowTotal, err := scan(rows)
 		if err != nil {
 			return nil, 0, err
 		}
+
 		items = append(items, item)
 		total = rowTotal
 	}

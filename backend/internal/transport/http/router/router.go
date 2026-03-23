@@ -13,13 +13,12 @@ import (
 	"github.com/woodleighschool/grinch/internal/platform/httpmiddleware"
 )
 
+const readinessTimeout = 2 * time.Second
+
 type statusResponse struct {
 	Status string `json:"status"`
 }
 
-const readinessTimeout = 2 * time.Second
-
-// New creates the root HTTP router for Grinch.
 func New(
 	logger *slog.Logger,
 	readinessCheck func(context.Context) error,
@@ -28,56 +27,56 @@ func New(
 	registerAPIRoutes func(chi.Router),
 	frontendDir string,
 ) http.Handler {
-	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
-	router.Use(httpmiddleware.RequestLogger(logger))
-	router.Use(middleware.Recoverer)
+	r := chi.NewRouter()
 
-	router.Get("/healthz", statusHandler(logger, http.StatusOK, statusResponse{Status: "ok"}))
-	router.Get("/readyz", readinessHandler(logger, readinessCheck))
-	router.Route("/sync", registerSyncRoutes)
-	router.Route("/auth", registerAuthRoutes)
-	router.Route("/api/v1", registerAPIRoutes)
-	mountFrontend(router, frontendDir)
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(httpmiddleware.RequestLogger(logger))
+	r.Use(middleware.Recoverer)
 
-	return router
+	r.Get("/healthz", healthHandler(logger))
+	r.Get("/readyz", readinessHandler(logger, readinessCheck))
+
+	r.Route("/sync", registerSyncRoutes)
+	r.Route("/auth", registerAuthRoutes)
+	r.Route("/api/v1", registerAPIRoutes)
+
+	mountFrontend(r, frontendDir)
+
+	return r
 }
 
-func statusHandler(
-	logger *slog.Logger,
-	statusCode int,
-	payload statusResponse,
-) http.HandlerFunc {
-	return func(writer http.ResponseWriter, _ *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		writer.WriteHeader(statusCode)
-		if err := json.NewEncoder(writer).Encode(payload); err != nil {
-			logger.Error("encode health response", "error", err)
-		}
+func healthHandler(logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, logger, http.StatusOK, statusResponse{Status: "ok"})
 	}
 }
 
 func readinessHandler(logger *slog.Logger, readinessCheck func(context.Context) error) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
-		if readinessCheck != nil {
-			checkContext, cancel := context.WithTimeout(request.Context(), readinessTimeout)
-			defer cancel()
-
-			if err := readinessCheck(checkContext); err != nil {
-				logger.Warn("readiness check failed", "error", err)
-				statusHandler(
-					logger,
-					http.StatusServiceUnavailable,
-					statusResponse{Status: "not_ready"},
-				)(
-					writer,
-					request,
-				)
-				return
-			}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if readinessCheck == nil {
+			writeJSON(w, logger, http.StatusOK, statusResponse{Status: "ready"})
+			return
 		}
 
-		statusHandler(logger, http.StatusOK, statusResponse{Status: "ready"})(writer, request)
+		ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
+		defer cancel()
+
+		if err := readinessCheck(ctx); err != nil {
+			logger.Warn("readiness check failed", "error", err)
+			writeJSON(w, logger, http.StatusServiceUnavailable, statusResponse{Status: "not_ready"})
+			return
+		}
+
+		writeJSON(w, logger, http.StatusOK, statusResponse{Status: "ready"})
+	}
+}
+
+func writeJSON(w http.ResponseWriter, logger *slog.Logger, statusCode int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		logger.Error("encode JSON response", "error", err)
 	}
 }

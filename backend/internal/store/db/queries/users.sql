@@ -6,12 +6,13 @@ INSERT INTO users (
   source
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4
+  sqlc.arg(id),
+  sqlc.arg(upn),
+  sqlc.arg(display_name),
+  sqlc.arg(source)
 )
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE
+SET
   upn = EXCLUDED.upn,
   display_name = EXCLUDED.display_name,
   source = EXCLUDED.source,
@@ -33,7 +34,7 @@ SELECT
   created_at,
   updated_at
 FROM users
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: ListUsers :many
 SELECT
@@ -45,9 +46,9 @@ SELECT
   updated_at
 FROM users
 ORDER BY display_name ASC, id ASC
-LIMIT $1
-OFFSET $2;
+LIMIT sqlc.arg(limit_count)
+OFFSET sqlc.arg(offset_count);
 
 -- name: DeleteUser :exec
 DELETE FROM users
-WHERE id = $1;
+WHERE id = sqlc.arg(id);

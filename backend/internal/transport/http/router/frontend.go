@@ -10,8 +10,16 @@ import (
 	"github.com/go-pkgz/rest"
 )
 
-func mountFrontend(router chi.Router, dir string) {
-	if _, err := os.Stat(filepath.Join(dir, "index.html")); err != nil {
+const (
+	frontendIndexFile = "index.html"
+	frontendAssetsURL = "/assets/"
+
+	cacheControlImmutable = "public, max-age=31536000, immutable"
+	cacheControlNoCache   = "no-cache"
+)
+
+func mountFrontend(r chi.Router, dir string) {
+	if !frontendExists(dir) {
 		return
 	}
 
@@ -20,20 +28,32 @@ func mountFrontend(router chi.Router, dir string) {
 		return
 	}
 
-	frontend := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if strings.HasPrefix(request.URL.Path, "/assets/") {
-			writer.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
-			writer.Header().Set("Cache-Control", "no-cache")
-		}
-		fileServer.ServeHTTP(writer, request)
+	frontend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setFrontendCacheHeaders(w, r)
+		fileServer.ServeHTTP(w, r)
 	})
 
-	router.NotFound(rest.Gzip(
-		"text/html",
-		"text/css",
-		"application/javascript",
-		"application/json",
-		"image/svg+xml",
-	)(frontend).ServeHTTP)
+	r.NotFound(
+		rest.Gzip(
+			"text/html",
+			"text/css",
+			"application/javascript",
+			"application/json",
+			"image/svg+xml",
+		)(frontend).ServeHTTP,
+	)
+}
+
+func frontendExists(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, frontendIndexFile))
+	return err == nil
+}
+
+func setFrontendCacheHeaders(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, frontendAssetsURL) {
+		w.Header().Set("Cache-Control", cacheControlImmutable)
+		return
+	}
+
+	w.Header().Set("Cache-Control", cacheControlNoCache)
 }

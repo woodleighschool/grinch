@@ -49,7 +49,7 @@ RETURNING
 type CreateExecutionEventParams struct {
 	MachineID       uuid.UUID
 	ExecutableID    uuid.UUID
-	Decision        string
+	Decision        ExecutionDecision
 	FilePath        string
 	ExecutingUser   string
 	LoggedInUsers   []string
@@ -99,8 +99,8 @@ DELETE FROM execution_events
 WHERE created_at < $1
 `
 
-func (q *Queries) DeleteExecutionEventsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExecutionEventsBefore, createdAt)
+func (q *Queries) DeleteExecutionEventsBefore(ctx context.Context, beforeCreatedAt time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExecutionEventsBefore, beforeCreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -129,7 +129,8 @@ SELECT
   ee.occurred_at,
   ee.created_at
 FROM execution_events AS ee
-JOIN executables AS x ON x.id = ee.executable_id
+JOIN executables AS x
+  ON x.id = ee.executable_id
 WHERE ee.id = $1
 `
 
@@ -137,7 +138,7 @@ type GetExecutionEventRow struct {
 	ID              uuid.UUID
 	MachineID       uuid.UUID
 	ExecutableID    uuid.UUID
-	Decision        string
+	Decision        ExecutionDecision
 	FilePath        string
 	FileName        string
 	FileSHA256      string

@@ -12,12 +12,12 @@ import (
 )
 
 // HandleRuleDownload serves the frozen pending snapshot from preflight.
-func (service *Service) HandleRuleDownload(
+func (s *Service) HandleRuleDownload(
 	ctx context.Context,
 	machineID uuid.UUID,
 	_ *syncv1.RuleDownloadRequest,
 ) (*syncv1.RuleDownloadResponse, error) {
-	pendingSnapshot, _, err := snapshot.PendingSnapshotForMachine(ctx, service.dataStore, machineID)
+	pendingSnapshot, _, err := snapshot.LoadPendingSnapshot(ctx, s.dataStore, machineID)
 	if err != nil {
 		if errors.Is(err, snapshot.ErrPendingSnapshotNotFound) {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidSyncRequest, err)

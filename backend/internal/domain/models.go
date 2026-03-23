@@ -30,13 +30,6 @@ const (
 	MemberKindUser    MemberKind = "user"
 )
 
-type MembershipKind string
-
-const (
-	MembershipKindActual    MembershipKind = "actual"
-	MembershipKindEffective MembershipKind = "effective"
-)
-
 type MembershipOrigin string
 
 const (
@@ -99,8 +92,6 @@ type Machine struct {
 	ClientMode           MachineClientMode     `json:"client_mode"`
 	BinaryRuleCount      int32                 `json:"binary_rule_count"`
 	CertificateRuleCount int32                 `json:"certificate_rule_count"`
-	CompilerRuleCount    int32                 `json:"compiler_rule_count"`
-	TransitiveRuleCount  int32                 `json:"transitive_rule_count"`
 	TeamIDRuleCount      int32                 `json:"teamid_rule_count"`
 	SigningIDRuleCount   int32                 `json:"signingid_rule_count"`
 	CDHashRuleCount      int32                 `json:"cdhash_rule_count"`
@@ -186,7 +177,7 @@ type ExecutionEvent struct {
 	ID              uuid.UUID           `json:"id"`
 	MachineID       uuid.UUID           `json:"machine_id"`
 	ExecutableID    uuid.UUID           `json:"executable_id"`
-	Decision        EventDecision       `json:"decision"`
+	Decision        ExecutionDecision   `json:"decision"`
 	FilePath        string              `json:"file_path"`
 	FileName        string              `json:"file_name"`
 	FileSHA256      string              `json:"file_sha256"`
@@ -205,15 +196,15 @@ type ExecutionEvent struct {
 }
 
 type ExecutionEventSummary struct {
-	ID           uuid.UUID     `json:"id"`
-	MachineID    uuid.UUID     `json:"machine_id"`
-	ExecutableID uuid.UUID     `json:"executable_id"`
-	Decision     EventDecision `json:"decision"`
-	FilePath     string        `json:"file_path"`
-	FileName     string        `json:"file_name"`
-	SigningID    string        `json:"signing_id"`
-	OccurredAt   *time.Time    `json:"occurred_at,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
+	ID           uuid.UUID         `json:"id"`
+	MachineID    uuid.UUID         `json:"machine_id"`
+	ExecutableID uuid.UUID         `json:"executable_id"`
+	Decision     ExecutionDecision `json:"decision"`
+	FilePath     string            `json:"file_path"`
+	FileName     string            `json:"file_name"`
+	SigningID    string            `json:"signing_id"`
+	OccurredAt   *time.Time        `json:"occurred_at,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
 }
 
 type FileAccessEventProcess struct {
@@ -343,21 +334,10 @@ type MembershipMember struct {
 
 type Membership struct {
 	ID        uuid.UUID        `json:"id"`
-	Kind      MembershipKind   `json:"kind"`
 	Group     MembershipGroup  `json:"group"`
 	Member    MembershipMember `json:"member"`
 	CreatedAt time.Time        `json:"created_at"`
 	UpdatedAt time.Time        `json:"updated_at"`
-}
-
-type MembershipListItem struct {
-	Kind                  MembershipKind   `json:"kind"`
-	ActualMembershipID    *uuid.UUID       `json:"actual_membership_id,omitempty"`
-	EffectiveMembershipID string           `json:"effective_membership_id,omitempty"`
-	Group                 MembershipGroup  `json:"group"`
-	Member                MembershipMember `json:"member"`
-	CreatedAt             time.Time        `json:"created_at"`
-	UpdatedAt             time.Time        `json:"updated_at"`
 }
 
 type RuleWriteInput struct {
@@ -387,7 +367,7 @@ type ExcludedGroupWriteInput struct {
 	GroupID uuid.UUID
 }
 
-type EntrasyncResult struct {
+type EntraSyncResult struct {
 	Users       int
 	Groups      int
 	Memberships int

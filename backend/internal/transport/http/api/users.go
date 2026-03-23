@@ -2,8 +2,6 @@ package apihttp //nolint:dupl // structurally similar to executables.go by desig
 
 import (
 	"net/http"
-
-	"github.com/woodleighschool/grinch/internal/domain"
 )
 
 func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Request, params ListUsersParams) {
@@ -20,9 +18,7 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	items, total, err := handler.store.ListUsers(request.Context(), domain.UserListOptions{
-		ListOptions: listOptions,
-	})
+	items, total, err := handler.store.ListUsers(request.Context(), listOptions)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

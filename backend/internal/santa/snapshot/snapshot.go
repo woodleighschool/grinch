@@ -1,12 +1,13 @@
-// Package snapshot freezes one Santa sync cycle into a pending desired state.
+// Package snapshot prepares and reloads the frozen state for a single Santa
+// sync cycle.
 //
-// Santa sync is inherently two-phase: preflight decides what the machine
-// should end up with, rule download must serve that same frozen state, and
-// postflight acknowledges the frozen result only after the client reports it
-// processed the full payload we sent for that frozen snapshot.
+// Santa sync is two-phase: preflight freezes the desired state, rule download
+// serves that exact snapshot, and postflight acknowledges the result after the
+// client reports it processed the payload for that snapshot.
 package snapshot
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -22,12 +23,17 @@ import (
 
 var ErrPendingSnapshotNotFound = errors.New("pending rule sync snapshot not found")
 
+// PendingSnapshot is the frozen rule payload prepared during preflight and
+// reused for the rest of the sync cycle.
 type PendingSnapshot struct {
 	FullSync         bool
 	Payload          []model.SyncRule
 	PayloadRuleCount int64
 }
 
+// PreparePendingSnapshot resolves the machine's desired rules, freezes the
+// resulting payload, and stores it as the pending snapshot for the current
+// sync cycle.
 func PreparePendingSnapshot(
 	ctx context.Context,
 	store model.DataStore,
@@ -41,30 +47,24 @@ func PreparePendingSnapshot(
 		return PendingSnapshot{}, fmt.Errorf("get machine sync state: %w", err)
 	}
 
-	ruleTargets, err := ruleResolver.ResolveMachineRuleTargets(ctx, machineID)
+	resolvedRules, err := ruleResolver.ResolveMachineRuleTargets(ctx, machineID)
 	if err != nil {
 		return PendingSnapshot{}, fmt.Errorf("resolve machine rule targets: %w", err)
 	}
 
-	currentTargets := withRulePayloadHashes(ruleTargets)
-	snapshot, pendingWrite := buildPendingSnapshot(
-		state,
-		currentTargets,
-		request,
-		preparedAt,
-		machineID,
-	)
+	pendingTargets := pendingRuleTargets(resolvedRules)
+	snapshot, write := planPendingSnapshot(state, pendingTargets, request, preparedAt, machineID)
 
-	if storeErr := store.ReplacePendingSnapshot(ctx, pendingWrite); storeErr != nil {
-		return PendingSnapshot{}, fmt.Errorf("store pending rule snapshot: %w", storeErr)
+	if err = store.ReplacePendingSnapshot(ctx, write); err != nil {
+		return PendingSnapshot{}, fmt.Errorf("replace pending snapshot: %w", err)
 	}
 
 	return snapshot, nil
 }
 
-// PendingSnapshotForMachine reloads the frozen state created at preflight time
-// so rule download serves one stable snapshot for the whole sync cycle.
-func PendingSnapshotForMachine(
+// LoadPendingSnapshot reloads the frozen snapshot created during preflight so
+// rule download can serve one stable payload for the full sync cycle.
+func LoadPendingSnapshot(
 	ctx context.Context,
 	store model.DataStore,
 	machineID uuid.UUID,
@@ -73,37 +73,47 @@ func PendingSnapshotForMachine(
 	if err != nil {
 		return PendingSnapshot{}, model.MachineSyncState{}, fmt.Errorf("get machine sync state: %w", err)
 	}
+
 	if state.PendingPreflightAt == nil {
-		return PendingSnapshot{}, model.MachineSyncState{}, fmt.Errorf("%w", ErrPendingSnapshotNotFound)
+		return PendingSnapshot{}, model.MachineSyncState{}, ErrPendingSnapshotNotFound
 	}
 
-	return PendingSnapshot{
+	snapshot := PendingSnapshot{
 		FullSync:         state.PendingFullSync,
 		Payload:          slices.Clone(state.PendingPayload),
 		PayloadRuleCount: state.PendingPayloadRuleCount,
-	}, state, nil
+	}
+
+	return snapshot, state, nil
 }
 
-func buildPendingSnapshot(
+func planPendingSnapshot(
 	state model.MachineSyncState,
-	current []model.PendingRuleTarget,
+	pendingTargets []model.PendingRuleTarget,
 	request *syncv1.PreflightRequest,
 	preparedAt time.Time,
 	machineID uuid.UUID,
 ) (PendingSnapshot, model.PendingSnapshotWrite) {
-	desiredTargets := toAppliedRuleTargets(current)
-	desiredCounts := countPendingRuleTargets(current)
-	applied := slices.Clone(state.AppliedTargets)
-	targetsMatch := appliedRuleTargetsMatch(desiredTargets, applied)
-	payload := diffSnapshot(current, applied)
+	pendingTargets = sortPendingRuleTargets(pendingTargets)
+
+	desiredTargets := toAppliedRuleTargets(pendingTargets)
+	appliedTargets := sortAppliedRuleTargets(slices.Clone(state.AppliedTargets))
+
+	desiredCounts := pendingRuleTargetCounts(pendingTargets)
+	reportedCounts := preflightRuleCounts(request)
+	reportedCountsMatch := desiredCounts == reportedCounts
+
 	reportedCountsMatchAt := state.LastReportedCountsMatchAt
-	reportedCountsMatch := managedRuleCountsMatch(desiredCounts, request)
 	if reportedCountsMatch {
 		reportedCountsMatchAt = &preparedAt
 	}
+
+	targetsMatch := slices.Equal(desiredTargets, appliedTargets)
 	fullSync := request.GetRequestCleanSync() || (targetsMatch && !reportedCountsMatch)
+
+	payload := buildIncrementalPayload(pendingTargets, appliedTargets)
 	if fullSync {
-		payload = fullSyncRules(current)
+		payload = buildFullSyncPayload(pendingTargets)
 	}
 
 	payloadRuleCount := int64(len(payload))
@@ -113,12 +123,12 @@ func buildPendingSnapshot(
 		PayloadRuleCount: payloadRuleCount,
 	}
 
-	return snapshot, model.PendingSnapshotWrite{
+	write := model.PendingSnapshotWrite{
 		MachineID:                   machineID,
 		RulesHash:                   state.RulesHash,
-		DesiredTargets:              desiredTargets,
-		AppliedTargets:              applied,
-		PendingTargets:              desiredTargets,
+		DesiredTargets:              slices.Clone(desiredTargets),
+		AppliedTargets:              slices.Clone(appliedTargets),
+		SentTargets:                 desiredTargets,
 		PendingPayload:              slices.Clone(payload),
 		PendingPayloadRuleCount:     payloadRuleCount,
 		PendingFullSync:             fullSync,
@@ -128,106 +138,159 @@ func buildPendingSnapshot(
 		DesiredTeamIDRuleCount:      desiredCounts.TeamID,
 		DesiredSigningIDRuleCount:   desiredCounts.SigningID,
 		DesiredCDHashRuleCount:      desiredCounts.CDHash,
-		ClientMode:                  MapClientMode(request.GetClientMode()),
-		BinaryRuleCount:             SafeCount(request.GetBinaryRuleCount()),
-		CertificateRuleCount:        SafeCount(request.GetCertificateRuleCount()),
-		CompilerRuleCount:           SafeCount(request.GetCompilerRuleCount()),
-		TransitiveRuleCount:         SafeCount(request.GetTransitiveRuleCount()),
-		TeamIDRuleCount:             SafeCount(request.GetTeamidRuleCount()),
-		SigningIDRuleCount:          SafeCount(request.GetSigningidRuleCount()),
-		CDHashRuleCount:             SafeCount(request.GetCdhashRuleCount()),
+		BinaryRuleCount:             ClampRuleCount(request.GetBinaryRuleCount()),
+		CertificateRuleCount:        ClampRuleCount(request.GetCertificateRuleCount()),
+		TeamIDRuleCount:             ClampRuleCount(request.GetTeamidRuleCount()),
+		SigningIDRuleCount:          ClampRuleCount(request.GetSigningidRuleCount()),
+		CDHashRuleCount:             ClampRuleCount(request.GetCdhashRuleCount()),
 		RulesReceived:               state.RulesReceived,
 		RulesProcessed:              state.RulesProcessed,
 		LastRuleSyncAttemptAt:       state.LastRuleSyncAttemptAt,
 		LastRuleSyncSuccessAt:       state.LastRuleSyncSuccessAt,
 		LastReportedCountsMatchAt:   reportedCountsMatchAt,
 	}
+
+	return snapshot, write
 }
 
-func diffSnapshot(current []model.PendingRuleTarget, applied []model.AppliedRuleTarget) []model.SyncRule {
-	appliedByKey := make(map[string]model.AppliedRuleTarget, len(applied))
-	for _, target := range applied {
-		appliedByKey[string(target.RuleType)+"|"+target.Identifier] = target
+func buildIncrementalPayload(
+	pendingTargets []model.PendingRuleTarget,
+	appliedTargets []model.AppliedRuleTarget,
+) []model.SyncRule {
+	appliedByKey := make(map[string]model.AppliedRuleTarget, len(appliedTargets))
+	for _, target := range appliedTargets {
+		appliedByKey[appliedRuleTargetKey(target)] = target
 	}
 
-	payload := make([]model.SyncRule, 0, len(current)+len(applied))
-	currentKeys := make(map[string]struct{}, len(current))
-	for _, target := range current {
+	currentKeys := make(map[string]struct{}, len(pendingTargets))
+	payload := make([]model.SyncRule, 0, len(pendingTargets)+len(appliedTargets))
+
+	for _, target := range pendingTargets {
 		key := domain.MachineRuleTargetKey(target.MachineRuleTarget)
 		currentKeys[key] = struct{}{}
 
-		appliedTarget, exists := appliedByKey[key]
-		if !exists || appliedTarget.PayloadHash != target.PayloadHash {
-			payload = append(payload, model.SyncRule{MachineRuleTarget: target.MachineRuleTarget})
-		}
-	}
-
-	for _, target := range applied {
-		if _, exists := currentKeys[string(target.RuleType)+"|"+target.Identifier]; !exists {
+		appliedTarget, ok := appliedByKey[key]
+		if !ok || appliedTarget.PayloadHash != target.PayloadHash {
 			payload = append(payload, model.SyncRule{
-				MachineRuleTarget: domain.MachineRuleTarget{
-					RuleType:   target.RuleType,
-					Identifier: target.Identifier,
-				},
-				Removed: true,
+				MachineRuleTarget: target.MachineRuleTarget,
 			})
 		}
 	}
 
-	return payload
-}
+	for _, target := range appliedTargets {
+		key := appliedRuleTargetKey(target)
+		if _, ok := currentKeys[key]; ok {
+			continue
+		}
 
-func fullSyncRules(targets []model.PendingRuleTarget) []model.SyncRule {
-	rules := make([]model.SyncRule, 0, len(targets))
-	for _, target := range targets {
-		rules = append(rules, model.SyncRule{MachineRuleTarget: target.MachineRuleTarget})
-	}
-
-	return rules
-}
-
-func withRulePayloadHashes(targets []domain.MachineResolvedRule) []model.PendingRuleTarget {
-	result := make([]model.PendingRuleTarget, 0, len(targets))
-	for _, target := range targets {
-		result = append(result, model.PendingRuleTarget{
-			MachineRuleTarget: target.MachineRuleTarget,
-			PayloadHash:       domain.MachineRuleTargetPayloadHash(target.MachineRuleTarget),
+		payload = append(payload, model.SyncRule{
+			MachineRuleTarget: domain.MachineRuleTarget{
+				RuleType:   target.RuleType,
+				Identifier: target.Identifier,
+			},
+			Removed: true,
 		})
 	}
 
-	return result
+	return sortSyncRules(payload)
+}
+
+func buildFullSyncPayload(targets []model.PendingRuleTarget) []model.SyncRule {
+	rules := make([]model.SyncRule, 0, len(targets))
+	for _, target := range targets {
+		rules = append(rules, model.SyncRule{
+			MachineRuleTarget: target.MachineRuleTarget,
+		})
+	}
+
+	return sortSyncRules(rules)
+}
+
+func pendingRuleTargets(resolvedRules []domain.MachineResolvedRule) []model.PendingRuleTarget {
+	targets := make([]model.PendingRuleTarget, 0, len(resolvedRules))
+	for _, rule := range resolvedRules {
+		targets = append(targets, model.PendingRuleTarget{
+			MachineRuleTarget: rule.MachineRuleTarget,
+			PayloadHash:       domain.MachineRuleTargetPayloadHash(rule.MachineRuleTarget),
+		})
+	}
+
+	return sortPendingRuleTargets(targets)
 }
 
 func toAppliedRuleTargets(targets []model.PendingRuleTarget) []model.AppliedRuleTarget {
-	result := make([]model.AppliedRuleTarget, 0, len(targets))
+	applied := make([]model.AppliedRuleTarget, 0, len(targets))
 	for _, target := range targets {
-		result = append(result, model.AppliedRuleTarget{
+		applied = append(applied, model.AppliedRuleTarget{
 			RuleType:    target.RuleType,
 			Identifier:  target.Identifier,
 			PayloadHash: target.PayloadHash,
 		})
 	}
 
-	return result
+	return sortAppliedRuleTargets(applied)
 }
 
-func appliedRuleTargetsMatch(left []model.AppliedRuleTarget, right []model.AppliedRuleTarget) bool {
-	return slices.Equal(left, right)
-}
-
-func managedRuleCountsMatch(expected domain.ExecutionRuleCounts, request *syncv1.PreflightRequest) bool {
-	return expected.Binary == SafeCount(request.GetBinaryRuleCount()) &&
-		expected.Certificate == SafeCount(request.GetCertificateRuleCount()) &&
-		expected.TeamID == SafeCount(request.GetTeamidRuleCount()) &&
-		expected.SigningID == SafeCount(request.GetSigningidRuleCount()) &&
-		expected.CDHash == SafeCount(request.GetCdhashRuleCount())
-}
-
-func countPendingRuleTargets(targets []model.PendingRuleTarget) domain.ExecutionRuleCounts {
+func pendingRuleTargetCounts(targets []model.PendingRuleTarget) domain.ExecutionRuleCounts {
 	rules := make([]domain.MachineRuleTarget, 0, len(targets))
 	for _, target := range targets {
 		rules = append(rules, target.MachineRuleTarget)
 	}
 
 	return domain.CountExecutionRules(rules)
+}
+
+func preflightRuleCounts(request *syncv1.PreflightRequest) domain.ExecutionRuleCounts {
+	return domain.ExecutionRuleCounts{
+		Binary:      ClampRuleCount(request.GetBinaryRuleCount()),
+		Certificate: ClampRuleCount(request.GetCertificateRuleCount()),
+		TeamID:      ClampRuleCount(request.GetTeamidRuleCount()),
+		SigningID:   ClampRuleCount(request.GetSigningidRuleCount()),
+		CDHash:      ClampRuleCount(request.GetCdhashRuleCount()),
+	}
+}
+
+func appliedRuleTargetKey(target model.AppliedRuleTarget) string {
+	return domain.MachineRuleTargetKey(domain.MachineRuleTarget{
+		RuleType:   target.RuleType,
+		Identifier: target.Identifier,
+	})
+}
+
+type withKey[T any] struct {
+	key string
+	val T
+}
+
+func sortByPrecomputedKey[T any](items []T, keyFn func(T) string) []T {
+	keyed := make([]withKey[T], len(items))
+	for i, item := range items {
+		keyed[i] = withKey[T]{key: keyFn(item), val: item}
+	}
+
+	slices.SortFunc(keyed, func(a, b withKey[T]) int {
+		return cmp.Compare(a.key, b.key)
+	})
+
+	for i, k := range keyed {
+		items[i] = k.val
+	}
+
+	return items
+}
+
+func sortPendingRuleTargets(targets []model.PendingRuleTarget) []model.PendingRuleTarget {
+	return sortByPrecomputedKey(targets, func(t model.PendingRuleTarget) string {
+		return domain.MachineRuleTargetKey(t.MachineRuleTarget)
+	})
+}
+
+func sortAppliedRuleTargets(targets []model.AppliedRuleTarget) []model.AppliedRuleTarget {
+	return sortByPrecomputedKey(targets, appliedRuleTargetKey)
+}
+
+func sortSyncRules(rules []model.SyncRule) []model.SyncRule {
+	return sortByPrecomputedKey(rules, func(r model.SyncRule) string {
+		return domain.MachineRuleTargetKey(r.MachineRuleTarget)
+	})
 }

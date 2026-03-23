@@ -13,22 +13,36 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/db"
 )
 
-func (store *Store) ListExecutionEvents(
-	ctx context.Context,
-	options domain.ExecutionEventListOptions,
-) ([]domain.ExecutionEventSummary, int32, error) {
-	orderBy, err := orderBy(options.Sort, options.Order, map[string]string{
+var (
+	executionEventListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
 		"id":          "ee.id",
 		"occurred_at": "ee.occurred_at",
 		"decision":    "ee.decision",
 		"file_name":   "x.file_name",
 		"created_at":  "ee.created_at",
-	}, []string{"ee.created_at DESC", "ee.id DESC"})
+	}
+
+	executionEventListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
+		"ee.created_at DESC",
+		"ee.id DESC",
+	}
+)
+
+func (s *Store) ListExecutionEvents(
+	ctx context.Context,
+	opts domain.ExecutionEventListOptions,
+) ([]domain.ExecutionEventSummary, int32, error) {
+	orderBy, err := orderBy(
+		opts.Sort,
+		opts.Order,
+		executionEventListSortColumns,
+		executionEventListDefaultOrder,
+	)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	whereClauses := []string{
+	where := []string{
 		`($1 = '' OR
   ee.file_path ILIKE $1 OR
   x.file_name ILIKE $1 OR
@@ -38,72 +52,102 @@ func (store *Store) ListExecutionEvents(
   ee.executing_user ILIKE $1 OR
   m.hostname ILIKE $1)`,
 	}
-	args := []any{searchPattern(options.Search)}
-	if len(options.IDs) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("ee.id = ANY($%d)", len(args)+1))
-		args = append(args, options.IDs)
-	}
-	if options.MachineID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("ee.machine_id = $%d::uuid", len(args)+1))
-		args = append(args, *options.MachineID)
-	}
-	if options.UserID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("u.id = $%d::uuid", len(args)+1))
-		args = append(args, *options.UserID)
-	}
-	if options.ExecutableID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("ee.executable_id = $%d::uuid", len(args)+1))
-		args = append(args, *options.ExecutableID)
-	}
-	if len(options.Decisions) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("ee.decision = ANY($%d)", len(args)+1))
-		args = append(args, toStrings(options.Decisions))
-	}
-	limitParam := len(args) + 1
-	offsetParam := limitParam + 1
+	args := []any{searchPattern(opts.Search)}
 
-	query := fmt.Sprintf(`
-SELECT
-  ee.id,
-  ee.machine_id,
-  ee.executable_id,
-  ee.decision,
-  ee.file_path,
-  x.file_name,
-  x.signing_id,
-  ee.occurred_at,
-  ee.created_at,
-  COUNT(*) OVER()::INT4 AS total
-FROM execution_events AS ee
-JOIN machines AS m ON m.machine_id = ee.machine_id
-JOIN executables AS x ON x.id = ee.executable_id
-LEFT JOIN users AS u
-  ON u.upn = m.primary_user
-  AND m.primary_user <> ''
-WHERE %s
-ORDER BY %s
-LIMIT NULLIF($%d::INT, 0)
-OFFSET $%d
-`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
-
-	args = append(args, options.Limit, options.Offset)
-
-	rows, queryErr := store.Pool().Query(ctx, query, args...)
-	if queryErr != nil {
-		return nil, 0, queryErr
+	if len(opts.IDs) > 0 {
+		where = append(where, fmt.Sprintf("ee.id = ANY($%d)", len(args)+1))
+		args = append(args, opts.IDs)
+	}
+	if opts.MachineID != nil {
+		where = append(where, fmt.Sprintf("ee.machine_id = $%d::uuid", len(args)+1))
+		args = append(args, *opts.MachineID)
+	}
+	if opts.UserID != nil {
+		where = append(where, fmt.Sprintf("u.id = $%d::uuid", len(args)+1))
+		args = append(args, *opts.UserID)
+	}
+	if opts.ExecutableID != nil {
+		where = append(where, fmt.Sprintf("ee.executable_id = $%d::uuid", len(args)+1))
+		args = append(args, *opts.ExecutableID)
+	}
+	if len(opts.Decisions) > 0 {
+		where = append(where, fmt.Sprintf("ee.decision = ANY($%d)", len(args)+1))
+		args = append(args, toStrings(opts.Decisions))
 	}
 
-	return collectRows(rows, scanExecutionEventSummary)
+	limitArg := len(args) + 1
+	offsetArg := limitArg + 1
+
+	query := fmt.Sprintf(
+		executionEventListQuery,
+		strings.Join(where, " AND "),
+		orderBy,
+		limitArg,
+		offsetArg,
+	)
+	args = append(args, opts.Limit, opts.Offset)
+
+	rows, err := s.Pool().Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list execution events: %w", err)
+	}
+
+	return collectRows(rows, scanExecutionEventSummaryRow)
 }
 
-func scanExecutionEventSummary(rows pgx.Rows) (domain.ExecutionEventSummary, int32, error) {
+func (s *Store) GetExecutionEvent(ctx context.Context, id uuid.UUID) (domain.ExecutionEvent, error) {
+	row, err := s.Queries().GetExecutionEvent(ctx, id)
+	if err != nil {
+		return domain.ExecutionEvent{}, err
+	}
+
+	return mapExecutionEvent(row)
+}
+
+func (s *Store) DeleteExecutionEvent(ctx context.Context, id uuid.UUID) error {
+	return s.Queries().DeleteExecutionEvent(ctx, id)
+}
+
+func (s *Store) IngestEvents(
+	ctx context.Context,
+	machineID uuid.UUID,
+	events []model.ExecutionEventWrite,
+	fileAccessEvents []model.FileAccessEventWrite,
+) error {
+	if err := s.RunInTx(ctx, func(q *db.Queries) error {
+		for _, event := range events {
+			executableID, err := upsertEventExecutable(ctx, q, event.Executable)
+			if err != nil {
+				return err
+			}
+
+			if err = ingestExecutionEvent(ctx, q, machineID, executableID, event); err != nil {
+				return err
+			}
+		}
+
+		for _, event := range fileAccessEvents {
+			if err := ingestFileAccessEvent(ctx, q, machineID, event); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("ingest events: %w", err)
+	}
+
+	return nil
+}
+
+func scanExecutionEventSummaryRow(rows pgx.Rows) (domain.ExecutionEventSummary, int32, error) {
 	var (
 		item         domain.ExecutionEventSummary
 		decisionText string
 		total        int32
 	)
 
-	scanErr := rows.Scan(
+	if err := rows.Scan(
 		&item.ID,
 		&item.MachineID,
 		&item.ExecutableID,
@@ -114,39 +158,34 @@ func scanExecutionEventSummary(rows pgx.Rows) (domain.ExecutionEventSummary, int
 		&item.OccurredAt,
 		&item.CreatedAt,
 		&total,
-	)
-	if scanErr != nil {
-		return domain.ExecutionEventSummary{}, 0, scanErr
+	); err != nil {
+		return domain.ExecutionEventSummary{}, 0, err
 	}
 
-	decision, parseErr := domain.ParseEventDecision(decisionText)
-	if parseErr != nil {
-		return domain.ExecutionEventSummary{}, 0, parseErr
+	decision, err := domain.ParseExecutionDecision(decisionText)
+	if err != nil {
+		return domain.ExecutionEventSummary{}, 0, fmt.Errorf("parse execution event decision: %w", err)
 	}
 
 	item.Decision = decision
+
 	return item, total, nil
 }
 
-func (store *Store) GetExecutionEvent(ctx context.Context, id uuid.UUID) (domain.ExecutionEvent, error) {
-	row, err := store.Queries().GetExecutionEvent(ctx, id)
+func mapExecutionEvent(row db.GetExecutionEventRow) (domain.ExecutionEvent, error) {
+	decision, err := domain.ParseExecutionDecision(string(row.Decision))
 	if err != nil {
-		return domain.ExecutionEvent{}, err
+		return domain.ExecutionEvent{}, fmt.Errorf("parse execution event decision: %w", err)
 	}
 
-	decision, decisionErr := domain.ParseEventDecision(row.Decision)
-	if decisionErr != nil {
-		return domain.ExecutionEvent{}, decisionErr
+	signingChain, err := unmarshalSigningChain(row.SigningChain)
+	if err != nil {
+		return domain.ExecutionEvent{}, fmt.Errorf("unmarshal signing chain: %w", err)
 	}
 
-	signingChain, signingChainErr := unmarshalSigningChain(row.SigningChain)
-	if signingChainErr != nil {
-		return domain.ExecutionEvent{}, signingChainErr
-	}
-
-	entitlements, entitlementsErr := unmarshalEntitlements(row.Entitlements)
-	if entitlementsErr != nil {
-		return domain.ExecutionEvent{}, entitlementsErr
+	entitlements, err := unmarshalEntitlements(row.Entitlements)
+	if err != nil {
+		return domain.ExecutionEvent{}, fmt.Errorf("unmarshal entitlements: %w", err)
 	}
 
 	return domain.ExecutionEvent{
@@ -170,35 +209,6 @@ func (store *Store) GetExecutionEvent(ctx context.Context, id uuid.UUID) (domain
 		OccurredAt:      row.OccurredAt,
 		CreatedAt:       row.CreatedAt,
 	}, nil
-}
-
-func (store *Store) DeleteExecutionEvent(ctx context.Context, id uuid.UUID) error {
-	return store.Queries().DeleteExecutionEvent(ctx, id)
-}
-
-func (store *Store) IngestEvents(
-	ctx context.Context,
-	machineID uuid.UUID,
-	events []model.ExecutionEventWrite,
-	fileAccessEvents []model.FileAccessEventWrite,
-) error {
-	return store.RunInTx(ctx, func(queries *db.Queries) error {
-		for _, event := range events {
-			executableID, err := upsertEventExecutable(ctx, queries, event.Executable)
-			if err != nil {
-				return err
-			}
-			if ingestErr := ingestExecutionEvent(ctx, queries, machineID, executableID, event); ingestErr != nil {
-				return ingestErr
-			}
-		}
-		for _, event := range fileAccessEvents {
-			if err := ingestFileAccessEvent(ctx, queries, machineID, event); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 func upsertEventExecutable(
@@ -234,7 +244,7 @@ func ingestExecutionEvent(
 	_, err := queries.CreateExecutionEvent(ctx, db.CreateExecutionEventParams{
 		MachineID:       machineID,
 		ExecutableID:    executableID,
-		Decision:        string(event.Decision),
+		Decision:        db.ExecutionDecision(event.Decision),
 		FilePath:        event.FilePath,
 		ExecutingUser:   event.ExecutingUser,
 		LoggedInUsers:   event.LoggedInUsers,
@@ -244,5 +254,32 @@ func ingestExecutionEvent(
 	if err != nil {
 		return fmt.Errorf("ingest execution event: %w", err)
 	}
+
 	return nil
 }
+
+const executionEventListQuery = `
+SELECT
+  ee.id,
+  ee.machine_id,
+  ee.executable_id,
+  ee.decision,
+  ee.file_path,
+  x.file_name,
+  x.signing_id,
+  ee.occurred_at,
+  ee.created_at,
+  COUNT(*) OVER()::INT4 AS total
+FROM execution_events AS ee
+JOIN machines AS m
+  ON m.id = ee.machine_id
+JOIN executables AS x
+  ON x.id = ee.executable_id
+LEFT JOIN users AS u
+  ON u.upn = m.primary_user
+  AND m.primary_user <> ''
+WHERE %s
+ORDER BY %s
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`

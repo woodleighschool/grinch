@@ -1,9 +1,9 @@
 import type { components } from "@/api/openapi";
 
-type EventDecision = components["schemas"]["EventDecision"];
+type ExecutionDecision = components["schemas"]["ExecutionDecision"];
 type FileAccessDecision = components["schemas"]["FileAccessDecision"];
 
-export const EVENT_DECISION_CHOICES = [
+export const EXECUTION_DECISION_CHOICES = [
   { id: "unknown", name: "Unknown" },
   { id: "allow_unknown", name: "Allow Unknown" },
   { id: "allow_binary", name: "Allow Binary" },
@@ -20,9 +20,9 @@ export const EVENT_DECISION_CHOICES = [
   { id: "block_signing_id", name: "Block Signing ID" },
   { id: "block_cd_hash", name: "Block CD Hash" },
   { id: "bundle_binary", name: "Bundle Binary" },
-] satisfies { id: EventDecision; name: string }[];
+] satisfies { id: ExecutionDecision; name: string }[];
 
-export const EVENT_DECISION_DESCRIPTIONS: Record<EventDecision, string> = {
+export const EXECUTION_DECISION_DESCRIPTIONS: Record<ExecutionDecision, string> = {
   unknown: "No decision reported.",
   allow_unknown: "Allowed because no rule matched while in Monitor mode.",
   allow_binary: "Allowed by a rule for this exact binary.",
@@ -55,8 +55,14 @@ export const FILE_ACCESS_DECISION_DESCRIPTIONS: Record<FileAccessDecision, strin
   audit_only: "Santa recorded the file access event without blocking it.",
 };
 
-export const eventDecisionName = (decision: EventDecision): string =>
-  EVENT_DECISION_CHOICES.find((choice): boolean => choice.id === decision)?.name ?? decision;
+export const EXECUTION_DECISION_NAMES: Record<ExecutionDecision, string> = Object.fromEntries(
+  EXECUTION_DECISION_CHOICES.map((c): [ExecutionDecision, string] => [c.id, c.name]),
+) as Record<ExecutionDecision, string>;
 
-export const fileAccessDecisionName = (decision: FileAccessDecision): string =>
-  FILE_ACCESS_DECISION_CHOICES.find((choice): boolean => choice.id === decision)?.name ?? decision;
+export const FILE_ACCESS_DECISION_NAMES: Record<FileAccessDecision, string> = Object.fromEntries(
+  FILE_ACCESS_DECISION_CHOICES.map((c): [FileAccessDecision, string] => [c.id, c.name]),
+) as Record<FileAccessDecision, string>;
+
+export const executionDecisionName = (decision: ExecutionDecision): string => EXECUTION_DECISION_NAMES[decision];
+
+export const fileAccessDecisionName = (decision: FileAccessDecision): string => FILE_ACCESS_DECISION_NAMES[decision];

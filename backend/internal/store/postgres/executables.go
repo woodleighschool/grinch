@@ -12,23 +12,37 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/db"
 )
 
-func (store *Store) ListExecutables(
-	ctx context.Context,
-	options domain.ExecutableListOptions,
-) ([]domain.ExecutableSummary, int32, error) {
-	orderBy, err := orderBy(options.Sort, options.Order, map[string]string{
+var (
+	executableListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
 		"id":          "e.id",
 		"file_name":   "e.file_name",
 		"file_sha256": "e.file_sha256",
 		"created_at":  "e.created_at",
 		"signing_id":  "e.signing_id",
 		"team_id":     "e.team_id",
-	}, []string{"e.created_at DESC", "e.id DESC"})
+	}
+
+	executableListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
+		"e.created_at DESC",
+		"e.id DESC",
+	}
+)
+
+func (s *Store) ListExecutables(
+	ctx context.Context,
+	opts domain.ListOptions,
+) ([]domain.ExecutableSummary, int32, error) {
+	orderBy, err := orderBy(
+		opts.Sort,
+		opts.Order,
+		executableListSortColumns,
+		executableListDefaultOrder,
+	)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	whereClauses := []string{
+	where := []string{
 		`($1 = '' OR
   e.file_name ILIKE $1 OR
   e.file_sha256 ILIKE $1 OR
@@ -36,66 +50,35 @@ func (store *Store) ListExecutables(
   e.team_id ILIKE $1 OR
   e.cdhash ILIKE $1)`,
 	}
-	args := []any{searchPattern(options.Search)}
-	if len(options.IDs) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("e.id = ANY($%d)", len(args)+1))
-		args = append(args, options.IDs)
-	}
-	limitParam := len(args) + 1
-	offsetParam := limitParam + 1
+	args := []any{searchPattern(opts.Search)}
 
-	query := fmt.Sprintf(`
-SELECT
-  e.id,
-  e.file_sha256,
-  e.file_name,
-  e.file_bundle_id,
-  e.file_bundle_path,
-  e.signing_id,
-  e.team_id,
-  e.cdhash,
-  e.created_at,
-  COUNT(*) OVER()::INT4 AS total
-FROM executables AS e
-WHERE %s
-ORDER BY %s
-LIMIT NULLIF($%d::INT, 0)
-OFFSET $%d
-`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
-
-	args = append(args, options.Limit, options.Offset)
-
-	rows, queryErr := store.Pool().Query(ctx, query, args...)
-	if queryErr != nil {
-		return nil, 0, queryErr
+	if len(opts.IDs) > 0 {
+		where = append(where, fmt.Sprintf("e.id = ANY($%d)", len(args)+1))
+		args = append(args, opts.IDs)
 	}
 
-	return collectRows(rows, func(rows pgx.Rows) (domain.ExecutableSummary, int32, error) {
-		var item domain.ExecutableSummary
-		var total int32
+	limitArg := len(args) + 1
+	offsetArg := limitArg + 1
 
-		scanErr := rows.Scan(
-			&item.ID,
-			&item.FileSHA256,
-			&item.FileName,
-			&item.FileBundleID,
-			&item.FileBundlePath,
-			&item.SigningID,
-			&item.TeamID,
-			&item.CDHash,
-			&item.CreatedAt,
-			&total,
-		)
-		if scanErr != nil {
-			return domain.ExecutableSummary{}, 0, scanErr
-		}
+	query := fmt.Sprintf(
+		executableListQuery,
+		strings.Join(where, " AND "),
+		orderBy,
+		limitArg,
+		offsetArg,
+	)
+	args = append(args, opts.Limit, opts.Offset)
 
-		return item, total, nil
-	})
+	rows, err := s.Pool().Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list executables: %w", err)
+	}
+
+	return collectRows(rows, scanExecutableSummaryRow)
 }
 
-func (store *Store) GetExecutable(ctx context.Context, id uuid.UUID) (domain.Executable, error) {
-	row, err := store.Queries().GetExecutable(ctx, id)
+func (s *Store) GetExecutable(ctx context.Context, id uuid.UUID) (domain.Executable, error) {
+	row, err := s.Queries().GetExecutable(ctx, id)
 	if err != nil {
 		return domain.Executable{}, err
 	}
@@ -103,15 +86,39 @@ func (store *Store) GetExecutable(ctx context.Context, id uuid.UUID) (domain.Exe
 	return mapExecutable(row)
 }
 
-func mapExecutable(row db.Executable) (domain.Executable, error) {
-	entitlements, entitlementsErr := unmarshalEntitlements(row.Entitlements)
-	if entitlementsErr != nil {
-		return domain.Executable{}, entitlementsErr
+func scanExecutableSummaryRow(rows pgx.Rows) (domain.ExecutableSummary, int32, error) {
+	var (
+		item  domain.ExecutableSummary
+		total int32
+	)
+
+	if err := rows.Scan(
+		&item.ID,
+		&item.FileSHA256,
+		&item.FileName,
+		&item.FileBundleID,
+		&item.FileBundlePath,
+		&item.SigningID,
+		&item.TeamID,
+		&item.CDHash,
+		&item.CreatedAt,
+		&total,
+	); err != nil {
+		return domain.ExecutableSummary{}, 0, err
 	}
 
-	signingChain, signingChainErr := unmarshalSigningChain(row.SigningChain)
-	if signingChainErr != nil {
-		return domain.Executable{}, signingChainErr
+	return item, total, nil
+}
+
+func mapExecutable(row db.Executable) (domain.Executable, error) {
+	entitlements, err := unmarshalEntitlements(row.Entitlements)
+	if err != nil {
+		return domain.Executable{}, fmt.Errorf("unmarshal entitlements: %w", err)
+	}
+
+	signingChain, err := unmarshalSigningChain(row.SigningChain)
+	if err != nil {
+		return domain.Executable{}, fmt.Errorf("unmarshal signing chain: %w", err)
 	}
 
 	return domain.Executable{
@@ -128,3 +135,22 @@ func mapExecutable(row db.Executable) (domain.Executable, error) {
 		CreatedAt:      row.CreatedAt,
 	}, nil
 }
+
+const executableListQuery = `
+SELECT
+  e.id,
+  e.file_sha256,
+  e.file_name,
+  e.file_bundle_id,
+  e.file_bundle_path,
+  e.signing_id,
+  e.team_id,
+  e.cdhash,
+  e.created_at,
+  COUNT(*) OVER()::INT4 AS total
+FROM executables AS e
+WHERE %s
+ORDER BY %s
+LIMIT NULLIF($%d::INT, 0)
+OFFSET $%d
+`

@@ -2,7 +2,6 @@ package groups
 
 import (
 	"context"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -15,7 +14,7 @@ type WriteInput struct {
 }
 
 type Store interface {
-	ListGroups(context.Context, domain.GroupListOptions) ([]domain.Group, int32, error)
+	ListGroups(context.Context, domain.ListOptions) ([]domain.Group, int32, error)
 	GetGroup(context.Context, uuid.UUID) (domain.Group, error)
 	CreateLocalGroup(context.Context, string, string) (domain.Group, error)
 	UpdateGroup(context.Context, uuid.UUID, string, string) (domain.Group, error)
@@ -30,43 +29,32 @@ func New(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (service *Service) ListGroups(
-	ctx context.Context,
-	options domain.GroupListOptions,
-) ([]domain.Group, int32, error) {
-	return service.store.ListGroups(ctx, options)
+func (s *Service) ListGroups(ctx context.Context, opts domain.ListOptions) ([]domain.Group, int32, error) {
+	return s.store.ListGroups(ctx, opts)
 }
 
-func (service *Service) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error) {
-	return service.store.GetGroup(ctx, id)
+func (s *Service) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error) {
+	return s.store.GetGroup(ctx, id)
 }
 
-func (service *Service) CreateGroup(ctx context.Context, input WriteInput) (domain.Group, error) {
-	normalized := normalizeInput(input)
-	if validationErr := validateInput(normalized); validationErr != nil {
-		return domain.Group{}, validationErr
+func (s *Service) CreateGroup(ctx context.Context, input WriteInput) (domain.Group, error) {
+	if err := validateInput(input); err != nil {
+		return domain.Group{}, err
 	}
 
-	return service.store.CreateLocalGroup(ctx, normalized.Name, normalized.Description)
+	return s.store.CreateLocalGroup(ctx, input.Name, input.Description)
 }
 
-func (service *Service) UpdateGroup(ctx context.Context, id uuid.UUID, input WriteInput) (domain.Group, error) {
-	normalized := normalizeInput(input)
-	if validationErr := validateInput(normalized); validationErr != nil {
-		return domain.Group{}, validationErr
+func (s *Service) UpdateGroup(ctx context.Context, id uuid.UUID, input WriteInput) (domain.Group, error) {
+	if err := validateInput(input); err != nil {
+		return domain.Group{}, err
 	}
 
-	return service.store.UpdateGroup(ctx, id, normalized.Name, normalized.Description)
+	return s.store.UpdateGroup(ctx, id, input.Name, input.Description)
 }
 
-func (service *Service) DeleteGroup(ctx context.Context, id uuid.UUID) error {
-	return service.store.DeleteGroup(ctx, id)
-}
-
-func normalizeInput(input WriteInput) WriteInput {
-	input.Name = strings.TrimSpace(input.Name)
-	input.Description = strings.TrimSpace(input.Description)
-	return input
+func (s *Service) DeleteGroup(ctx context.Context, id uuid.UUID) error {
+	return s.store.DeleteGroup(ctx, id)
 }
 
 func validateInput(input WriteInput) *domain.ValidationError {

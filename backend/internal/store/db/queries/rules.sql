@@ -10,14 +10,14 @@ INSERT INTO rules (
   enabled
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8
+  sqlc.arg(id),
+  sqlc.arg(name),
+  sqlc.arg(description),
+  sqlc.arg(rule_type),
+  sqlc.arg(identifier),
+  sqlc.arg(custom_message),
+  sqlc.arg(custom_url),
+  sqlc.arg(enabled)
 )
 RETURNING
   id,
@@ -44,20 +44,20 @@ SELECT
   created_at,
   updated_at
 FROM rules
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateRule :one
 UPDATE rules
 SET
-  name = $2,
-  description = $3,
-  rule_type = $4,
-  identifier = $5,
-  custom_message = $6,
-  custom_url = $7,
-  enabled = $8,
+  name = sqlc.arg(name),
+  description = sqlc.arg(description),
+  rule_type = sqlc.arg(rule_type),
+  identifier = sqlc.arg(identifier),
+  custom_message = sqlc.arg(custom_message),
+  custom_url = sqlc.arg(custom_url),
+  enabled = sqlc.arg(enabled),
   updated_at = NOW()
-WHERE id = $1
+WHERE id = sqlc.arg(id)
 RETURNING
   id,
   name,
@@ -72,33 +72,31 @@ RETURNING
 
 -- name: DeleteRule :one
 DELETE FROM rules
-WHERE id = $1
+WHERE id = sqlc.arg(id)
 RETURNING id;
 
 -- name: ListResolvedRulesForMachine :many
-WITH effective_groups AS (
-  SELECT gm.group_id
-  FROM group_memberships AS gm
-  WHERE gm.member_kind = 'machine'
-    AND gm.member_id = $1
-  UNION
-  SELECT gm.group_id
-  FROM group_memberships AS gm
-  JOIN users AS u
-    ON u.id = gm.member_id
-    AND gm.member_kind = 'user'
-  JOIN machines AS m
-    ON m.primary_user = u.upn
-  WHERE m.machine_id = $1
-    AND m.primary_user <> ''
-),
-machine_user AS (
+WITH machine_user AS (
   SELECT u.id
   FROM machines AS m
   JOIN users AS u
-    ON u.upn = m.primary_user
-  WHERE m.machine_id = $1
-    AND m.primary_user <> ''
+    ON u.upn = NULLIF(m.primary_user, '')
+  WHERE m.id = sqlc.arg(machine_id)
+),
+effective_groups AS (
+  SELECT gmm.group_id
+  FROM group_machine_memberships AS gmm
+  WHERE gmm.machine_id = sqlc.arg(machine_id)
+
+  UNION
+
+  SELECT gum.group_id
+  FROM machines AS m
+  JOIN users AS u
+    ON u.upn = NULLIF(m.primary_user, '')
+  JOIN group_user_memberships AS gum
+    ON gum.user_id = u.id
+  WHERE m.id = sqlc.arg(machine_id)
 ),
 matching_targets AS (
   SELECT
@@ -167,7 +165,7 @@ JOIN winning_includes AS wi
 LEFT JOIN matching_excludes AS me
   ON me.rule_id = r.id
 WHERE me.rule_id IS NULL
-  AND r.enabled = true
+  AND r.enabled = TRUE
 ORDER BY r.rule_type ASC, r.identifier ASC, r.id ASC;
 
 -- name: CreateRuleTarget :exec
@@ -182,14 +180,14 @@ INSERT INTO rule_targets (
   cel_expression
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8
+  sqlc.arg(id),
+  sqlc.arg(rule_id),
+  sqlc.arg(subject_kind),
+  sqlc.arg(subject_id),
+  sqlc.arg(assignment),
+  sqlc.arg(priority),
+  sqlc.arg(policy),
+  sqlc.arg(cel_expression)
 );
 
 -- name: ListRuleTargetsByRule :many
@@ -210,7 +208,7 @@ FROM rule_targets AS rt
 LEFT JOIN groups AS g
   ON rt.subject_kind = 'group'
   AND g.id = rt.subject_id
-WHERE rt.rule_id = $1
+WHERE rt.rule_id = sqlc.arg(rule_id)
 ORDER BY
   CASE WHEN rt.assignment = 'include' THEN 0 ELSE 1 END ASC,
   rt.priority ASC NULLS LAST,
@@ -219,4 +217,4 @@ ORDER BY
 
 -- name: DeleteRuleTargetsByRule :exec
 DELETE FROM rule_targets
-WHERE rule_id = $1;
+WHERE rule_id = sqlc.arg(rule_id);

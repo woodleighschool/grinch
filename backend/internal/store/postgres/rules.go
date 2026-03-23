@@ -14,11 +14,8 @@ import (
 	"github.com/woodleighschool/grinch/internal/store/db"
 )
 
-func (store *Store) ListRules(
-	ctx context.Context,
-	options domain.RuleListOptions,
-) ([]domain.RuleSummary, int32, error) {
-	orderBy, err := orderBy(options.Sort, options.Order, map[string]string{
+var (
+	ruleListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
 		"id":          "r.id",
 		"name":        "r.name",
 		"description": "r.description",
@@ -27,33 +24,47 @@ func (store *Store) ListRules(
 		"enabled":     "r.enabled",
 		"created_at":  "r.created_at",
 		"updated_at":  "r.updated_at",
-	}, []string{"r.name ASC", "r.id ASC"})
+	}
+
+	ruleListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
+		"r.name ASC",
+		"r.id ASC",
+	}
+)
+
+func (s *Store) ListRules(
+	ctx context.Context,
+	opts domain.RuleListOptions,
+) ([]domain.RuleSummary, int32, error) {
+	orderBy, err := orderBy(opts.Sort, opts.Order, ruleListSortColumns, ruleListDefaultOrder)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	whereClauses := []string{
+	where := []string{
 		`($1 = '' OR
   r.name ILIKE $1 OR
   r.description ILIKE $1 OR
   r.identifier ILIKE $1 OR
-  r.rule_type ILIKE $1)`,
+  r.rule_type::text ILIKE $1)`,
 	}
-	args := []any{searchPattern(options.Search)}
-	if len(options.IDs) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("r.id = ANY($%d)", len(args)+1))
-		args = append(args, options.IDs)
+	args := []any{searchPattern(opts.Search)}
+
+	if len(opts.IDs) > 0 {
+		where = append(where, fmt.Sprintf("r.id = ANY($%d)", len(args)+1))
+		args = append(args, opts.IDs)
 	}
-	if len(options.Enabled) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("r.enabled = ANY($%d)", len(args)+1))
-		args = append(args, options.Enabled)
+	if len(opts.Enabled) > 0 {
+		where = append(where, fmt.Sprintf("r.enabled = ANY($%d)", len(args)+1))
+		args = append(args, opts.Enabled)
 	}
-	if len(options.RuleTypes) > 0 {
-		whereClauses = append(whereClauses, fmt.Sprintf("r.rule_type = ANY($%d)", len(args)+1))
-		args = append(args, toStrings(options.RuleTypes))
+	if len(opts.RuleTypes) > 0 {
+		where = append(where, fmt.Sprintf("r.rule_type = ANY($%d)", len(args)+1))
+		args = append(args, toStrings(opts.RuleTypes))
 	}
-	limitParam := len(args) + 1
-	offsetParam := limitParam + 1
+
+	limitArg := len(args) + 1
+	offsetArg := limitArg + 1
 
 	query := fmt.Sprintf(`
 SELECT
@@ -71,184 +82,182 @@ WHERE %s
 ORDER BY %s
 LIMIT NULLIF($%d::INT, 0)
 OFFSET $%d
-`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
+`, strings.Join(where, " AND "), orderBy, limitArg, offsetArg)
 
-	args = append(args, options.Limit, options.Offset)
+	args = append(args, opts.Limit, opts.Offset)
 
-	rows, err := store.Pool().Query(ctx, query, args...)
+	rows, err := s.Pool().Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("list rules: %w", err)
 	}
 
-	return collectRows(rows, func(rows pgx.Rows) (domain.RuleSummary, int32, error) {
-		var (
-			ruleType string
-			item     domain.RuleSummary
-			total    int32
-		)
-
-		if scanErr := rows.Scan(
-			&item.ID,
-			&item.Name,
-			&item.Description,
-			&ruleType,
-			&item.Identifier,
-			&item.Enabled,
-			&item.CreatedAt,
-			&item.UpdatedAt,
-			&total,
-		); scanErr != nil {
-			return domain.RuleSummary{}, 0, scanErr
-		}
-
-		parsedRuleType, parseErr := domain.ParseRuleType(ruleType)
-		if parseErr != nil {
-			return domain.RuleSummary{}, 0, parseErr
-		}
-		item.RuleType = parsedRuleType
-
-		return item, total, nil
-	})
+	return collectRows(rows, scanRuleSummaryRow)
 }
 
-func (store *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
-	queries := store.Queries()
+func (s *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
+	queries := s.Queries()
+
 	row, err := queries.GetRule(ctx, id)
 	if err != nil {
 		return domain.Rule{}, err
 	}
 
-	targets, err := store.listRuleTargets(ctx, queries, id)
+	targets, err := s.listRuleTargets(ctx, queries, id)
 	if err != nil {
 		return domain.Rule{}, err
 	}
 
-	return mapRuleFields(row, targets)
+	return mapRule(row, targets)
 }
 
-func (store *Store) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
-	ruleID, err := uuid.NewV7()
+func (s *Store) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
+	id, err := uuid.NewV7()
 	if err != nil {
 		return domain.Rule{}, fmt.Errorf("create rule id: %w", err)
 	}
 
-	var row db.Rule
-	var targets domain.RuleTargets
-	runErr := store.RunInTx(ctx, func(queries *db.Queries) error {
-		createdRule, createErr := queries.CreateRule(ctx, db.CreateRuleParams{
-			ID:            ruleID,
-			Name:          input.Name,
-			Description:   input.Description,
-			RuleType:      string(input.RuleType),
-			Identifier:    input.Identifier,
-			CustomMessage: input.CustomMessage,
-			CustomURL:     input.CustomURL,
-			Enabled:       input.Enabled,
-		})
-		if createErr != nil {
-			return createErr
-		}
-		row = createdRule
-
-		if replaceErr := store.replaceRuleTargets(ctx, queries, ruleID, input.Targets); replaceErr != nil {
-			return replaceErr
-		}
-		resolvedTargets, targetErr := store.listRuleTargets(ctx, queries, ruleID)
-		if targetErr != nil {
-			return targetErr
-		}
-		targets = resolvedTargets
-		return nil
-	})
-	if runErr != nil {
-		return domain.Rule{}, runErr
-	}
-
-	return mapRuleFields(row, targets)
-}
-
-func (store *Store) UpdateRule(ctx context.Context, id uuid.UUID, input domain.RuleWriteInput) (domain.Rule, error) {
-	var row db.Rule
-	var targets domain.RuleTargets
-	runErr := store.RunInTx(ctx, func(queries *db.Queries) error {
-		updatedRule, updateErr := queries.UpdateRule(ctx, db.UpdateRuleParams{
+	return s.writeRule(ctx, id, input, func(q *db.Queries) (db.Rule, error) {
+		return q.CreateRule(ctx, db.CreateRuleParams{
 			ID:            id,
 			Name:          input.Name,
 			Description:   input.Description,
-			RuleType:      string(input.RuleType),
+			RuleType:      db.RuleType(input.RuleType),
 			Identifier:    input.Identifier,
 			CustomMessage: input.CustomMessage,
 			CustomURL:     input.CustomURL,
 			Enabled:       input.Enabled,
 		})
-		if updateErr != nil {
-			return updateErr
-		}
-		row = updatedRule
-
-		if replaceErr := store.replaceRuleTargets(ctx, queries, id, input.Targets); replaceErr != nil {
-			return replaceErr
-		}
-		resolvedTargets, targetErr := store.listRuleTargets(ctx, queries, id)
-		if targetErr != nil {
-			return targetErr
-		}
-		targets = resolvedTargets
-		return nil
 	})
-	if runErr != nil {
-		return domain.Rule{}, runErr
-	}
-
-	return mapRuleFields(row, targets)
 }
 
-func (store *Store) DeleteRule(ctx context.Context, id uuid.UUID) error {
-	_, err := store.Queries().DeleteRule(ctx, id)
+func (s *Store) UpdateRule(ctx context.Context, id uuid.UUID, input domain.RuleWriteInput) (domain.Rule, error) {
+	return s.writeRule(ctx, id, input, func(q *db.Queries) (db.Rule, error) {
+		return q.UpdateRule(ctx, db.UpdateRuleParams{
+			ID:            id,
+			Name:          input.Name,
+			Description:   input.Description,
+			RuleType:      db.RuleType(input.RuleType),
+			Identifier:    input.Identifier,
+			CustomMessage: input.CustomMessage,
+			CustomURL:     input.CustomURL,
+			Enabled:       input.Enabled,
+		})
+	})
+}
+
+func (s *Store) DeleteRule(ctx context.Context, id uuid.UUID) error {
+	_, err := s.Queries().DeleteRule(ctx, id)
 	return err
 }
 
-func (store *Store) ListResolvedMachineRules(
+func (s *Store) ListResolvedMachineRules(
 	ctx context.Context,
 	machineID uuid.UUID,
 ) ([]domain.MachineResolvedRule, error) {
-	rows, err := store.Queries().ListResolvedRulesForMachine(ctx, machineID)
+	rows, err := s.Queries().ListResolvedRulesForMachine(ctx, machineID)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]domain.MachineResolvedRule, 0, len(rows))
+	rules := make([]domain.MachineResolvedRule, 0, len(rows))
+	var rule domain.MachineResolvedRule
 	for _, row := range rows {
-		ruleType, ruleTypeErr := domain.ParseRuleType(row.RuleType)
-		if ruleTypeErr != nil {
-			return nil, ruleTypeErr
+		rule, err = mapResolvedMachineRule(row)
+		if err != nil {
+			return nil, err
 		}
-		policy, policyErr := domain.ParseRulePolicy(row.Policy.String)
-		if policyErr != nil {
-			return nil, policyErr
-		}
-
-		result = append(result, domain.MachineResolvedRule{
-			MachineRuleTarget: domain.MachineRuleTarget{
-				RuleType:      ruleType,
-				Identifier:    row.Identifier,
-				Policy:        policy,
-				CustomMessage: row.CustomMessage,
-				CustomURL:     row.CustomURL,
-				CELExpression: row.CelExpression,
-			},
-			RuleID: row.ID,
-			Name:   row.Name,
-		})
+		rules = append(rules, rule)
 	}
 
-	return result, nil
+	return rules, nil
 }
 
-func mapRuleFields(row db.Rule, targets domain.RuleTargets) (domain.Rule, error) {
-	ruleType, err := domain.ParseRuleType(row.RuleType)
-	if err != nil {
+func (s *Store) writeRule(
+	ctx context.Context,
+	ruleID uuid.UUID,
+	input domain.RuleWriteInput,
+	write func(*db.Queries) (db.Rule, error),
+) (domain.Rule, error) {
+	var (
+		row     db.Rule
+		targets domain.RuleTargets
+	)
+
+	if err := s.RunInTx(ctx, func(q *db.Queries) error {
+		var err error
+
+		row, err = write(q)
+		if err != nil {
+			return err
+		}
+
+		if err = s.replaceRuleTargets(ctx, q, ruleID, input.Targets); err != nil {
+			return err
+		}
+
+		targets, err = s.listRuleTargets(ctx, q, ruleID)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return domain.Rule{}, err
+	}
+
+	return mapRule(row, targets)
+}
+
+func scanRuleSummaryRow(rows pgx.Rows) (domain.RuleSummary, int32, error) {
+	var (
+		row   db.Rule
+		total int32
+	)
+
+	if err := rows.Scan(
+		&row.ID,
+		&row.Name,
+		&row.Description,
+		&row.RuleType,
+		&row.Identifier,
+		&row.Enabled,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+		&total,
+	); err != nil {
+		return domain.RuleSummary{}, 0, err
+	}
+
+	rule, err := mapRuleSummary(row)
+	if err != nil {
+		return domain.RuleSummary{}, 0, err
+	}
+
+	return rule, total, nil
+}
+
+func mapRuleSummary(row db.Rule) (domain.RuleSummary, error) {
+	ruleType, err := domain.ParseRuleType(string(row.RuleType))
+	if err != nil {
+		return domain.RuleSummary{}, fmt.Errorf("parse rule type: %w", err)
+	}
+
+	return domain.RuleSummary{
+		ID:          row.ID,
+		Name:        row.Name,
+		Description: row.Description,
+		RuleType:    ruleType,
+		Identifier:  row.Identifier,
+		Enabled:     row.Enabled,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}, nil
+}
+
+func mapRule(row db.Rule, targets domain.RuleTargets) (domain.Rule, error) {
+	ruleType, err := domain.ParseRuleType(string(row.RuleType))
+	if err != nil {
+		return domain.Rule{}, fmt.Errorf("parse rule type: %w", err)
 	}
 
 	return domain.Rule{
@@ -266,7 +275,32 @@ func mapRuleFields(row db.Rule, targets domain.RuleTargets) (domain.Rule, error)
 	}, nil
 }
 
-func (store *Store) listRuleTargets(
+func mapResolvedMachineRule(row db.ListResolvedRulesForMachineRow) (domain.MachineResolvedRule, error) {
+	ruleType, err := domain.ParseRuleType(string(row.RuleType))
+	if err != nil {
+		return domain.MachineResolvedRule{}, fmt.Errorf("parse rule type: %w", err)
+	}
+
+	policy, err := domain.ParseRulePolicy(string(row.Policy.RulePolicy))
+	if err != nil {
+		return domain.MachineResolvedRule{}, fmt.Errorf("parse rule policy: %w", err)
+	}
+
+	return domain.MachineResolvedRule{
+		MachineRuleTarget: domain.MachineRuleTarget{
+			RuleType:      ruleType,
+			Identifier:    row.Identifier,
+			Policy:        policy,
+			CustomMessage: row.CustomMessage,
+			CustomURL:     row.CustomURL,
+			CELExpression: row.CelExpression,
+		},
+		RuleID: row.ID,
+		Name:   row.Name,
+	}, nil
+}
+
+func (s *Store) listRuleTargets(
 	ctx context.Context,
 	queries *db.Queries,
 	ruleID uuid.UUID,
@@ -280,17 +314,17 @@ func (store *Store) listRuleTargets(
 		Include: make([]domain.IncludeRuleTarget, 0, len(rows)),
 		Exclude: make([]domain.ExcludedGroup, 0, len(rows)),
 	}
+
 	for _, row := range rows {
-		mapErr := appendRuleTargetRow(&targets, row)
-		if mapErr != nil {
-			return domain.RuleTargets{}, mapErr
+		if err = appendRuleTarget(&targets, row); err != nil {
+			return domain.RuleTargets{}, fmt.Errorf("append rule target: %w", err)
 		}
 	}
 
 	return targets, nil
 }
 
-func (store *Store) replaceRuleTargets(
+func (s *Store) replaceRuleTargets(
 	ctx context.Context,
 	queries *db.Queries,
 	ruleID uuid.UUID,
@@ -300,64 +334,62 @@ func (store *Store) replaceRuleTargets(
 		return err
 	}
 
-	includePriority := int32(0)
+	var includePriority int32
 	for _, target := range targets.Include {
 		targetID, err := uuid.NewV7()
 		if err != nil {
-			return fmt.Errorf("create rule target id: %w", err)
+			return fmt.Errorf("create include target id: %w", err)
 		}
 
-		var priority pgtype.Int4
-		var policy pgtype.Text
 		includePriority++
-		priority = pgtype.Int4{Int32: includePriority, Valid: true}
-		policy = pgtype.Text{String: string(target.Policy), Valid: true}
 
-		createErr := queries.CreateRuleTarget(ctx, db.CreateRuleTargetParams{
-			ID:            targetID,
-			RuleID:        ruleID,
-			SubjectKind:   string(target.SubjectKind),
-			SubjectID:     target.SubjectID,
-			Assignment:    string(domain.RuleTargetAssignmentInclude),
-			Priority:      priority,
-			Policy:        policy,
+		if err = queries.CreateRuleTarget(ctx, db.CreateRuleTargetParams{
+			ID:          targetID,
+			RuleID:      ruleID,
+			SubjectKind: db.RuleTargetSubjectKind(target.SubjectKind),
+			SubjectID:   target.SubjectID,
+			Assignment:  db.RuleTargetAssignment(domain.RuleTargetAssignmentInclude),
+			Priority:    pgtype.Int4{Int32: includePriority, Valid: true},
+			Policy: db.NullRulePolicy{
+				RulePolicy: db.RulePolicy(target.Policy),
+				Valid:      true,
+			},
 			CelExpression: target.CELExpression,
-		})
-		if createErr != nil {
-			return createErr
+		}); err != nil {
+			return fmt.Errorf("create include rule target: %w", err)
 		}
 	}
 
 	for _, group := range targets.Exclude {
 		targetID, err := uuid.NewV7()
 		if err != nil {
-			return fmt.Errorf("create rule target id: %w", err)
+			return fmt.Errorf("create exclude target id: %w", err)
 		}
 
-		createErr := queries.CreateRuleTarget(ctx, db.CreateRuleTargetParams{
+		if err = queries.CreateRuleTarget(ctx, db.CreateRuleTargetParams{
 			ID:            targetID,
 			RuleID:        ruleID,
-			SubjectKind:   string(domain.RuleTargetSubjectKindGroup),
+			SubjectKind:   db.RuleTargetSubjectKind(domain.RuleTargetSubjectKindGroup),
 			SubjectID:     &group.GroupID,
-			Assignment:    string(domain.RuleTargetAssignmentExclude),
+			Assignment:    db.RuleTargetAssignment(domain.RuleTargetAssignmentExclude),
 			Priority:      pgtype.Int4{},
-			Policy:        pgtype.Text{},
+			Policy:        db.NullRulePolicy{},
 			CelExpression: "",
-		})
-		if createErr != nil {
-			return createErr
+		}); err != nil {
+			return fmt.Errorf("create exclude rule target: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func appendRuleTargetRow(targets *domain.RuleTargets, row db.ListRuleTargetsByRuleRow) error {
-	subjectKind, err := domain.ParseRuleTargetSubjectKind(row.SubjectKind)
+func appendRuleTarget(targets *domain.RuleTargets, row db.ListRuleTargetsByRuleRow) error {
+	subjectKind, err := domain.ParseRuleTargetSubjectKind(string(row.SubjectKind))
 	if err != nil {
 		return err
 	}
-	assignment, err := domain.ParseRuleTargetAssignment(row.Assignment)
+
+	assignment, err := domain.ParseRuleTargetAssignment(string(row.Assignment))
 	if err != nil {
 		return err
 	}
@@ -367,10 +399,13 @@ func appendRuleTargetRow(targets *domain.RuleTargets, row db.ListRuleTargetsByRu
 		if !row.Policy.Valid {
 			return errors.New("include rule target missing policy")
 		}
-		policy, policyErr := domain.ParseRulePolicy(row.Policy.String)
-		if policyErr != nil {
-			return policyErr
+
+		var policy domain.RulePolicy
+		policy, err = domain.ParseRulePolicy(string(row.Policy.RulePolicy))
+		if err != nil {
+			return err
 		}
+
 		targets.Include = append(targets.Include, domain.IncludeRuleTarget{
 			SubjectKind:   subjectKind,
 			SubjectID:     row.SubjectID,
@@ -378,17 +413,13 @@ func appendRuleTargetRow(targets *domain.RuleTargets, row db.ListRuleTargetsByRu
 			Policy:        policy,
 			CELExpression: row.CelExpression,
 		})
+
 	case domain.RuleTargetAssignmentExclude:
-		if subjectKind != domain.RuleTargetSubjectKindGroup {
-			return errors.New("exclude rule target must be group")
-		}
-		if row.SubjectID == nil {
-			return errors.New("exclude rule target missing group id")
-		}
 		targets.Exclude = append(targets.Exclude, domain.ExcludedGroup{
 			GroupID:   *row.SubjectID,
 			GroupName: row.SubjectName,
 		})
+
 	default:
 		return fmt.Errorf("unsupported rule target assignment %q", assignment)
 	}

@@ -11,14 +11,6 @@ type ListOptions struct {
 	Order  string
 }
 
-type UserListOptions struct {
-	ListOptions
-}
-
-type GroupListOptions struct {
-	ListOptions
-}
-
 type MembershipListOptions struct {
 	ListOptions
 
@@ -47,17 +39,13 @@ type RuleMachineListOptions struct {
 	RuleID *uuid.UUID
 }
 
-type ExecutableListOptions struct {
-	ListOptions
-}
-
 type ExecutionEventListOptions struct {
 	ListOptions
 
 	MachineID    *uuid.UUID
 	UserID       *uuid.UUID
 	ExecutableID *uuid.UUID
-	Decisions    []EventDecision
+	Decisions    []ExecutionDecision
 }
 
 type FileAccessEventListOptions struct {
@@ -72,14 +60,4 @@ type RuleListOptions struct {
 
 	Enabled   []bool
 	RuleTypes []RuleType
-}
-
-type RuleTargetListOptions struct {
-	ListOptions
-
-	RuleID      *uuid.UUID
-	SubjectKind *RuleTargetSubjectKind
-	SubjectID   *uuid.UUID
-	Assignment  *RuleTargetAssignment
-	Policy      *RulePolicy
 }

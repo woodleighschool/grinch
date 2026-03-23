@@ -57,17 +57,17 @@ SELECT
   updated_at
 FROM users
 ORDER BY display_name ASC, id ASC
-LIMIT $1
-OFFSET $2
+LIMIT $2
+OFFSET $1
 `
 
 type ListUsersParams struct {
-	Limit  int32
-	Offset int32
+	OffsetCount int32
+	LimitCount  int32
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listUsers, arg.OffsetCount, arg.LimitCount)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,8 @@ VALUES (
   $3,
   $4
 )
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE
+SET
   upn = EXCLUDED.upn,
   display_name = EXCLUDED.display_name,
   source = EXCLUDED.source,
@@ -124,7 +125,7 @@ type UpsertUserParams struct {
 	ID          uuid.UUID
 	Upn         string
 	DisplayName string
-	Source      string
+	Source      PrincipalSource
 }
 
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {

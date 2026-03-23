@@ -2,10 +2,10 @@ import {
   executablesApi,
   executionEventsApi,
   fileAccessEventsApi,
-  membershipsApi,
   groupsApi,
   machineRulesApi,
   machinesApi,
+  membershipsApi,
   ruleMachinesApi,
   rulesApi,
   usersApi,
@@ -36,7 +36,7 @@ import type {
 } from "react-admin";
 
 type MembershipCreateRequest = components["schemas"]["MembershipCreateRequest"];
-type MembershipListItem = components["schemas"]["MembershipListItem"];
+type MembershipListItem = components["schemas"]["Membership"];
 type RecordShape = Record<string, unknown>;
 type QueryScalar = string | number | boolean;
 type QueryValue = QueryScalar | QueryScalar[];
@@ -124,17 +124,9 @@ const toListResult = (payload: { rows: unknown[]; total: number }): ListResult =
   total: payload.total,
 });
 
-const toMembershipRecord = (item: MembershipListItem): RaRecord => {
-  const id = item.actual_membership_id ?? item.effective_membership_id;
-  if (!id) {
-    throw new Error("membership list item missing id");
-  }
-
-  return {
-    ...item,
-    id,
-  };
-};
+const toMembershipRecord = (item: MembershipListItem): RaRecord => ({
+  ...item,
+});
 
 const toMembershipListResult = (payload: { rows: MembershipListItem[]; total: number }): ListResult => ({
   data: payload.rows.map((item): RaRecord => toMembershipRecord(item)),
@@ -288,8 +280,7 @@ const listHandlers: Record<ResourceName, ListHandler> = {
 const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   users: (id, signal): Promise<RaRecord> => usersApi.get(String(id), signal) as Promise<RaRecord>,
   groups: (id, signal): Promise<RaRecord> => groupsApi.get(String(id), signal) as Promise<RaRecord>,
-  memberships: (id, signal): Promise<RaRecord> =>
-    membershipsApi.get(String(id), signal) as Promise<RaRecord>,
+  memberships: (id, signal): Promise<RaRecord> => membershipsApi.get(String(id), signal) as Promise<RaRecord>,
   machines: (id, signal): Promise<RaRecord> => machinesApi.get(String(id), signal) as Promise<RaRecord>,
   executables: (id, signal): Promise<RaRecord> => executablesApi.get(String(id), signal) as Promise<RaRecord>,
   "execution-events": (id, signal): Promise<RaRecord> =>
@@ -302,8 +293,7 @@ const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
 const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
   rules: (data): Promise<RaRecord> => rulesApi.create(data) as Promise<RaRecord>,
   groups: (data): Promise<RaRecord> => groupsApi.create(data) as Promise<RaRecord>,
-  memberships: (data): Promise<RaRecord> =>
-    membershipsApi.create(data as MembershipCreateRequest) as Promise<RaRecord>,
+  memberships: (data): Promise<RaRecord> => membershipsApi.create(data as MembershipCreateRequest) as Promise<RaRecord>,
 };
 
 const updateHandlers: Partial<Record<ResourceName, UpdateHandler>> = {

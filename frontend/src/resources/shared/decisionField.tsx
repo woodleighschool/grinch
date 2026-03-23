@@ -1,15 +1,15 @@
 import type { components } from "@/api/openapi";
 import {
-  EVENT_DECISION_DESCRIPTIONS,
+  EXECUTION_DECISION_DESCRIPTIONS,
   FILE_ACCESS_DECISION_DESCRIPTIONS,
-  eventDecisionName,
+  executionDecisionName,
   fileAccessDecisionName,
 } from "@/resources/shared/decisionChoices";
 import { Chip, Tooltip } from "@mui/material";
 import type { ReactElement } from "react";
 import { useRecordContext } from "react-admin";
 
-type EventDecision = components["schemas"]["EventDecision"];
+type ExecutionDecision = components["schemas"]["ExecutionDecision"];
 type FileAccessDecision = components["schemas"]["FileAccessDecision"];
 
 const getDecisionColor = (value: string): "default" | "error" | "info" | "success" | "warning" => {
@@ -40,8 +40,8 @@ export const DecisionChip = ({ decision, label, description }: DecisionChipPrope
   </Tooltip>
 );
 
-export const EventDecisionField = (): ReactElement | undefined => {
-  const record = useRecordContext<{ decision: EventDecision }>();
+export const ExecutionDecisionField = (): ReactElement | undefined => {
+  const record = useRecordContext<{ decision: ExecutionDecision }>();
 
   if (!record) {
     return undefined;
@@ -50,8 +50,8 @@ export const EventDecisionField = (): ReactElement | undefined => {
   return (
     <DecisionChip
       decision={record.decision}
-      label={eventDecisionName(record.decision)}
-      description={EVENT_DECISION_DESCRIPTIONS[record.decision]}
+      label={executionDecisionName(record.decision)}
+      description={EXECUTION_DECISION_DESCRIPTIONS[record.decision]}
     />
   );
 };

@@ -2,25 +2,25 @@ package domain
 
 import "fmt"
 
-type EventDecision string
+type ExecutionDecision string
 
 const (
-	EventDecisionUnknown          EventDecision = "unknown"
-	EventDecisionAllowUnknown     EventDecision = "allow_unknown"
-	EventDecisionAllowBinary      EventDecision = "allow_binary"
-	EventDecisionAllowCertificate EventDecision = "allow_certificate"
-	EventDecisionAllowScope       EventDecision = "allow_scope"
-	EventDecisionAllowTeamID      EventDecision = "allow_team_id"
-	EventDecisionAllowSigningID   EventDecision = "allow_signing_id"
-	EventDecisionAllowCDHash      EventDecision = "allow_cd_hash"
-	EventDecisionBlockUnknown     EventDecision = "block_unknown"
-	EventDecisionBlockBinary      EventDecision = "block_binary"
-	EventDecisionBlockCertificate EventDecision = "block_certificate"
-	EventDecisionBlockScope       EventDecision = "block_scope"
-	EventDecisionBlockTeamID      EventDecision = "block_team_id"
-	EventDecisionBlockSigningID   EventDecision = "block_signing_id"
-	EventDecisionBlockCDHash      EventDecision = "block_cd_hash"
-	EventDecisionBundleBinary     EventDecision = "bundle_binary"
+	ExecutionDecisionUnknown          ExecutionDecision = "unknown"
+	ExecutionDecisionAllowUnknown     ExecutionDecision = "allow_unknown"
+	ExecutionDecisionAllowBinary      ExecutionDecision = "allow_binary"
+	ExecutionDecisionAllowCertificate ExecutionDecision = "allow_certificate"
+	ExecutionDecisionAllowScope       ExecutionDecision = "allow_scope"
+	ExecutionDecisionAllowTeamID      ExecutionDecision = "allow_team_id"
+	ExecutionDecisionAllowSigningID   ExecutionDecision = "allow_signing_id"
+	ExecutionDecisionAllowCDHash      ExecutionDecision = "allow_cd_hash"
+	ExecutionDecisionBlockUnknown     ExecutionDecision = "block_unknown"
+	ExecutionDecisionBlockBinary      ExecutionDecision = "block_binary"
+	ExecutionDecisionBlockCertificate ExecutionDecision = "block_certificate"
+	ExecutionDecisionBlockScope       ExecutionDecision = "block_scope"
+	ExecutionDecisionBlockTeamID      ExecutionDecision = "block_team_id"
+	ExecutionDecisionBlockSigningID   ExecutionDecision = "block_signing_id"
+	ExecutionDecisionBlockCDHash      ExecutionDecision = "block_cd_hash"
+	ExecutionDecisionBundleBinary     ExecutionDecision = "bundle_binary"
 )
 
 type FileAccessDecision string
@@ -86,14 +86,14 @@ func ParseMachineClientMode(value string) (MachineClientMode, error) {
 	)
 }
 
-func ParseEventDecision(value string) (EventDecision, error) {
+func ParseExecutionDecision(value string) (ExecutionDecision, error) {
 	return parseEnum(value, "event decision",
-		EventDecisionUnknown, EventDecisionAllowUnknown, EventDecisionAllowBinary,
-		EventDecisionAllowCertificate, EventDecisionAllowScope, EventDecisionAllowTeamID,
-		EventDecisionAllowSigningID, EventDecisionAllowCDHash,
-		EventDecisionBlockUnknown, EventDecisionBlockBinary, EventDecisionBlockCertificate,
-		EventDecisionBlockScope, EventDecisionBlockTeamID, EventDecisionBlockSigningID,
-		EventDecisionBlockCDHash, EventDecisionBundleBinary,
+		ExecutionDecisionUnknown, ExecutionDecisionAllowUnknown, ExecutionDecisionAllowBinary,
+		ExecutionDecisionAllowCertificate, ExecutionDecisionAllowScope, ExecutionDecisionAllowTeamID,
+		ExecutionDecisionAllowSigningID, ExecutionDecisionAllowCDHash,
+		ExecutionDecisionBlockUnknown, ExecutionDecisionBlockBinary, ExecutionDecisionBlockCertificate,
+		ExecutionDecisionBlockScope, ExecutionDecisionBlockTeamID, ExecutionDecisionBlockSigningID,
+		ExecutionDecisionBlockCDHash, ExecutionDecisionBundleBinary,
 	)
 }
 

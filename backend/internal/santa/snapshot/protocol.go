@@ -10,62 +10,69 @@ import (
 	"github.com/woodleighschool/grinch/internal/santa/model"
 )
 
-// BuildRuleDownloadResponse maps the already-prepared payload into the Santa
-// wire shape. Selection and diffing happen earlier in the snapshot package.
+// BuildRuleDownloadResponse converts the prepared sync payload into the Santa
+// wire format.
 func BuildRuleDownloadResponse(rules []model.SyncRule) (*syncv1.RuleDownloadResponse, error) {
 	protoRules := make([]*syncv1.Rule, 0, len(rules))
 	for _, rule := range rules {
-		protoRule, err := buildProtoRule(rule)
+		protoRule, err := protoRuleFromSyncRule(rule)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("build proto rule %s/%s: %w", rule.RuleType, rule.Identifier, err)
 		}
 		protoRules = append(protoRules, protoRule)
 	}
 
-	return syncv1.RuleDownloadResponse_builder{Rules: protoRules}.Build(), nil
+	return syncv1.RuleDownloadResponse_builder{
+		Rules: protoRules,
+	}.Build(), nil
 }
 
-func MapPendingFullSync(value bool) syncv1.SyncType {
-	if value {
+// SyncTypeFromPendingFullSync maps the stored pending sync mode to the Santa
+// wire enum.
+func SyncTypeFromPendingFullSync(fullSync bool) syncv1.SyncType {
+	if fullSync {
 		return syncv1.SyncType_CLEAN
 	}
 	return syncv1.SyncType_NORMAL
 }
 
-func MapClientMode(value syncv1.ClientMode) domain.MachineClientMode {
+// MachineClientModeFromProto maps the Santa client mode enum to the internal
+// machine client mode.
+func MachineClientModeFromProto(value syncv1.ClientMode) domain.MachineClientMode {
 	switch value {
-	case syncv1.ClientMode_UNKNOWN_CLIENT_MODE:
-		return domain.MachineClientModeUnknown
 	case syncv1.ClientMode_MONITOR:
 		return domain.MachineClientModeMonitor
 	case syncv1.ClientMode_LOCKDOWN:
 		return domain.MachineClientModeLockdown
 	case syncv1.ClientMode_STANDALONE:
 		return domain.MachineClientModeStandalone
+	case syncv1.ClientMode_UNKNOWN_CLIENT_MODE:
+		fallthrough
 	default:
 		return domain.MachineClientModeUnknown
 	}
 }
 
-func SafeCount(value uint32) int32 {
+// ClampRuleCount converts a uint32 rule count to int32 without overflow.
+func ClampRuleCount(value uint32) int32 {
 	if value > math.MaxInt32 {
 		return math.MaxInt32
 	}
 	return int32(value)
 }
 
-func buildProtoRule(rule model.SyncRule) (*syncv1.Rule, error) {
-	ruleType, err := mapRuleType(rule.RuleType)
+func protoRuleFromSyncRule(rule model.SyncRule) (*syncv1.Rule, error) {
+	ruleType, err := protoRuleType(rule.RuleType)
 	if err != nil {
 		return nil, err
 	}
 
-	policy, err := mapPolicy(rule)
+	policy, err := protoPolicy(rule)
 	if err != nil {
 		return nil, err
 	}
 
-	ruleBuilder := syncv1.Rule_builder{
+	builder := syncv1.Rule_builder{
 		Identifier: rule.Identifier,
 		Policy:     policy,
 		RuleType:   ruleType,
@@ -74,13 +81,13 @@ func buildProtoRule(rule model.SyncRule) (*syncv1.Rule, error) {
 	}
 
 	if policy == syncv1.Policy_CEL {
-		ruleBuilder.CelExpr = rule.CELExpression
+		builder.CelExpr = rule.CELExpression
 	}
 
-	return ruleBuilder.Build(), nil
+	return builder.Build(), nil
 }
 
-func mapRuleType(value domain.RuleType) (syncv1.RuleType, error) {
+func protoRuleType(value domain.RuleType) (syncv1.RuleType, error) {
 	switch value {
 	case domain.RuleTypeBinary:
 		return syncv1.RuleType_BINARY, nil
@@ -97,13 +104,12 @@ func mapRuleType(value domain.RuleType) (syncv1.RuleType, error) {
 	}
 }
 
-func mapPolicy(rule model.SyncRule) (syncv1.Policy, error) {
+func protoPolicy(rule model.SyncRule) (syncv1.Policy, error) {
 	if rule.Removed {
 		return syncv1.Policy_REMOVE, nil
 	}
 
-	value := rule.Policy
-	switch value {
+	switch rule.Policy {
 	case domain.RulePolicyAllowlist:
 		return syncv1.Policy_ALLOWLIST, nil
 	case domain.RulePolicyBlocklist:
@@ -113,6 +119,6 @@ func mapPolicy(rule model.SyncRule) (syncv1.Policy, error) {
 	case domain.RulePolicyCEL:
 		return syncv1.Policy_CEL, nil
 	default:
-		return syncv1.Policy_POLICY_UNKNOWN, fmt.Errorf("unsupported policy %q", value)
+		return syncv1.Policy_POLICY_UNKNOWN, fmt.Errorf("unsupported policy %q", rule.Policy)
 	}
 }

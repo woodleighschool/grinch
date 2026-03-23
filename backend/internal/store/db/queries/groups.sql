@@ -6,12 +6,13 @@ INSERT INTO groups (
   source
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4
+  sqlc.arg(id),
+  sqlc.arg(name),
+  sqlc.arg(description),
+  sqlc.arg(source)
 )
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE
+SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
   source = EXCLUDED.source,
@@ -27,30 +28,30 @@ RETURNING
 
 -- name: UpdateGroup :one
 WITH matched AS (
-  SELECT source
-  FROM groups
-  WHERE groups.id = $1
+  SELECT g.source
+  FROM groups AS g
+  WHERE g.id = sqlc.arg(id)
 ),
 updated AS (
-  UPDATE groups
+  UPDATE groups AS g
   SET
-    name = $2,
-    description = $3,
+    name = sqlc.arg(name),
+    description = sqlc.arg(description),
     updated_at = NOW()
-  WHERE groups.id = $1
-    AND groups.source = 'local'
+  WHERE g.id = sqlc.arg(id)
+    AND g.source = 'local'
   RETURNING
-    id,
-    name,
-    description,
-    source,
+    g.id,
+    g.name,
+    g.description,
+    g.source,
     (
       SELECT COUNT(*)::INT4
-      FROM group_memberships
-      WHERE group_id = groups.id
+      FROM group_memberships AS gm
+      WHERE gm.group_id = g.id
     ) AS member_count,
-    created_at,
-    updated_at
+    g.created_at,
+    g.updated_at
 )
 SELECT
   CASE
@@ -58,15 +59,16 @@ SELECT
     WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
     ELSE 'not_found'
   END AS status,
-  updated.id,
-  updated.name,
-  updated.description,
-  updated.source,
-  COALESCE(updated.member_count, 0)::INT4 AS member_count,
-  updated.created_at,
-  updated.updated_at
-FROM (SELECT 1) AS marker
-LEFT JOIN updated ON TRUE;
+  u.id,
+  u.name,
+  u.description,
+  u.source,
+  COALESCE(u.member_count, 0)::INT4 AS member_count,
+  u.created_at,
+  u.updated_at
+FROM (VALUES (1)) AS marker(dummy)
+LEFT JOIN updated AS u
+  ON TRUE;
 
 -- name: GetGroup :one
 SELECT
@@ -74,17 +76,15 @@ SELECT
   g.name,
   g.description,
   g.source,
-  COALESCE(member_counts.member_count, 0)::INT4 AS member_count,
+  (
+    SELECT COUNT(*)::INT4
+    FROM group_memberships AS gm
+    WHERE gm.group_id = g.id
+  ) AS member_count,
   g.created_at,
   g.updated_at
 FROM groups AS g
-LEFT JOIN (
-  SELECT group_id, COUNT(*)::INT4 AS member_count
-  FROM group_memberships
-  GROUP BY group_id
-) AS member_counts
-  ON member_counts.group_id = g.id
-WHERE g.id = $1;
+WHERE g.id = sqlc.arg(id);
 
 -- name: ListGroups :many
 SELECT
@@ -96,23 +96,24 @@ SELECT
   updated_at
 FROM groups
 ORDER BY name ASC, id ASC
-LIMIT $1
-OFFSET $2;
+LIMIT sqlc.arg(limit_count)
+OFFSET sqlc.arg(offset_count);
 
 -- name: DeleteGroup :one
 WITH matched AS (
-  SELECT source
-  FROM groups
-  WHERE groups.id = $1
+  SELECT g.source
+  FROM groups AS g
+  WHERE g.id = sqlc.arg(id)
 ),
 deleted AS (
-  DELETE FROM groups
-  WHERE groups.id = $1
-    AND groups.source = 'local'
+  DELETE FROM groups AS g
+  WHERE g.id = sqlc.arg(id)
+    AND g.source = 'local'
   RETURNING 1
 )
-SELECT CASE
-  WHEN EXISTS (SELECT 1 FROM deleted) THEN 'deleted'
-  WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
-  ELSE 'not_found'
-END AS status;
+SELECT
+  CASE
+    WHEN EXISTS (SELECT 1 FROM deleted) THEN 'deleted'
+    WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
+    ELSE 'not_found'
+  END AS status;

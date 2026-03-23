@@ -12,90 +12,77 @@ import (
 	uuid "github.com/google/uuid"
 )
 
-const addSyncedMembership = `-- name: AddSyncedMembership :exec
-INSERT INTO group_memberships (
+const addSyncedUserMembership = `-- name: AddSyncedUserMembership :exec
+INSERT INTO group_user_memberships (
   id,
   group_id,
-  member_kind,
-  member_id,
+  user_id,
   origin
 )
 VALUES (
   $1,
   $2,
   $3,
-  $4,
   'synced'
 )
-ON CONFLICT (group_id, member_kind, member_id) DO UPDATE SET
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
   origin = 'synced',
   updated_at = NOW()
 `
 
-type AddSyncedMembershipParams struct {
-	ID         uuid.UUID
-	GroupID    uuid.UUID
-	MemberKind string
-	MemberID   uuid.UUID
+type AddSyncedUserMembershipParams struct {
+	ID      uuid.UUID
+	GroupID uuid.UUID
+	UserID  uuid.UUID
 }
 
-func (q *Queries) AddSyncedMembership(ctx context.Context, arg AddSyncedMembershipParams) error {
-	_, err := q.db.Exec(ctx, addSyncedMembership,
-		arg.ID,
-		arg.GroupID,
-		arg.MemberKind,
-		arg.MemberID,
-	)
+func (q *Queries) AddSyncedUserMembership(ctx context.Context, arg AddSyncedUserMembershipParams) error {
+	_, err := q.db.Exec(ctx, addSyncedUserMembership, arg.ID, arg.GroupID, arg.UserID)
 	return err
 }
 
-const createMembership = `-- name: CreateMembership :one
-INSERT INTO group_memberships (
+const createMachineMembership = `-- name: CreateMachineMembership :one
+INSERT INTO group_machine_memberships (
   id,
   group_id,
-  member_kind,
-  member_id,
+  machine_id,
   origin
 )
 VALUES (
   $1,
   $2,
   $3,
-  $4,
-  $5
+  $4
 )
 RETURNING
   id,
   group_id,
-  member_kind,
-  member_id,
+  machine_id,
   origin,
   created_at,
   updated_at
 `
 
-type CreateMembershipParams struct {
-	ID         uuid.UUID
-	GroupID    uuid.UUID
-	MemberKind string
-	MemberID   uuid.UUID
-	Origin     string
+type CreateMachineMembershipParams struct {
+	ID        uuid.UUID
+	GroupID   uuid.UUID
+	MachineID uuid.UUID
+	Origin    MembershipOrigin
 }
 
-func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error) {
-	row := q.db.QueryRow(ctx, createMembership,
+func (q *Queries) CreateMachineMembership(ctx context.Context, arg CreateMachineMembershipParams) (GroupMachineMembership, error) {
+	row := q.db.QueryRow(ctx, createMachineMembership,
 		arg.ID,
 		arg.GroupID,
-		arg.MemberKind,
-		arg.MemberID,
+		arg.MachineID,
 		arg.Origin,
 	)
-	var i Membership
+	var i GroupMachineMembership
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
-		&i.MemberKind,
-		&i.MemberID,
+		&i.MachineID,
 		&i.Origin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -103,27 +90,47 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 	return i, err
 }
 
-const deleteMembership = `-- name: DeleteMembership :one
-DELETE FROM group_memberships
-WHERE id = $1
+const createUserMembership = `-- name: CreateUserMembership :one
+INSERT INTO group_user_memberships (
+  id,
+  group_id,
+  user_id,
+  origin
+)
+VALUES (
+  $1,
+  $2,
+  $3,
+  $4
+)
 RETURNING
   id,
   group_id,
-  member_kind,
-  member_id,
+  user_id,
   origin,
   created_at,
   updated_at
 `
 
-func (q *Queries) DeleteMembership(ctx context.Context, id uuid.UUID) (Membership, error) {
-	row := q.db.QueryRow(ctx, deleteMembership, id)
-	var i Membership
+type CreateUserMembershipParams struct {
+	ID      uuid.UUID
+	GroupID uuid.UUID
+	UserID  uuid.UUID
+	Origin  MembershipOrigin
+}
+
+func (q *Queries) CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (GroupUserMembership, error) {
+	row := q.db.QueryRow(ctx, createUserMembership,
+		arg.ID,
+		arg.GroupID,
+		arg.UserID,
+		arg.Origin,
+	)
+	var i GroupUserMembership
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
-		&i.MemberKind,
-		&i.MemberID,
+		&i.UserID,
 		&i.Origin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -131,32 +138,30 @@ func (q *Queries) DeleteMembership(ctx context.Context, id uuid.UUID) (Membershi
 	return i, err
 }
 
-const getMembership = `-- name: GetMembership :one
-SELECT
-  id,
-  group_id,
-  member_kind,
-  member_id,
-  origin,
-  created_at,
-  updated_at
-FROM group_memberships
+const deleteMachineMembership = `-- name: DeleteMachineMembership :execrows
+DELETE FROM group_machine_memberships
 WHERE id = $1
 `
 
-func (q *Queries) GetMembership(ctx context.Context, id uuid.UUID) (Membership, error) {
-	row := q.db.QueryRow(ctx, getMembership, id)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.MemberKind,
-		&i.MemberID,
-		&i.Origin,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) DeleteMachineMembership(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMachineMembership, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteUserMembership = `-- name: DeleteUserMembership :execrows
+DELETE FROM group_user_memberships
+WHERE id = $1
+`
+
+func (q *Queries) DeleteUserMembership(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUserMembership, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getPersistedMembershipView = `-- name: GetPersistedMembershipView :one
@@ -167,10 +172,13 @@ SELECT
   g.source AS group_source,
   gm.member_kind,
   gm.member_id,
-  COALESCE(CASE
-    WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
-    ELSE NULLIF(m.hostname, '')
-  END, '')::TEXT AS member_name,
+  COALESCE(
+    CASE
+      WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
+      ELSE NULLIF(m.hostname, '')
+    END,
+    ''
+  )::TEXT AS member_name,
   gm.created_at,
   gm.updated_at
 FROM group_memberships AS gm
@@ -181,7 +189,7 @@ LEFT JOIN users AS u
   AND u.id = gm.member_id
 LEFT JOIN machines AS m
   ON gm.member_kind = 'machine'
-  AND m.machine_id = gm.member_id
+  AND m.id = gm.member_id
 WHERE gm.id = $1
 `
 
@@ -189,8 +197,8 @@ type GetPersistedMembershipViewRow struct {
 	ID          uuid.UUID
 	GroupID     uuid.UUID
 	GroupName   string
-	GroupSource string
-	MemberKind  string
+	GroupSource PrincipalSource
+	MemberKind  MembershipMemberKind
 	MemberID    uuid.UUID
 	MemberName  string
 	CreatedAt   time.Time
@@ -215,24 +223,25 @@ func (q *Queries) GetPersistedMembershipView(ctx context.Context, id uuid.UUID) 
 }
 
 const listEffectiveGroupIDsForMachine = `-- name: ListEffectiveGroupIDsForMachine :many
-SELECT gm.group_id
-FROM group_memberships AS gm
-WHERE gm.member_kind = 'machine'
-  AND gm.member_id = $1
+SELECT gmm.group_id
+FROM group_machine_memberships AS gmm
+WHERE gmm.machine_id = $1
+
 UNION
-SELECT gm.group_id
-FROM group_memberships AS gm
+
+SELECT gum.group_id
+FROM machines AS m
 JOIN users AS u
-  ON u.id = gm.member_id
-  AND gm.member_kind = 'user'
-JOIN machines AS m
-  ON m.primary_user = u.upn
-WHERE m.machine_id = $1
-  AND m.primary_user <> ''
+  ON u.upn = NULLIF(m.primary_user, '')
+JOIN group_user_memberships AS gum
+  ON gum.user_id = u.id
+WHERE m.id = $1
+
+ORDER BY group_id ASC
 `
 
-func (q *Queries) ListEffectiveGroupIDsForMachine(ctx context.Context, memberID uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listEffectiveGroupIDsForMachine, memberID)
+func (q *Queries) ListEffectiveGroupIDsForMachine(ctx context.Context, machineID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listEffectiveGroupIDsForMachine, machineID)
 	if err != nil {
 		return nil, err
 	}

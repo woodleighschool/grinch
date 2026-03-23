@@ -39,7 +39,7 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 
 	items, total, err := handler.rules.ListRules(request.Context(), domain.RuleListOptions{
 		ListOptions: listOptions,
-		Enabled:     optionalBools(params.Enabled),
+		Enabled:     cloneBools(params.Enabled),
 		RuleTypes:   ruleTypes,
 	})
 	if err != nil {

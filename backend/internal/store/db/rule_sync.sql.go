@@ -14,7 +14,7 @@ import (
 
 const getMachineSyncState = `-- name: GetMachineSyncState :one
 SELECT
-  m.machine_id,
+  m.id,
   COALESCE(ms.rules_hash, '') AS rules_hash,
   COALESCE(ms.desired_targets, '[]'::JSONB) AS desired_targets,
   COALESCE(ms.applied_targets, '[]'::JSONB) AS applied_targets,
@@ -28,11 +28,8 @@ SELECT
   COALESCE(ms.desired_teamid_rule_count, 0)::INT4 AS desired_teamid_rule_count,
   COALESCE(ms.desired_signingid_rule_count, 0)::INT4 AS desired_signingid_rule_count,
   COALESCE(ms.desired_cdhash_rule_count, 0)::INT4 AS desired_cdhash_rule_count,
-  COALESCE(ms.client_mode, 'unknown') AS client_mode,
   COALESCE(ms.binary_rule_count, 0)::INT4 AS binary_rule_count,
   COALESCE(ms.certificate_rule_count, 0)::INT4 AS certificate_rule_count,
-  COALESCE(ms.compiler_rule_count, 0)::INT4 AS compiler_rule_count,
-  COALESCE(ms.transitive_rule_count, 0)::INT4 AS transitive_rule_count,
   COALESCE(ms.teamid_rule_count, 0)::INT4 AS teamid_rule_count,
   COALESCE(ms.signingid_rule_count, 0)::INT4 AS signingid_rule_count,
   COALESCE(ms.cdhash_rule_count, 0)::INT4 AS cdhash_rule_count,
@@ -44,12 +41,12 @@ SELECT
   ms.last_reported_counts_match_at
 FROM machines AS m
 LEFT JOIN machine_sync_states AS ms
-  ON ms.machine_id = m.machine_id
-WHERE m.machine_id = $1
+  ON ms.machine_id = m.id
+WHERE m.id = $1
 `
 
 type GetMachineSyncStateRow struct {
-	MachineID                   uuid.UUID
+	ID                          uuid.UUID
 	RulesHash                   string
 	DesiredTargets              []byte
 	AppliedTargets              []byte
@@ -63,11 +60,8 @@ type GetMachineSyncStateRow struct {
 	DesiredTeamIDRuleCount      int32
 	DesiredSigningIDRuleCount   int32
 	DesiredCDHashRuleCount      int32
-	ClientMode                  string
 	BinaryRuleCount             int32
 	CertificateRuleCount        int32
-	CompilerRuleCount           int32
-	TransitiveRuleCount         int32
 	TeamIDRuleCount             int32
 	SigningIDRuleCount          int32
 	CDHashRuleCount             int32
@@ -83,7 +77,7 @@ func (q *Queries) GetMachineSyncState(ctx context.Context, machineID uuid.UUID) 
 	row := q.db.QueryRow(ctx, getMachineSyncState, machineID)
 	var i GetMachineSyncStateRow
 	err := row.Scan(
-		&i.MachineID,
+		&i.ID,
 		&i.RulesHash,
 		&i.DesiredTargets,
 		&i.AppliedTargets,
@@ -97,11 +91,8 @@ func (q *Queries) GetMachineSyncState(ctx context.Context, machineID uuid.UUID) 
 		&i.DesiredTeamIDRuleCount,
 		&i.DesiredSigningIDRuleCount,
 		&i.DesiredCDHashRuleCount,
-		&i.ClientMode,
 		&i.BinaryRuleCount,
 		&i.CertificateRuleCount,
-		&i.CompilerRuleCount,
-		&i.TransitiveRuleCount,
 		&i.TeamIDRuleCount,
 		&i.SigningIDRuleCount,
 		&i.CDHashRuleCount,
@@ -124,22 +115,22 @@ SET
   pending_payload_rule_count = 0,
   pending_full_sync = FALSE,
   pending_preflight_at = NULL,
-  last_rule_sync_success_at = $2,
+  last_rule_sync_success_at = $1,
   last_clean_sync_at = CASE
-    WHEN pending_full_sync THEN $2
+    WHEN pending_full_sync THEN $1
     ELSE last_clean_sync_at
   END,
   updated_at = NOW()
-WHERE machine_id = $1
+WHERE machine_id = $2
 `
 
 type PromoteMachineSyncPendingSnapshotParams struct {
-	MachineID             uuid.UUID
 	LastRuleSyncSuccessAt *time.Time
+	MachineID             uuid.UUID
 }
 
 func (q *Queries) PromoteMachineSyncPendingSnapshot(ctx context.Context, arg PromoteMachineSyncPendingSnapshotParams) (int64, error) {
-	result, err := q.db.Exec(ctx, promoteMachineSyncPendingSnapshot, arg.MachineID, arg.LastRuleSyncSuccessAt)
+	result, err := q.db.Exec(ctx, promoteMachineSyncPendingSnapshot, arg.LastRuleSyncSuccessAt, arg.MachineID)
 	if err != nil {
 		return 0, err
 	}
@@ -149,29 +140,29 @@ func (q *Queries) PromoteMachineSyncPendingSnapshot(ctx context.Context, arg Pro
 const recordMachineSyncPostflight = `-- name: RecordMachineSyncPostflight :execrows
 UPDATE machine_sync_states
 SET
-  rules_hash = $2,
-  rules_received = $3,
-  rules_processed = $4,
-  last_rule_sync_attempt_at = $5,
+  rules_hash = $1,
+  rules_received = $2,
+  rules_processed = $3,
+  last_rule_sync_attempt_at = $4,
   updated_at = NOW()
-WHERE machine_id = $1
+WHERE machine_id = $5
 `
 
 type RecordMachineSyncPostflightParams struct {
-	MachineID             uuid.UUID
 	RulesHash             string
 	RulesReceived         int32
 	RulesProcessed        int32
 	LastRuleSyncAttemptAt *time.Time
+	MachineID             uuid.UUID
 }
 
 func (q *Queries) RecordMachineSyncPostflight(ctx context.Context, arg RecordMachineSyncPostflightParams) (int64, error) {
 	result, err := q.db.Exec(ctx, recordMachineSyncPostflight,
-		arg.MachineID,
 		arg.RulesHash,
 		arg.RulesReceived,
 		arg.RulesProcessed,
 		arg.LastRuleSyncAttemptAt,
+		arg.MachineID,
 	)
 	if err != nil {
 		return 0, err
@@ -198,7 +189,8 @@ VALUES (
   $6,
   $7
 )
-ON CONFLICT (machine_id) DO UPDATE SET
+ON CONFLICT (machine_id) DO UPDATE
+SET
   desired_targets = EXCLUDED.desired_targets,
   desired_binary_rule_count = EXCLUDED.desired_binary_rule_count,
   desired_certificate_rule_count = EXCLUDED.desired_certificate_rule_count,
@@ -239,7 +231,7 @@ func (q *Queries) UpsertMachineDesiredTargets(ctx context.Context, arg UpsertMac
 	return err
 }
 
-const upsertMachineSyncState = `-- name: UpsertMachineSyncState :one
+const upsertMachineSyncState = `-- name: UpsertMachineSyncState :exec
 INSERT INTO machine_sync_states (
   machine_id,
   rules_hash,
@@ -255,11 +247,8 @@ INSERT INTO machine_sync_states (
   desired_teamid_rule_count,
   desired_signingid_rule_count,
   desired_cdhash_rule_count,
-  client_mode,
   binary_rule_count,
   certificate_rule_count,
-  compiler_rule_count,
-  transitive_rule_count,
   teamid_rule_count,
   signingid_rule_count,
   cdhash_rule_count,
@@ -293,12 +282,10 @@ VALUES (
   $21,
   $22,
   $23,
-  $24,
-  $25,
-  $26,
-  $27
+  $24
 )
-ON CONFLICT (machine_id) DO UPDATE SET
+ON CONFLICT (machine_id) DO UPDATE
+SET
   rules_hash = EXCLUDED.rules_hash,
   desired_targets = EXCLUDED.desired_targets,
   applied_targets = EXCLUDED.applied_targets,
@@ -312,11 +299,8 @@ ON CONFLICT (machine_id) DO UPDATE SET
   desired_teamid_rule_count = EXCLUDED.desired_teamid_rule_count,
   desired_signingid_rule_count = EXCLUDED.desired_signingid_rule_count,
   desired_cdhash_rule_count = EXCLUDED.desired_cdhash_rule_count,
-  client_mode = EXCLUDED.client_mode,
   binary_rule_count = EXCLUDED.binary_rule_count,
   certificate_rule_count = EXCLUDED.certificate_rule_count,
-  compiler_rule_count = EXCLUDED.compiler_rule_count,
-  transitive_rule_count = EXCLUDED.transitive_rule_count,
   teamid_rule_count = EXCLUDED.teamid_rule_count,
   signingid_rule_count = EXCLUDED.signingid_rule_count,
   cdhash_rule_count = EXCLUDED.cdhash_rule_count,
@@ -333,37 +317,6 @@ ON CONFLICT (machine_id) DO UPDATE SET
     ELSE EXCLUDED.last_reported_counts_match_at
   END,
   updated_at = NOW()
-RETURNING
-  machine_id,
-  rules_hash,
-  desired_targets,
-  applied_targets,
-  pending_targets,
-  pending_payload,
-  pending_payload_rule_count,
-  pending_full_sync,
-  pending_preflight_at,
-  desired_binary_rule_count,
-  desired_certificate_rule_count,
-  desired_teamid_rule_count,
-  desired_signingid_rule_count,
-  desired_cdhash_rule_count,
-  client_mode,
-  binary_rule_count,
-  certificate_rule_count,
-  compiler_rule_count,
-  transitive_rule_count,
-  teamid_rule_count,
-  signingid_rule_count,
-  cdhash_rule_count,
-  rules_received,
-  rules_processed,
-  last_rule_sync_attempt_at,
-  last_rule_sync_success_at,
-  last_clean_sync_at,
-  last_reported_counts_match_at,
-  created_at,
-  updated_at
 `
 
 type UpsertMachineSyncStateParams struct {
@@ -381,11 +334,8 @@ type UpsertMachineSyncStateParams struct {
 	DesiredTeamIDRuleCount      int32
 	DesiredSigningIDRuleCount   int32
 	DesiredCDHashRuleCount      int32
-	ClientMode                  string
 	BinaryRuleCount             int32
 	CertificateRuleCount        int32
-	CompilerRuleCount           int32
-	TransitiveRuleCount         int32
 	TeamIDRuleCount             int32
 	SigningIDRuleCount          int32
 	CDHashRuleCount             int32
@@ -396,41 +346,8 @@ type UpsertMachineSyncStateParams struct {
 	LastReportedCountsMatchAt   *time.Time
 }
 
-type UpsertMachineSyncStateRow struct {
-	MachineID                   uuid.UUID
-	RulesHash                   string
-	DesiredTargets              []byte
-	AppliedTargets              []byte
-	PendingTargets              []byte
-	PendingPayload              []byte
-	PendingPayloadRuleCount     int64
-	PendingFullSync             bool
-	PendingPreflightAt          *time.Time
-	DesiredBinaryRuleCount      int32
-	DesiredCertificateRuleCount int32
-	DesiredTeamIDRuleCount      int32
-	DesiredSigningIDRuleCount   int32
-	DesiredCDHashRuleCount      int32
-	ClientMode                  string
-	BinaryRuleCount             int32
-	CertificateRuleCount        int32
-	CompilerRuleCount           int32
-	TransitiveRuleCount         int32
-	TeamIDRuleCount             int32
-	SigningIDRuleCount          int32
-	CDHashRuleCount             int32
-	RulesReceived               int32
-	RulesProcessed              int32
-	LastRuleSyncAttemptAt       *time.Time
-	LastRuleSyncSuccessAt       *time.Time
-	LastCleanSyncAt             *time.Time
-	LastReportedCountsMatchAt   *time.Time
-	CreatedAt                   time.Time
-	UpdatedAt                   time.Time
-}
-
-func (q *Queries) UpsertMachineSyncState(ctx context.Context, arg UpsertMachineSyncStateParams) (UpsertMachineSyncStateRow, error) {
-	row := q.db.QueryRow(ctx, upsertMachineSyncState,
+func (q *Queries) UpsertMachineSyncState(ctx context.Context, arg UpsertMachineSyncStateParams) error {
+	_, err := q.db.Exec(ctx, upsertMachineSyncState,
 		arg.MachineID,
 		arg.RulesHash,
 		arg.DesiredTargets,
@@ -445,11 +362,8 @@ func (q *Queries) UpsertMachineSyncState(ctx context.Context, arg UpsertMachineS
 		arg.DesiredTeamIDRuleCount,
 		arg.DesiredSigningIDRuleCount,
 		arg.DesiredCDHashRuleCount,
-		arg.ClientMode,
 		arg.BinaryRuleCount,
 		arg.CertificateRuleCount,
-		arg.CompilerRuleCount,
-		arg.TransitiveRuleCount,
 		arg.TeamIDRuleCount,
 		arg.SigningIDRuleCount,
 		arg.CDHashRuleCount,
@@ -459,38 +373,5 @@ func (q *Queries) UpsertMachineSyncState(ctx context.Context, arg UpsertMachineS
 		arg.LastRuleSyncSuccessAt,
 		arg.LastReportedCountsMatchAt,
 	)
-	var i UpsertMachineSyncStateRow
-	err := row.Scan(
-		&i.MachineID,
-		&i.RulesHash,
-		&i.DesiredTargets,
-		&i.AppliedTargets,
-		&i.PendingTargets,
-		&i.PendingPayload,
-		&i.PendingPayloadRuleCount,
-		&i.PendingFullSync,
-		&i.PendingPreflightAt,
-		&i.DesiredBinaryRuleCount,
-		&i.DesiredCertificateRuleCount,
-		&i.DesiredTeamIDRuleCount,
-		&i.DesiredSigningIDRuleCount,
-		&i.DesiredCDHashRuleCount,
-		&i.ClientMode,
-		&i.BinaryRuleCount,
-		&i.CertificateRuleCount,
-		&i.CompilerRuleCount,
-		&i.TransitiveRuleCount,
-		&i.TeamIDRuleCount,
-		&i.SigningIDRuleCount,
-		&i.CDHashRuleCount,
-		&i.RulesReceived,
-		&i.RulesProcessed,
-		&i.LastRuleSyncAttemptAt,
-		&i.LastRuleSyncSuccessAt,
-		&i.LastCleanSyncAt,
-		&i.LastReportedCountsMatchAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	return err
 }

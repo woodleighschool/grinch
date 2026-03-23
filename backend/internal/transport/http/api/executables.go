@@ -2,8 +2,6 @@ package apihttp //nolint:dupl // structurally similar to users.go by design
 
 import (
 	"net/http"
-
-	"github.com/woodleighschool/grinch/internal/domain"
 )
 
 func (handler *Server) ListExecutables(
@@ -24,9 +22,7 @@ func (handler *Server) ListExecutables(
 		return
 	}
 
-	items, total, err := handler.store.ListExecutables(request.Context(), domain.ExecutableListOptions{
-		ListOptions: listOptions,
-	})
+	items, total, err := handler.store.ListExecutables(request.Context(), listOptions)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

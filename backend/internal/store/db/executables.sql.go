@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	uuid "github.com/google/uuid"
 )
@@ -49,46 +48,31 @@ func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (Executable, 
 }
 
 const getOrCreateExecutable = `-- name: GetOrCreateExecutable :one
-WITH inserted AS (
-  INSERT INTO executables (
-    file_sha256,
-    file_name,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain
-  )
-  VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9
-  )
-  ON CONFLICT (file_sha256, file_name) DO NOTHING
-  RETURNING
-    id,
-    file_sha256,
-    file_name,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain,
-    created_at
+INSERT INTO executables (
+  file_sha256,
+  file_name,
+  file_bundle_id,
+  file_bundle_path,
+  signing_id,
+  team_id,
+  cdhash,
+  entitlements,
+  signing_chain
 )
-SELECT id, file_sha256, file_name, file_bundle_id, file_bundle_path, signing_id, team_id, cdhash, entitlements, signing_chain, created_at FROM inserted
-UNION ALL
-SELECT
+VALUES (
+  $1,
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9
+)
+ON CONFLICT (file_sha256, file_name) DO UPDATE
+SET file_name = executables.file_name
+RETURNING
   id,
   file_sha256,
   file_name,
@@ -100,11 +84,6 @@ SELECT
   entitlements,
   signing_chain,
   created_at
-FROM executables
-WHERE file_sha256 = $1
-  AND file_name = $2
-  AND NOT EXISTS (SELECT 1 FROM inserted)
-LIMIT 1
 `
 
 type GetOrCreateExecutableParams struct {
@@ -119,21 +98,7 @@ type GetOrCreateExecutableParams struct {
 	SigningChain   []byte
 }
 
-type GetOrCreateExecutableRow struct {
-	ID             uuid.UUID
-	FileSHA256     string
-	FileName       string
-	FileBundleID   string
-	FileBundlePath string
-	SigningID      string
-	TeamID         string
-	Cdhash         string
-	Entitlements   []byte
-	SigningChain   []byte
-	CreatedAt      time.Time
-}
-
-func (q *Queries) GetOrCreateExecutable(ctx context.Context, arg GetOrCreateExecutableParams) (GetOrCreateExecutableRow, error) {
+func (q *Queries) GetOrCreateExecutable(ctx context.Context, arg GetOrCreateExecutableParams) (Executable, error) {
 	row := q.db.QueryRow(ctx, getOrCreateExecutable,
 		arg.FileSHA256,
 		arg.FileName,
@@ -145,7 +110,7 @@ func (q *Queries) GetOrCreateExecutable(ctx context.Context, arg GetOrCreateExec
 		arg.Entitlements,
 		arg.SigningChain,
 	)
-	var i GetOrCreateExecutableRow
+	var i Executable
 	err := row.Scan(
 		&i.ID,
 		&i.FileSHA256,

@@ -1,57 +1,62 @@
--- name: CreateMembership :one
-INSERT INTO group_memberships (
+-- name: CreateUserMembership :one
+INSERT INTO group_user_memberships (
   id,
   group_id,
-  member_kind,
-  member_id,
+  user_id,
   origin
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5
+  sqlc.arg(id),
+  sqlc.arg(group_id),
+  sqlc.arg(user_id),
+  sqlc.arg(origin)
 )
 RETURNING
   id,
   group_id,
-  member_kind,
-  member_id,
+  user_id,
   origin,
   created_at,
   updated_at;
 
--- name: AddSyncedMembership :exec
-INSERT INTO group_memberships (
+-- name: CreateMachineMembership :one
+INSERT INTO group_machine_memberships (
   id,
   group_id,
-  member_kind,
-  member_id,
+  machine_id,
   origin
 )
 VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  'synced'
+  sqlc.arg(id),
+  sqlc.arg(group_id),
+  sqlc.arg(machine_id),
+  sqlc.arg(origin)
 )
-ON CONFLICT (group_id, member_kind, member_id) DO UPDATE SET
-  origin = 'synced',
-  updated_at = NOW();
-
--- name: GetMembership :one
-SELECT
+RETURNING
   id,
   group_id,
-  member_kind,
-  member_id,
+  machine_id,
   origin,
   created_at,
-  updated_at
-FROM group_memberships
-WHERE id = $1;
+  updated_at;
+
+-- name: AddSyncedUserMembership :exec
+INSERT INTO group_user_memberships (
+  id,
+  group_id,
+  user_id,
+  origin
+)
+VALUES (
+  sqlc.arg(id),
+  sqlc.arg(group_id),
+  sqlc.arg(user_id),
+  'synced'
+)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+  origin = 'synced',
+  updated_at = NOW();
 
 -- name: GetPersistedMembershipView :one
 SELECT
@@ -61,10 +66,13 @@ SELECT
   g.source AS group_source,
   gm.member_kind,
   gm.member_id,
-  COALESCE(CASE
-    WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
-    ELSE NULLIF(m.hostname, '')
-  END, '')::TEXT AS member_name,
+  COALESCE(
+    CASE
+      WHEN gm.member_kind = 'user' THEN NULLIF(u.display_name, '')
+      ELSE NULLIF(m.hostname, '')
+    END,
+    ''
+  )::TEXT AS member_name,
   gm.created_at,
   gm.updated_at
 FROM group_memberships AS gm
@@ -75,33 +83,30 @@ LEFT JOIN users AS u
   AND u.id = gm.member_id
 LEFT JOIN machines AS m
   ON gm.member_kind = 'machine'
-  AND m.machine_id = gm.member_id
-WHERE gm.id = $1;
+  AND m.id = gm.member_id
+WHERE gm.id = sqlc.arg(id);
 
--- name: DeleteMembership :one
-DELETE FROM group_memberships
-WHERE id = $1
-RETURNING
-  id,
-  group_id,
-  member_kind,
-  member_id,
-  origin,
-  created_at,
-  updated_at;
+-- name: DeleteUserMembership :execrows
+DELETE FROM group_user_memberships
+WHERE id = sqlc.arg(id);
+
+-- name: DeleteMachineMembership :execrows
+DELETE FROM group_machine_memberships
+WHERE id = sqlc.arg(id);
 
 -- name: ListEffectiveGroupIDsForMachine :many
-SELECT gm.group_id
-FROM group_memberships AS gm
-WHERE gm.member_kind = 'machine'
-  AND gm.member_id = $1
+SELECT gmm.group_id
+FROM group_machine_memberships AS gmm
+WHERE gmm.machine_id = sqlc.arg(machine_id)
+
 UNION
-SELECT gm.group_id
-FROM group_memberships AS gm
+
+SELECT gum.group_id
+FROM machines AS m
 JOIN users AS u
-  ON u.id = gm.member_id
-  AND gm.member_kind = 'user'
-JOIN machines AS m
-  ON m.primary_user = u.upn
-WHERE m.machine_id = $1
-  AND m.primary_user <> '';
+  ON u.upn = NULLIF(m.primary_user, '')
+JOIN group_user_memberships AS gum
+  ON gum.user_id = u.id
+WHERE m.id = sqlc.arg(machine_id)
+
+ORDER BY group_id ASC;

@@ -1,44 +1,29 @@
 -- name: GetOrCreateExecutable :one
-WITH inserted AS (
-  INSERT INTO executables (
-    file_sha256,
-    file_name,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain
-  )
-  VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9
-  )
-  ON CONFLICT (file_sha256, file_name) DO NOTHING
-  RETURNING
-    id,
-    file_sha256,
-    file_name,
-    file_bundle_id,
-    file_bundle_path,
-    signing_id,
-    team_id,
-    cdhash,
-    entitlements,
-    signing_chain,
-    created_at
+INSERT INTO executables (
+  file_sha256,
+  file_name,
+  file_bundle_id,
+  file_bundle_path,
+  signing_id,
+  team_id,
+  cdhash,
+  entitlements,
+  signing_chain
 )
-SELECT * FROM inserted
-UNION ALL
-SELECT
+VALUES (
+  sqlc.arg(file_sha256),
+  sqlc.arg(file_name),
+  sqlc.arg(file_bundle_id),
+  sqlc.arg(file_bundle_path),
+  sqlc.arg(signing_id),
+  sqlc.arg(team_id),
+  sqlc.arg(cdhash),
+  sqlc.arg(entitlements),
+  sqlc.arg(signing_chain)
+)
+ON CONFLICT (file_sha256, file_name) DO UPDATE
+SET file_name = executables.file_name
+RETURNING
   id,
   file_sha256,
   file_name,
@@ -49,12 +34,7 @@ SELECT
   cdhash,
   entitlements,
   signing_chain,
-  created_at
-FROM executables
-WHERE file_sha256 = $1
-  AND file_name = $2
-  AND NOT EXISTS (SELECT 1 FROM inserted)
-LIMIT 1;
+  created_at;
 
 -- name: GetExecutable :one
 SELECT
@@ -70,4 +50,4 @@ SELECT
   signing_chain,
   created_at
 FROM executables
-WHERE id = $1;
+WHERE id = sqlc.arg(id);

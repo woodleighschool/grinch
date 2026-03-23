@@ -35,7 +35,7 @@ import {
 } from "react-admin";
 
 type Group = components["schemas"]["Group"];
-type MembershipListItem = components["schemas"]["MembershipListItem"];
+type MembershipListItem = components["schemas"]["Membership"];
 type MemberKind = components["schemas"]["MemberKind"];
 
 interface AddMemberDialogProperties {

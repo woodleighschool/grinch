@@ -2,7 +2,6 @@ package santa_test
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"slices"
@@ -19,6 +18,7 @@ import (
 )
 
 type fakeDataStore struct {
+	ruleResolver   *fakeRuleResolver
 	ruleSyncStates map[uuid.UUID]santamodel.MachineSyncState
 	upsertErr      error
 	upsertMachine  santamodel.MachineUpsert
@@ -56,7 +56,21 @@ func (store *fakeDataStore) GetMachineSyncState(
 	return state, nil
 }
 
-func (store *fakeDataStore) SyncMachineDesiredRuleTargets(context.Context, uuid.UUID) error {
+func (store *fakeDataStore) UpdateMachineDesiredTargets(_ context.Context, machineID uuid.UUID) error {
+	if store.ruleSyncStates == nil {
+		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
+	}
+	state := store.ruleSyncStates[machineID]
+	desired := make([]santamodel.AppliedRuleTarget, 0, len(store.ruleResolver.resolvedTargets))
+	for _, rule := range store.ruleResolver.resolvedTargets {
+		desired = append(desired, santamodel.AppliedRuleTarget{
+			RuleType:    rule.RuleType,
+			Identifier:  rule.Identifier,
+			PayloadHash: domain.MachineRuleTargetPayloadHash(rule.MachineRuleTarget),
+		})
+	}
+	state.DesiredTargets = desired
+	store.ruleSyncStates[machineID] = state
 	return nil
 }
 
@@ -70,7 +84,7 @@ func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending sa
 		RulesHash:                   pending.RulesHash,
 		DesiredTargets:              slices.Clone(pending.DesiredTargets),
 		AppliedTargets:              slices.Clone(pending.AppliedTargets),
-		PendingTargets:              slices.Clone(pending.PendingTargets),
+		SentTargets:                 slices.Clone(pending.SentTargets),
 		PendingPayload:              slices.Clone(pending.PendingPayload),
 		PendingPayloadRuleCount:     pending.PendingPayloadRuleCount,
 		PendingFullSync:             pending.PendingFullSync,
@@ -80,11 +94,8 @@ func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending sa
 		DesiredTeamIDRuleCount:      pending.DesiredTeamIDRuleCount,
 		DesiredSigningIDRuleCount:   pending.DesiredSigningIDRuleCount,
 		DesiredCDHashRuleCount:      pending.DesiredCDHashRuleCount,
-		ClientMode:                  pending.ClientMode,
 		BinaryRuleCount:             pending.BinaryRuleCount,
 		CertificateRuleCount:        pending.CertificateRuleCount,
-		CompilerRuleCount:           pending.CompilerRuleCount,
-		TransitiveRuleCount:         pending.TransitiveRuleCount,
 		TeamIDRuleCount:             pending.TeamIDRuleCount,
 		SigningIDRuleCount:          pending.SigningIDRuleCount,
 		CDHashRuleCount:             pending.CDHashRuleCount,
@@ -114,8 +125,8 @@ func (store *fakeDataStore) PromotePendingSnapshot(
 ) error {
 	state := store.ruleSyncStates[machineID]
 	pendingFullSync := state.PendingFullSync
-	state.AppliedTargets = slices.Clone(state.PendingTargets)
-	state.PendingTargets = nil
+	state.AppliedTargets = slices.Clone(state.SentTargets)
+	state.SentTargets = nil
 	state.PendingPayload = nil
 	state.PendingPayloadRuleCount = 0
 	state.PendingFullSync = false
@@ -145,6 +156,7 @@ func (resolver *fakeRuleResolver) ResolveMachineRuleTargets(
 }
 
 func newService(store *fakeDataStore, resolver *fakeRuleResolver) *santa.Service {
+	store.ruleResolver = resolver
 	return santa.New(testLogger(), store, nil, resolver)
 }
 
@@ -188,22 +200,14 @@ func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 		t.Fatalf("LastSeenAt out of expected range: %s", store.upsertMachine.LastSeenAt)
 	}
 
-	var primaryUserGroups []string
-	if unmarshalErr := json.Unmarshal(
-		store.upsertMachine.PrimaryUserGroupsRaw,
-		&primaryUserGroups,
-	); unmarshalErr != nil {
-		t.Fatalf("PrimaryUserGroupsRaw json = %v", unmarshalErr)
-	}
-	if len(primaryUserGroups) != 2 || primaryUserGroups[0] != "g1" || primaryUserGroups[1] != "g2" {
-		t.Fatalf("PrimaryUserGroupsRaw = %#v, want [g1 g2]", primaryUserGroups)
+	if groups := store.upsertMachine.PrimaryUserGroups; len(groups) != 2 || groups[0] != "g1" || groups[1] != "g2" {
+		t.Fatalf("PrimaryUserGroups = %#v, want [g1 g2]", groups)
 	}
 	if response.GetSyncType() != syncv1.SyncType_CLEAN {
 		t.Fatalf("SyncType = %v, want CLEAN", response.GetSyncType())
 	}
-	state := store.ruleSyncStates[machineID]
-	if state.ClientMode != domain.MachineClientModeLockdown {
-		t.Fatalf("ClientMode = %q, want lockdown", state.ClientMode)
+	if store.upsertMachine.ClientMode != domain.MachineClientModeLockdown {
+		t.Fatalf("ClientMode = %q, want lockdown", store.upsertMachine.ClientMode)
 	}
 }
 
@@ -369,14 +373,15 @@ func TestHandleRuleDownload_ReturnsChangedRulesAndRemovalsDuringNormalSync(t *te
 	if len(response.GetRules()) != 2 {
 		t.Fatalf("len(response.Rules) = %d, want 2", len(response.GetRules()))
 	}
-	if response.GetRules()[0].GetPolicy() != syncv1.Policy_BLOCKLIST {
-		t.Fatalf("first policy = %v, want BLOCKLIST", response.GetRules()[0].GetPolicy())
+	// Rules are sorted by type|identifier: binary < certificate.
+	if response.GetRules()[0].GetPolicy() != syncv1.Policy_REMOVE {
+		t.Fatalf("rules[0] policy = %v, want REMOVE", response.GetRules()[0].GetPolicy())
 	}
-	if response.GetRules()[1].GetPolicy() != syncv1.Policy_REMOVE {
-		t.Fatalf("second policy = %v, want REMOVE", response.GetRules()[1].GetPolicy())
+	if response.GetRules()[0].GetIdentifier() != "com.example.removed" {
+		t.Fatalf("rules[0] identifier = %q, want com.example.removed", response.GetRules()[0].GetIdentifier())
 	}
-	if response.GetRules()[1].GetIdentifier() != "com.example.removed" {
-		t.Fatalf("remove identifier = %q, want com.example.removed", response.GetRules()[1].GetIdentifier())
+	if response.GetRules()[1].GetPolicy() != syncv1.Policy_BLOCKLIST {
+		t.Fatalf("rules[1] policy = %v, want BLOCKLIST", response.GetRules()[1].GetPolicy())
 	}
 }
 

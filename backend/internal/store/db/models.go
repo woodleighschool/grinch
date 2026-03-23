@@ -5,11 +5,457 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type ExecutionDecision string
+
+const (
+	ExecutionDecisionUnknown          ExecutionDecision = "unknown"
+	ExecutionDecisionAllowUnknown     ExecutionDecision = "allow_unknown"
+	ExecutionDecisionAllowBinary      ExecutionDecision = "allow_binary"
+	ExecutionDecisionAllowCertificate ExecutionDecision = "allow_certificate"
+	ExecutionDecisionAllowScope       ExecutionDecision = "allow_scope"
+	ExecutionDecisionAllowTeamID      ExecutionDecision = "allow_team_id"
+	ExecutionDecisionAllowSigningID   ExecutionDecision = "allow_signing_id"
+	ExecutionDecisionAllowCdHash      ExecutionDecision = "allow_cd_hash"
+	ExecutionDecisionBlockUnknown     ExecutionDecision = "block_unknown"
+	ExecutionDecisionBlockBinary      ExecutionDecision = "block_binary"
+	ExecutionDecisionBlockCertificate ExecutionDecision = "block_certificate"
+	ExecutionDecisionBlockScope       ExecutionDecision = "block_scope"
+	ExecutionDecisionBlockTeamID      ExecutionDecision = "block_team_id"
+	ExecutionDecisionBlockSigningID   ExecutionDecision = "block_signing_id"
+	ExecutionDecisionBlockCdHash      ExecutionDecision = "block_cd_hash"
+	ExecutionDecisionBundleBinary     ExecutionDecision = "bundle_binary"
+)
+
+func (e *ExecutionDecision) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ExecutionDecision(s)
+	case string:
+		*e = ExecutionDecision(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ExecutionDecision: %T", src)
+	}
+	return nil
+}
+
+type NullExecutionDecision struct {
+	ExecutionDecision ExecutionDecision
+	Valid             bool // Valid is true if ExecutionDecision is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullExecutionDecision) Scan(value interface{}) error {
+	if value == nil {
+		ns.ExecutionDecision, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ExecutionDecision.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullExecutionDecision) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ExecutionDecision), nil
+}
+
+type FileAccessDecision string
+
+const (
+	FileAccessDecisionUnknown                FileAccessDecision = "unknown"
+	FileAccessDecisionDenied                 FileAccessDecision = "denied"
+	FileAccessDecisionDeniedInvalidSignature FileAccessDecision = "denied_invalid_signature"
+	FileAccessDecisionAuditOnly              FileAccessDecision = "audit_only"
+)
+
+func (e *FileAccessDecision) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = FileAccessDecision(s)
+	case string:
+		*e = FileAccessDecision(s)
+	default:
+		return fmt.Errorf("unsupported scan type for FileAccessDecision: %T", src)
+	}
+	return nil
+}
+
+type NullFileAccessDecision struct {
+	FileAccessDecision FileAccessDecision
+	Valid              bool // Valid is true if FileAccessDecision is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFileAccessDecision) Scan(value interface{}) error {
+	if value == nil {
+		ns.FileAccessDecision, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.FileAccessDecision.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFileAccessDecision) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.FileAccessDecision), nil
+}
+
+type MembershipMemberKind string
+
+const (
+	MembershipMemberKindUser    MembershipMemberKind = "user"
+	MembershipMemberKindMachine MembershipMemberKind = "machine"
+)
+
+func (e *MembershipMemberKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MembershipMemberKind(s)
+	case string:
+		*e = MembershipMemberKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MembershipMemberKind: %T", src)
+	}
+	return nil
+}
+
+type NullMembershipMemberKind struct {
+	MembershipMemberKind MembershipMemberKind
+	Valid                bool // Valid is true if MembershipMemberKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMembershipMemberKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.MembershipMemberKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MembershipMemberKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMembershipMemberKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MembershipMemberKind), nil
+}
+
+type MembershipOrigin string
+
+const (
+	MembershipOriginExplicit MembershipOrigin = "explicit"
+	MembershipOriginSynced   MembershipOrigin = "synced"
+)
+
+func (e *MembershipOrigin) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MembershipOrigin(s)
+	case string:
+		*e = MembershipOrigin(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MembershipOrigin: %T", src)
+	}
+	return nil
+}
+
+type NullMembershipOrigin struct {
+	MembershipOrigin MembershipOrigin
+	Valid            bool // Valid is true if MembershipOrigin is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMembershipOrigin) Scan(value interface{}) error {
+	if value == nil {
+		ns.MembershipOrigin, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MembershipOrigin.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMembershipOrigin) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MembershipOrigin), nil
+}
+
+type PrincipalSource string
+
+const (
+	PrincipalSourceLocal PrincipalSource = "local"
+	PrincipalSourceEntra PrincipalSource = "entra"
+)
+
+func (e *PrincipalSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PrincipalSource(s)
+	case string:
+		*e = PrincipalSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PrincipalSource: %T", src)
+	}
+	return nil
+}
+
+type NullPrincipalSource struct {
+	PrincipalSource PrincipalSource
+	Valid           bool // Valid is true if PrincipalSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPrincipalSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.PrincipalSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PrincipalSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPrincipalSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PrincipalSource), nil
+}
+
+type RulePolicy string
+
+const (
+	RulePolicyAllowlist       RulePolicy = "allowlist"
+	RulePolicyBlocklist       RulePolicy = "blocklist"
+	RulePolicySilentBlocklist RulePolicy = "silent_blocklist"
+	RulePolicyCel             RulePolicy = "cel"
+)
+
+func (e *RulePolicy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RulePolicy(s)
+	case string:
+		*e = RulePolicy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RulePolicy: %T", src)
+	}
+	return nil
+}
+
+type NullRulePolicy struct {
+	RulePolicy RulePolicy
+	Valid      bool // Valid is true if RulePolicy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRulePolicy) Scan(value interface{}) error {
+	if value == nil {
+		ns.RulePolicy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RulePolicy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRulePolicy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RulePolicy), nil
+}
+
+type RuleTargetAssignment string
+
+const (
+	RuleTargetAssignmentInclude RuleTargetAssignment = "include"
+	RuleTargetAssignmentExclude RuleTargetAssignment = "exclude"
+)
+
+func (e *RuleTargetAssignment) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RuleTargetAssignment(s)
+	case string:
+		*e = RuleTargetAssignment(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RuleTargetAssignment: %T", src)
+	}
+	return nil
+}
+
+type NullRuleTargetAssignment struct {
+	RuleTargetAssignment RuleTargetAssignment
+	Valid                bool // Valid is true if RuleTargetAssignment is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRuleTargetAssignment) Scan(value interface{}) error {
+	if value == nil {
+		ns.RuleTargetAssignment, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RuleTargetAssignment.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRuleTargetAssignment) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RuleTargetAssignment), nil
+}
+
+type RuleTargetSubjectKind string
+
+const (
+	RuleTargetSubjectKindGroup      RuleTargetSubjectKind = "group"
+	RuleTargetSubjectKindAllDevices RuleTargetSubjectKind = "all_devices"
+	RuleTargetSubjectKindAllUsers   RuleTargetSubjectKind = "all_users"
+)
+
+func (e *RuleTargetSubjectKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RuleTargetSubjectKind(s)
+	case string:
+		*e = RuleTargetSubjectKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RuleTargetSubjectKind: %T", src)
+	}
+	return nil
+}
+
+type NullRuleTargetSubjectKind struct {
+	RuleTargetSubjectKind RuleTargetSubjectKind
+	Valid                 bool // Valid is true if RuleTargetSubjectKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRuleTargetSubjectKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.RuleTargetSubjectKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RuleTargetSubjectKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRuleTargetSubjectKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RuleTargetSubjectKind), nil
+}
+
+type RuleType string
+
+const (
+	RuleTypeBinary      RuleType = "binary"
+	RuleTypeCertificate RuleType = "certificate"
+	RuleTypeTeamID      RuleType = "team_id"
+	RuleTypeSigningID   RuleType = "signing_id"
+	RuleTypeCdHash      RuleType = "cd_hash"
+)
+
+func (e *RuleType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RuleType(s)
+	case string:
+		*e = RuleType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RuleType: %T", src)
+	}
+	return nil
+}
+
+type NullRuleType struct {
+	RuleType RuleType
+	Valid    bool // Valid is true if RuleType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRuleType) Scan(value interface{}) error {
+	if value == nil {
+		ns.RuleType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RuleType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRuleType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RuleType), nil
+}
+
+type SantaClientMode string
+
+const (
+	SantaClientModeUnknown    SantaClientMode = "unknown"
+	SantaClientModeMonitor    SantaClientMode = "monitor"
+	SantaClientModeLockdown   SantaClientMode = "lockdown"
+	SantaClientModeStandalone SantaClientMode = "standalone"
+)
+
+func (e *SantaClientMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SantaClientMode(s)
+	case string:
+		*e = SantaClientMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SantaClientMode: %T", src)
+	}
+	return nil
+}
+
+type NullSantaClientMode struct {
+	SantaClientMode SantaClientMode
+	Valid           bool // Valid is true if SantaClientMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSantaClientMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.SantaClientMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SantaClientMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSantaClientMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SantaClientMode), nil
+}
 
 type Executable struct {
 	ID             uuid.UUID
@@ -29,7 +475,7 @@ type ExecutionEvent struct {
 	ID              uuid.UUID
 	MachineID       uuid.UUID
 	ExecutableID    uuid.UUID
-	Decision        string
+	Decision        ExecutionDecision
 	FilePath        string
 	ExecutingUser   string
 	LoggedInUsers   []string
@@ -44,7 +490,7 @@ type FileAccessEvent struct {
 	RuleVersion  string
 	RuleName     string
 	Target       string
-	Decision     string
+	Decision     FileAccessDecision
 	ProcessChain []byte
 	OccurredAt   *time.Time
 	CreatedAt    time.Time
@@ -54,24 +500,43 @@ type Group struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Source      string
+	Source      PrincipalSource
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
+type GroupMachineMembership struct {
+	ID        uuid.UUID
+	GroupID   uuid.UUID
+	MachineID uuid.UUID
+	Origin    MembershipOrigin
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type GroupUserMembership struct {
+	ID        uuid.UUID
+	GroupID   uuid.UUID
+	UserID    uuid.UUID
+	Origin    MembershipOrigin
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Machine struct {
-	MachineID            uuid.UUID
-	SerialNumber         string
-	Hostname             string
-	ModelIdentifier      string
-	OsVersion            string
-	OsBuild              string
-	SantaVersion         string
-	PrimaryUser          string
-	PrimaryUserGroupsRaw []byte
-	LastSeenAt           time.Time
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                uuid.UUID
+	SerialNumber      string
+	Hostname          string
+	ModelIdentifier   string
+	OsVersion         string
+	OsBuild           string
+	SantaVersion      string
+	PrimaryUser       string
+	PrimaryUserGroups []string
+	ClientMode        SantaClientMode
+	LastSeenAt        time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type MachineSyncState struct {
@@ -79,40 +544,37 @@ type MachineSyncState struct {
 	RulesHash                   string
 	AppliedTargets              []byte
 	PendingTargets              []byte
+	PendingPayload              []byte
+	DesiredTargets              []byte
 	PendingPayloadRuleCount     int64
-	PendingPreflightAt          *time.Time
-	LastRuleSyncSuccessAt       *time.Time
-	CreatedAt                   time.Time
-	UpdatedAt                   time.Time
 	PendingFullSync             bool
-	ClientMode                  string
+	PendingPreflightAt          *time.Time
+	DesiredBinaryRuleCount      int32
+	DesiredCertificateRuleCount int32
+	DesiredTeamIDRuleCount      int32
+	DesiredSigningIDRuleCount   int32
+	DesiredCDHashRuleCount      int32
 	BinaryRuleCount             int32
 	CertificateRuleCount        int32
-	CompilerRuleCount           int32
-	TransitiveRuleCount         int32
 	TeamIDRuleCount             int32
 	SigningIDRuleCount          int32
 	CDHashRuleCount             int32
 	RulesReceived               int32
 	RulesProcessed              int32
 	LastRuleSyncAttemptAt       *time.Time
-	PendingPayload              []byte
-	DesiredTargets              []byte
-	DesiredBinaryRuleCount      int32
-	DesiredCertificateRuleCount int32
-	DesiredTeamIDRuleCount      int32
-	DesiredSigningIDRuleCount   int32
-	DesiredCDHashRuleCount      int32
+	LastRuleSyncSuccessAt       *time.Time
 	LastCleanSyncAt             *time.Time
 	LastReportedCountsMatchAt   *time.Time
+	CreatedAt                   time.Time
+	UpdatedAt                   time.Time
 }
 
 type Membership struct {
 	ID         uuid.UUID
 	GroupID    uuid.UUID
-	MemberKind string
+	MemberKind MembershipMemberKind
 	MemberID   uuid.UUID
-	Origin     string
+	Origin     MembershipOrigin
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }
@@ -121,7 +583,7 @@ type Rule struct {
 	ID            uuid.UUID
 	Name          string
 	Description   string
-	RuleType      string
+	RuleType      RuleType
 	Identifier    string
 	CustomMessage string
 	CustomURL     string
@@ -133,19 +595,21 @@ type Rule struct {
 type RuleTarget struct {
 	ID            uuid.UUID
 	RuleID        uuid.UUID
-	SubjectKind   string
+	SubjectKind   RuleTargetSubjectKind
 	SubjectID     *uuid.UUID
-	Assignment    string
+	Assignment    RuleTargetAssignment
 	Priority      pgtype.Int4
-	Policy        pgtype.Text
+	Policy        NullRulePolicy
 	CelExpression string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type User struct {
 	ID          uuid.UUID
 	Upn         string
 	DisplayName string
-	Source      string
+	Source      PrincipalSource
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

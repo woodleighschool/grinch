@@ -15,21 +15,22 @@ import (
 
 const deleteGroup = `-- name: DeleteGroup :one
 WITH matched AS (
-  SELECT source
-  FROM groups
-  WHERE groups.id = $1
+  SELECT g.source
+  FROM groups AS g
+  WHERE g.id = $1
 ),
 deleted AS (
-  DELETE FROM groups
-  WHERE groups.id = $1
-    AND groups.source = 'local'
+  DELETE FROM groups AS g
+  WHERE g.id = $1
+    AND g.source = 'local'
   RETURNING 1
 )
-SELECT CASE
-  WHEN EXISTS (SELECT 1 FROM deleted) THEN 'deleted'
-  WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
-  ELSE 'not_found'
-END AS status
+SELECT
+  CASE
+    WHEN EXISTS (SELECT 1 FROM deleted) THEN 'deleted'
+    WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
+    ELSE 'not_found'
+  END AS status
 `
 
 func (q *Queries) DeleteGroup(ctx context.Context, id uuid.UUID) (string, error) {
@@ -45,16 +46,14 @@ SELECT
   g.name,
   g.description,
   g.source,
-  COALESCE(member_counts.member_count, 0)::INT4 AS member_count,
+  (
+    SELECT COUNT(*)::INT4
+    FROM group_memberships AS gm
+    WHERE gm.group_id = g.id
+  ) AS member_count,
   g.created_at,
   g.updated_at
 FROM groups AS g
-LEFT JOIN (
-  SELECT group_id, COUNT(*)::INT4 AS member_count
-  FROM group_memberships
-  GROUP BY group_id
-) AS member_counts
-  ON member_counts.group_id = g.id
 WHERE g.id = $1
 `
 
@@ -62,7 +61,7 @@ type GetGroupRow struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Source      string
+	Source      PrincipalSource
 	MemberCount int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -93,17 +92,17 @@ SELECT
   updated_at
 FROM groups
 ORDER BY name ASC, id ASC
-LIMIT $1
-OFFSET $2
+LIMIT $2
+OFFSET $1
 `
 
 type ListGroupsParams struct {
-	Limit  int32
-	Offset int32
+	OffsetCount int32
+	LimitCount  int32
 }
 
 func (q *Queries) ListGroups(ctx context.Context, arg ListGroupsParams) ([]Group, error) {
-	rows, err := q.db.Query(ctx, listGroups, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listGroups, arg.OffsetCount, arg.LimitCount)
 	if err != nil {
 		return nil, err
 	}
@@ -131,30 +130,30 @@ func (q *Queries) ListGroups(ctx context.Context, arg ListGroupsParams) ([]Group
 
 const updateGroup = `-- name: UpdateGroup :one
 WITH matched AS (
-  SELECT source
-  FROM groups
-  WHERE groups.id = $1
+  SELECT g.source
+  FROM groups AS g
+  WHERE g.id = $1
 ),
 updated AS (
-  UPDATE groups
+  UPDATE groups AS g
   SET
     name = $2,
     description = $3,
     updated_at = NOW()
-  WHERE groups.id = $1
-    AND groups.source = 'local'
+  WHERE g.id = $1
+    AND g.source = 'local'
   RETURNING
-    id,
-    name,
-    description,
-    source,
+    g.id,
+    g.name,
+    g.description,
+    g.source,
     (
       SELECT COUNT(*)::INT4
-      FROM group_memberships
-      WHERE group_id = groups.id
+      FROM group_memberships AS gm
+      WHERE gm.group_id = g.id
     ) AS member_count,
-    created_at,
-    updated_at
+    g.created_at,
+    g.updated_at
 )
 SELECT
   CASE
@@ -162,15 +161,16 @@ SELECT
     WHEN EXISTS (SELECT 1 FROM matched WHERE source <> 'local') THEN 'read_only'
     ELSE 'not_found'
   END AS status,
-  updated.id,
-  updated.name,
-  updated.description,
-  updated.source,
-  COALESCE(updated.member_count, 0)::INT4 AS member_count,
-  updated.created_at,
-  updated.updated_at
-FROM (SELECT 1) AS marker
-LEFT JOIN updated ON TRUE
+  u.id,
+  u.name,
+  u.description,
+  u.source,
+  COALESCE(u.member_count, 0)::INT4 AS member_count,
+  u.created_at,
+  u.updated_at
+FROM (VALUES (1)) AS marker(dummy)
+LEFT JOIN updated AS u
+  ON TRUE
 `
 
 type UpdateGroupParams struct {
@@ -184,7 +184,7 @@ type UpdateGroupRow struct {
 	ID          *uuid.UUID
 	Name        pgtype.Text
 	Description pgtype.Text
-	Source      pgtype.Text
+	Source      NullPrincipalSource
 	MemberCount int32
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
@@ -219,7 +219,8 @@ VALUES (
   $3,
   $4
 )
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE
+SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
   source = EXCLUDED.source,
@@ -238,14 +239,14 @@ type UpsertGroupParams struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Source      string
+	Source      PrincipalSource
 }
 
 type UpsertGroupRow struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Source      string
+	Source      PrincipalSource
 	MemberCount int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

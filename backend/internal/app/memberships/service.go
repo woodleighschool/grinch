@@ -16,10 +16,7 @@ type CreateInput struct {
 }
 
 type Store interface {
-	ListMemberships(
-		context.Context,
-		domain.MembershipListOptions,
-	) ([]domain.MembershipListItem, int32, error)
+	ListMemberships(context.Context, domain.MembershipListOptions) ([]domain.Membership, int32, error)
 	GetMembership(context.Context, uuid.UUID) (domain.Membership, error)
 	CreateMembership(
 		context.Context,
@@ -28,10 +25,10 @@ type Store interface {
 		uuid.UUID,
 		domain.MembershipOrigin,
 	) (domain.Membership, error)
-	DeleteMembership(context.Context, uuid.UUID) error
+	DeleteMembership(context.Context, uuid.UUID, domain.MemberKind) error
 	GetGroup(context.Context, uuid.UUID) (domain.Group, error)
-	SyncMachineDesiredRuleTargets(context.Context, uuid.UUID) error
-	SyncMachineDesiredRuleTargetsByPrimaryUserID(context.Context, uuid.UUID) error
+	UpdateMachineDesiredTargets(context.Context, uuid.UUID) error
+	UpdateMachineDesiredTargetsByPrimaryUserID(context.Context, uuid.UUID) error
 }
 
 type Service struct {
@@ -42,19 +39,19 @@ func New(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (service *Service) ListMemberships(
+func (s *Service) ListMemberships(
 	ctx context.Context,
-	options domain.MembershipListOptions,
-) ([]domain.MembershipListItem, int32, error) {
-	return service.store.ListMemberships(ctx, options)
+	opts domain.MembershipListOptions,
+) ([]domain.Membership, int32, error) {
+	return s.store.ListMemberships(ctx, opts)
 }
 
-func (service *Service) GetMembership(ctx context.Context, id uuid.UUID) (domain.Membership, error) {
-	return service.store.GetMembership(ctx, id)
+func (s *Service) GetMembership(ctx context.Context, id uuid.UUID) (domain.Membership, error) {
+	return s.store.GetMembership(ctx, id)
 }
 
-func (service *Service) CreateMembership(ctx context.Context, input CreateInput) (domain.Membership, error) {
-	group, err := service.store.GetGroup(ctx, input.GroupID)
+func (s *Service) CreateMembership(ctx context.Context, input CreateInput) (domain.Membership, error) {
+	group, err := s.store.GetGroup(ctx, input.GroupID)
 	if err != nil {
 		return domain.Membership{}, err
 	}
@@ -77,7 +74,7 @@ func (service *Service) CreateMembership(ctx context.Context, input CreateInput)
 		return domain.Membership{}, validationErr
 	}
 
-	membership, err := service.store.CreateMembership(
+	membership, err := s.store.CreateMembership(
 		ctx,
 		input.GroupID,
 		input.MemberKind,
@@ -87,16 +84,16 @@ func (service *Service) CreateMembership(ctx context.Context, input CreateInput)
 	if err != nil {
 		return domain.Membership{}, err
 	}
-	syncErr := syncMembershipMachineRuleTargets(ctx, service.store, input.MemberKind, input.MemberID)
-	if syncErr != nil {
-		return domain.Membership{}, syncErr
+
+	if err = syncMembershipMachineRuleTargets(ctx, s.store, input.MemberKind, input.MemberID); err != nil {
+		return domain.Membership{}, err
 	}
 
 	return membership, nil
 }
 
-func (service *Service) DeleteMembership(ctx context.Context, id uuid.UUID) error {
-	membership, err := service.store.GetMembership(ctx, id)
+func (s *Service) DeleteMembership(ctx context.Context, id uuid.UUID) error {
+	membership, err := s.store.GetMembership(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -105,12 +102,11 @@ func (service *Service) DeleteMembership(ctx context.Context, id uuid.UUID) erro
 		return domain.ErrGroupReadOnly
 	}
 
-	deleteErr := service.store.DeleteMembership(ctx, id)
-	if deleteErr != nil {
-		return deleteErr
+	if err = s.store.DeleteMembership(ctx, id, membership.Member.Kind); err != nil {
+		return err
 	}
 
-	return syncMembershipMachineRuleTargets(ctx, service.store, membership.Member.Kind, membership.Member.ID)
+	return syncMembershipMachineRuleTargets(ctx, s.store, membership.Member.Kind, membership.Member.ID)
 }
 
 func syncMembershipMachineRuleTargets(
@@ -121,9 +117,9 @@ func syncMembershipMachineRuleTargets(
 ) error {
 	switch memberKind {
 	case domain.MemberKindMachine:
-		return store.SyncMachineDesiredRuleTargets(ctx, memberID)
+		return store.UpdateMachineDesiredTargets(ctx, memberID)
 	case domain.MemberKindUser:
-		return store.SyncMachineDesiredRuleTargetsByPrimaryUserID(ctx, memberID)
+		return store.UpdateMachineDesiredTargetsByPrimaryUserID(ctx, memberID)
 	default:
 		return fmt.Errorf("unsupported member kind %q", memberKind)
 	}

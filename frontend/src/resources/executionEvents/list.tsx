@@ -1,11 +1,11 @@
-import { EVENT_DECISION_CHOICES } from "@/resources/executionEvents/choices";
-import { EventDecisionField } from "@/resources/shared/decisionField";
+import { EXECUTION_DECISION_CHOICES } from "@/resources/executionEvents/choices";
+import { ExecutionDecisionField } from "@/resources/shared/decisionField";
 import type { ReactElement } from "react";
 import { DataTable, DateField, List, ReferenceField, SearchInput, SelectArrayInput, TextField } from "react-admin";
 
 const executionEventFilters = [
   <SearchInput key="search" source="search" alwaysOn />,
-  <SelectArrayInput key="decision" source="decision" label="Decision" choices={EVENT_DECISION_CHOICES} />,
+  <SelectArrayInput key="decision" source="decision" label="Decision" choices={EXECUTION_DECISION_CHOICES} />,
 ];
 
 export const ExecutionEventList = (): ReactElement => (
@@ -15,7 +15,7 @@ export const ExecutionEventList = (): ReactElement => (
         <DateField source="occurred_at" showTime />
       </DataTable.Col>
       <DataTable.Col source="decision" label="Decision">
-        <EventDecisionField />
+        <ExecutionDecisionField />
       </DataTable.Col>
       <DataTable.Col label="Machine">
         <ReferenceField source="machine_id" reference="machines">

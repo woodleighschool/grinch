@@ -11,13 +11,39 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const bulkUpsertSyncedUserMemberships = `-- name: BulkUpsertSyncedUserMemberships :exec
+INSERT INTO group_user_memberships (
+  group_id,
+  user_id,
+  origin
+)
+SELECT
+  UNNEST($1::UUID[]),
+  UNNEST($2::UUID[]),
+  'synced'
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+  origin = 'synced',
+  updated_at = NOW()
+`
+
+type BulkUpsertSyncedUserMembershipsParams struct {
+	GroupIds []uuid.UUID
+	UserIds  []uuid.UUID
+}
+
+func (q *Queries) BulkUpsertSyncedUserMemberships(ctx context.Context, arg BulkUpsertSyncedUserMembershipsParams) error {
+	_, err := q.db.Exec(ctx, bulkUpsertSyncedUserMemberships, arg.GroupIds, arg.UserIds)
+	return err
+}
+
 const convertMissingEntraGroupsToLocal = `-- name: ConvertMissingEntraGroupsToLocal :exec
 UPDATE groups
 SET
   source = 'local',
   updated_at = NOW()
 WHERE source = 'entra'
-  AND NOT (id = ANY($1::UUID[]))
+  AND id <> ALL($1::UUID[])
 `
 
 func (q *Queries) ConvertMissingEntraGroupsToLocal(ctx context.Context, groupIds []uuid.UUID) error {
@@ -31,7 +57,7 @@ SET
   source = 'local',
   updated_at = NOW()
 WHERE source = 'entra'
-  AND NOT (id = ANY($1::UUID[]))
+  AND id <> ALL($1::UUID[])
 `
 
 func (q *Queries) ConvertMissingEntraUsersToLocal(ctx context.Context, userIds []uuid.UUID) error {
@@ -40,11 +66,10 @@ func (q *Queries) ConvertMissingEntraUsersToLocal(ctx context.Context, userIds [
 }
 
 const deleteUserMembersForEntraGroups = `-- name: DeleteUserMembersForEntraGroups :exec
-DELETE FROM group_memberships AS gm
+DELETE FROM group_user_memberships AS gum
 USING groups AS g
-WHERE gm.group_id = g.id
+WHERE g.id = gum.group_id
   AND g.source = 'entra'
-  AND gm.member_kind = 'user'
 `
 
 func (q *Queries) DeleteUserMembersForEntraGroups(ctx context.Context) error {

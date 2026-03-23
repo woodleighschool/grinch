@@ -1,5 +1,5 @@
 import { EditableShowActions } from "@/resources/shared/actions";
-import { EventDecisionField } from "@/resources/shared/decisionField";
+import { ExecutionDecisionField } from "@/resources/shared/decisionField";
 import { ExecutableEntitlementsArrayField, SigningChainArrayField } from "@/resources/shared/executableFields";
 import type { ReactElement } from "react";
 import { DateField, Labeled, ReferenceField, Show, TabbedShowLayout, TextArrayField, TextField } from "react-admin";
@@ -15,7 +15,7 @@ export const ExecutionEventShow = (): ReactElement => (
           <TextField source="file_name" />
         </ReferenceField>
         <Labeled label="Decision">
-          <EventDecisionField />
+          <ExecutionDecisionField />
         </Labeled>
         <TextField source="executing_user" label="Executing User" />
         <DateField source="occurred_at" label="Occurred At" showTime />

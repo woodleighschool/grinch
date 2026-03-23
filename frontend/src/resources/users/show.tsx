@@ -1,9 +1,6 @@
 import { ShowActions } from "@/resources/shared/actions";
-import { EventDecisionField } from "@/resources/shared/decisionField";
-import {
-  MembershipGroupLinkField,
-  MembershipGroupSourceField,
-} from "@/resources/shared/membershipFields";
+import { ExecutionDecisionField } from "@/resources/shared/decisionField";
+import { MembershipGroupLinkField, MembershipGroupSourceField } from "@/resources/shared/membershipFields";
 import type { ReactElement } from "react";
 import {
   DataTable,
@@ -63,7 +60,7 @@ export const UserShow = (): ReactElement => (
             </DataTable.Col>
             <DataTable.Col source="file_name" label="File Name" />
             <DataTable.Col source="decision" label="Decision">
-              <EventDecisionField />
+              <ExecutionDecisionField />
             </DataTable.Col>
           </DataTable>
         </ReferenceManyField>

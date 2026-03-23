@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	appgroups "github.com/woodleighschool/grinch/internal/app/groups"
-	"github.com/woodleighschool/grinch/internal/domain"
 )
 
 type groupWriteRequestBody struct {
@@ -26,9 +25,7 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	items, total, err := handler.groups.ListGroups(request.Context(), domain.GroupListOptions{
-		ListOptions: listOptions,
-	})
+	items, total, err := handler.groups.ListGroups(request.Context(), listOptions)
 	if err != nil {
 		writeClassifiedError(writer, err, apiErrorOptions{})
 		return

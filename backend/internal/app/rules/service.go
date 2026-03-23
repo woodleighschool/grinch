@@ -3,16 +3,11 @@ package rules
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/woodleighschool/grinch/internal/domain"
 )
-
-type Service struct {
-	store Store
-}
 
 type Store interface {
 	ListRules(context.Context, domain.RuleListOptions) ([]domain.RuleSummary, int32, error)
@@ -21,93 +16,72 @@ type Store interface {
 	UpdateRule(context.Context, uuid.UUID, domain.RuleWriteInput) (domain.Rule, error)
 	DeleteRule(context.Context, uuid.UUID) error
 	ListResolvedMachineRules(context.Context, uuid.UUID) ([]domain.MachineResolvedRule, error)
-	SyncAllMachineDesiredRuleTargets(context.Context) error
+	UpdateAllMachineDesiredTargets(context.Context) error
+}
+
+type Service struct {
+	store Store
 }
 
 func New(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (service *Service) ListRules(
-	ctx context.Context,
-	options domain.RuleListOptions,
-) ([]domain.RuleSummary, int32, error) {
-	return service.store.ListRules(ctx, options)
+func (s *Service) ListRules(ctx context.Context, opts domain.RuleListOptions) ([]domain.RuleSummary, int32, error) {
+	return s.store.ListRules(ctx, opts)
 }
 
-func (service *Service) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
-	return service.store.GetRule(ctx, id)
+func (s *Service) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) {
+	return s.store.GetRule(ctx, id)
 }
 
-func (service *Service) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
-	normalized := normalizeInput(input)
-	if validationErr := validateInput(normalized); validationErr != nil {
-		return domain.Rule{}, validationErr
+func (s *Service) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
+	if err := validateInput(input); err != nil {
+		return domain.Rule{}, err
 	}
 
-	rule, err := service.store.CreateRule(ctx, normalized)
+	rule, err := s.store.CreateRule(ctx, input)
 	if err != nil {
 		return domain.Rule{}, err
 	}
-	syncErr := service.store.SyncAllMachineDesiredRuleTargets(ctx)
-	if syncErr != nil {
-		return domain.Rule{}, syncErr
+
+	if err = s.store.UpdateAllMachineDesiredTargets(ctx); err != nil {
+		return domain.Rule{}, err
 	}
 
 	return rule, nil
 }
 
-func (service *Service) UpdateRule(
-	ctx context.Context,
-	id uuid.UUID,
-	input domain.RuleWriteInput,
-) (domain.Rule, error) {
-	normalized := normalizeInput(input)
-	if validationErr := validateInput(normalized); validationErr != nil {
-		return domain.Rule{}, validationErr
+func (s *Service) UpdateRule(ctx context.Context, id uuid.UUID, input domain.RuleWriteInput) (domain.Rule, error) {
+	if err := validateInput(input); err != nil {
+		return domain.Rule{}, err
 	}
 
-	rule, err := service.store.UpdateRule(ctx, id, normalized)
+	rule, err := s.store.UpdateRule(ctx, id, input)
 	if err != nil {
 		return domain.Rule{}, err
 	}
-	syncErr := service.store.SyncAllMachineDesiredRuleTargets(ctx)
-	if syncErr != nil {
-		return domain.Rule{}, syncErr
+
+	if err = s.store.UpdateAllMachineDesiredTargets(ctx); err != nil {
+		return domain.Rule{}, err
 	}
 
 	return rule, nil
 }
 
-func (service *Service) DeleteRule(ctx context.Context, id uuid.UUID) error {
-	if err := service.store.DeleteRule(ctx, id); err != nil {
+func (s *Service) DeleteRule(ctx context.Context, id uuid.UUID) error {
+	if err := s.store.DeleteRule(ctx, id); err != nil {
 		return err
 	}
 
-	return service.store.SyncAllMachineDesiredRuleTargets(ctx)
+	return s.store.UpdateAllMachineDesiredTargets(ctx)
 }
 
-func (service *Service) ResolveMachineRuleTargets(
+func (s *Service) ResolveMachineRuleTargets(
 	ctx context.Context,
 	machineID uuid.UUID,
 ) ([]domain.MachineResolvedRule, error) {
-	return service.store.ListResolvedMachineRules(ctx, machineID)
-}
-
-func normalizeInput(input domain.RuleWriteInput) domain.RuleWriteInput {
-	input.Name = strings.TrimSpace(input.Name)
-	input.Description = strings.TrimSpace(input.Description)
-	input.Identifier = strings.TrimSpace(input.Identifier)
-	input.CustomMessage = strings.TrimSpace(input.CustomMessage)
-	input.CustomURL = strings.TrimSpace(input.CustomURL)
-	for index := range input.Targets.Include {
-		target := &input.Targets.Include[index]
-		target.CELExpression = strings.TrimSpace(target.CELExpression)
-		if target.Policy != domain.RulePolicyCEL {
-			target.CELExpression = ""
-		}
-	}
-	return input
+	return s.store.ListResolvedMachineRules(ctx, machineID)
 }
 
 func validateInput(input domain.RuleWriteInput) *domain.ValidationError {
