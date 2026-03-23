@@ -18,13 +18,13 @@ func (handler *Server) ListExecutables(
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	items, total, err := handler.store.ListExecutables(request.Context(), listOptions)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -37,7 +37,7 @@ func (handler *Server) ListExecutables(
 func (handler *Server) GetExecutable(writer http.ResponseWriter, request *http.Request, id Id) {
 	executable, err := handler.store.GetExecutable(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "executable not found"})
+		writeError(writer, err)
 		return
 	}
 

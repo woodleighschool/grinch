@@ -21,13 +21,13 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	items, total, err := handler.groups.ListGroups(request.Context(), listOptions)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Request) {
 	var body groupWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Req
 		Description: optionalString(body.Description),
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -59,7 +59,7 @@ func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Req
 func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Request, id Id) {
 	group, err := handler.groups.GetGroup(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -69,7 +69,7 @@ func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Reques
 func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Request, id Id) {
 	var body groupWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 		},
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 
 func (handler *Server) DeleteGroup(writer http.ResponseWriter, request *http.Request, id Id) {
 	if err := handler.groups.DeleteGroup(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group not found"})
+		writeError(writer, err)
 		return
 	}
 

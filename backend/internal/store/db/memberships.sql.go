@@ -27,8 +27,7 @@ VALUES (
 )
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
-  origin = 'synced',
-  updated_at = NOW()
+  origin = 'synced'
 `
 
 type AddSyncedUserMembershipParams struct {

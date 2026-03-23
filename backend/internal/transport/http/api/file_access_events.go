@@ -20,13 +20,13 @@ func (handler *Server) ListFileAccessEvents(
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	decisions, err := parseOptionalValues(params.Decision, domain.ParseFileAccessDecision)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (handler *Server) ListFileAccessEvents(
 		},
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (handler *Server) ListFileAccessEvents(
 func (handler *Server) GetFileAccessEvent(writer http.ResponseWriter, request *http.Request, id Id) {
 	event, err := handler.fileAccessEvents.GetFileAccessEvent(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "file access event not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (handler *Server) GetFileAccessEvent(writer http.ResponseWriter, request *h
 
 func (handler *Server) DeleteFileAccessEvent(writer http.ResponseWriter, request *http.Request, id Id) {
 	if err := handler.fileAccessEvents.DeleteFileAccessEvent(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "file access event not found"})
+		writeError(writer, err)
 		return
 	}
 

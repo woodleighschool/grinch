@@ -14,13 +14,13 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	items, total, err := handler.store.ListUsers(request.Context(), listOptions)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 func (handler *Server) GetUser(writer http.ResponseWriter, request *http.Request, id Id) {
 	user, err := handler.store.GetUser(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "user not found"})
+		writeError(writer, err)
 		return
 	}
 

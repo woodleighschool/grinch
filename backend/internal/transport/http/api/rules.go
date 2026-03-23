@@ -27,13 +27,13 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	ruleTypes, err := parseOptionalValues(params.RuleType, domain.ParseRuleType)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 		RuleTypes:   ruleTypes,
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Request) {
 	var body ruleWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Requ
 
 	rule, err := handler.rules.CreateRule(request.Context(), input)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Requ
 func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request, id Id) {
 	rule, err := handler.rules.GetRule(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "rule not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request
 func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Request, id Id) {
 	var body ruleWriteRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -92,9 +92,7 @@ func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Requ
 
 	updated, err := handler.rules.UpdateRule(request.Context(), id, input)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{
-			NotFoundMessage: "rule not found",
-		})
+		writeError(writer, err)
 		return
 	}
 
@@ -103,7 +101,7 @@ func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Requ
 
 func (handler *Server) DeleteRule(writer http.ResponseWriter, request *http.Request, id Id) {
 	if err := handler.rules.DeleteRule(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "rule not found"})
+		writeError(writer, err)
 		return
 	}
 

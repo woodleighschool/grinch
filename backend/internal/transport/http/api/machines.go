@@ -16,19 +16,19 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	ruleSyncStatuses, err := parseOptionalValues(params.RuleSyncStatus, domain.ParseMachineRuleSyncStatus)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	clientModes, err := parseOptionalValues(params.ClientMode, domain.ParseMachineClientMode)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 		ClientModes:      clientModes,
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 func (handler *Server) GetMachine(writer http.ResponseWriter, request *http.Request, id Id) {
 	machine, err := handler.store.GetMachine(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "machine not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (handler *Server) GetMachine(writer http.ResponseWriter, request *http.Requ
 
 func (handler *Server) DeleteMachine(writer http.ResponseWriter, request *http.Request, id Id) {
 	if err := handler.store.DeleteMachine(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "machine not found"})
+		writeError(writer, err)
 		return
 	}
 

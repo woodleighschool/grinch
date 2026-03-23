@@ -30,18 +30,6 @@ type Server struct {
 	rules            *apprules.Service
 }
 
-type problemSpec struct {
-	Type        string
-	Title       string
-	Code        string
-	Detail      string
-	FieldErrors []domain.FieldError
-}
-
-type apiErrorOptions struct {
-	NotFoundMessage string
-}
-
 type badRequestError string
 
 func New(
@@ -64,12 +52,7 @@ func (s *Server) RegisterRoutes(r chi.Router) {
 	_ = HandlerWithOptions(s, ChiServerOptions{
 		BaseRouter: r,
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
-			writeProblem(w, http.StatusBadRequest, problemSpec{
-				Type:   "urn:grinch:problem:invalid-request",
-				Title:  "Invalid request",
-				Code:   "invalid_request",
-				Detail: "Request parameters are invalid.",
-			})
+			w.WriteHeader(http.StatusBadRequest)
 		},
 	})
 }
@@ -179,73 +162,37 @@ func writeJSON(w http.ResponseWriter, statusCode int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func writeProblem(w http.ResponseWriter, statusCode int, spec problemSpec) {
-	problem := Problem{
-		Type:   spec.Type,
-		Title:  spec.Title,
-		Status: statusCode,
-		Detail: spec.Detail,
-		Code:   spec.Code,
+// writeValidationErrors writes a React Admin compatible validation error body.
+// Shape: {"errors": {"root": {"serverError": "..."}, "field": "message", ...}}.
+func writeValidationErrors(w http.ResponseWriter, root string, fields []domain.FieldError) {
+	errs := make(map[string]any, len(fields)+1)
+	if root != "" {
+		errs["root"] = map[string]string{"serverError": root}
 	}
-
-	if len(spec.FieldErrors) > 0 {
-		fieldErrors := make([]FieldError, 0, len(spec.FieldErrors))
-		for _, fieldErr := range spec.FieldErrors {
-			mapped := FieldError{
-				Field:   fieldErr.Field,
-				Message: fieldErr.Message,
-			}
-			if fieldErr.Code != "" {
-				code := fieldErr.Code
-				mapped.Code = &code
-			}
-			fieldErrors = append(fieldErrors, mapped)
-		}
-		problem.FieldErrors = &fieldErrors
+	for _, fe := range fields {
+		errs[fe.Field] = fe.Message
 	}
-
-	writeJSON(w, statusCode, problem)
+	writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"errors": errs})
 }
 
-func writeClassifiedError(w http.ResponseWriter, err error, opts apiErrorOptions) {
+func writeError(w http.ResponseWriter, err error) {
 	var validationErr *domain.ValidationError
 
 	switch {
-	case opts.NotFoundMessage != "" && isNotFound(err):
-		writeProblem(w, http.StatusNotFound, problemSpec{
-			Type:   "urn:grinch:problem:not-found",
-			Title:  "Not found",
-			Code:   "not_found",
-			Detail: opts.NotFoundMessage,
-		})
+	case isNotFound(err):
+		w.WriteHeader(http.StatusNotFound)
 		return
 
 	case errors.Is(err, domain.ErrGroupReadOnly):
-		writeProblem(w, http.StatusForbidden, problemSpec{
-			Type:   "urn:grinch:problem:forbidden",
-			Title:  "Forbidden",
-			Code:   "forbidden",
-			Detail: "Entra groups are read-only.",
-		})
+		w.WriteHeader(http.StatusForbidden)
 		return
 
 	case errors.Is(err, domain.ErrInvalidSort), isBadRequestError(err):
-		writeProblem(w, http.StatusBadRequest, problemSpec{
-			Type:   "urn:grinch:problem:invalid-request",
-			Title:  "Invalid request",
-			Code:   "invalid_request",
-			Detail: err.Error(),
-		})
+		w.WriteHeader(http.StatusBadRequest)
 		return
 
 	case errors.As(err, &validationErr):
-		writeProblem(w, http.StatusUnprocessableEntity, problemSpec{
-			Type:        "urn:grinch:problem:validation-error",
-			Title:       "Validation failed",
-			Code:        validationErr.Code,
-			Detail:      validationErr.Detail,
-			FieldErrors: validationErr.FieldErrors,
-		})
+		writeValidationErrors(w, validationErr.Detail, validationErr.FieldErrors)
 		return
 	}
 
@@ -253,31 +200,16 @@ func writeClassifiedError(w http.ResponseWriter, err error, opts apiErrorOptions
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case pgerrcode.UniqueViolation:
-			writeProblem(w, http.StatusConflict, problemSpec{
-				Type:   "urn:grinch:problem:conflict",
-				Title:  "Conflict",
-				Code:   "conflict",
-				Detail: "Resource already exists.",
-			})
+			writeValidationErrors(w, "Resource already exists.", nil)
 			return
 
 		case pgerrcode.ForeignKeyViolation:
-			writeProblem(w, http.StatusUnprocessableEntity, problemSpec{
-				Type:   "urn:grinch:problem:validation-error",
-				Title:  "Validation failed",
-				Code:   "validation_error",
-				Detail: "Referenced resource does not exist.",
-			})
+			writeValidationErrors(w, "Referenced resource does not exist.", nil)
 			return
 		}
 	}
 
-	writeProblem(w, http.StatusInternalServerError, problemSpec{
-		Type:   "urn:grinch:problem:internal-error",
-		Title:  "Internal server error",
-		Code:   "internal_error",
-		Detail: "An internal server error occurred.",
-	})
+	w.WriteHeader(http.StatusInternalServerError)
 }
 
 func isNotFound(err error) bool {

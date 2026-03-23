@@ -246,13 +246,6 @@ type ExecutionEventListResponse struct {
 // ExecutionEventSummary defines model for ExecutionEventSummary.
 type ExecutionEventSummary = domain.ExecutionEventSummary
 
-// FieldError defines model for FieldError.
-type FieldError struct {
-	Code    *string `json:"code,omitempty"`
-	Field   string  `json:"field"`
-	Message string  `json:"message"`
-}
-
 // FileAccessDecision defines model for FileAccessDecision.
 type FileAccessDecision = domain.FileAccessDecision
 
@@ -340,16 +333,6 @@ type MembershipListResponse struct {
 
 // MembershipMember defines model for MembershipMember.
 type MembershipMember = domain.MembershipMember
-
-// Problem defines model for Problem.
-type Problem struct {
-	Code        string        `json:"code"`
-	Detail      string        `json:"detail"`
-	FieldErrors *[]FieldError `json:"field_errors,omitempty"`
-	Status      int           `json:"status"`
-	Title       string        `json:"title"`
-	Type        string        `json:"type"`
-}
 
 // Rule defines model for Rule.
 type Rule = domain.RuleSummary
@@ -481,9 +464,6 @@ type SubjectKindFilter = RuleTargetSubjectKind
 
 // UserIdFilter defines model for UserIdFilter.
 type UserIdFilter = openapi_types.UUID
-
-// NotFound defines model for NotFound.
-type NotFound = Problem
 
 // ListExecutablesParams defines parameters for ListExecutables.
 type ListExecutablesParams struct {

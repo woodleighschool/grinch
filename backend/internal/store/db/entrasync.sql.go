@@ -23,8 +23,7 @@ SELECT
   'synced'
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
-  origin = 'synced',
-  updated_at = NOW()
+  origin = 'synced'
 `
 
 type BulkUpsertSyncedUserMembershipsParams struct {
@@ -40,8 +39,7 @@ func (q *Queries) BulkUpsertSyncedUserMemberships(ctx context.Context, arg BulkU
 const convertMissingEntraGroupsToLocal = `-- name: ConvertMissingEntraGroupsToLocal :exec
 UPDATE groups
 SET
-  source = 'local',
-  updated_at = NOW()
+  source = 'local'
 WHERE source = 'entra'
   AND id <> ALL($1::UUID[])
 `
@@ -54,8 +52,7 @@ func (q *Queries) ConvertMissingEntraGroupsToLocal(ctx context.Context, groupIds
 const convertMissingEntraUsersToLocal = `-- name: ConvertMissingEntraUsersToLocal :exec
 UPDATE users
 SET
-  source = 'local',
-  updated_at = NOW()
+  source = 'local'
 WHERE source = 'entra'
   AND id <> ALL($1::UUID[])
 `

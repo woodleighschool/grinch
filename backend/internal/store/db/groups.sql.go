@@ -138,8 +138,7 @@ updated AS (
   UPDATE groups AS g
   SET
     name = $2,
-    description = $3,
-    updated_at = NOW()
+    description = $3
   WHERE g.id = $1
     AND g.source = 'local'
   RETURNING
@@ -223,8 +222,7 @@ ON CONFLICT (id) DO UPDATE
 SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
-  source = EXCLUDED.source,
-  updated_at = NOW()
+  source = EXCLUDED.source
 RETURNING
   id,
   name,

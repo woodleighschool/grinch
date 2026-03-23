@@ -119,8 +119,7 @@ SET
   last_clean_sync_at = CASE
     WHEN pending_full_sync THEN $1
     ELSE last_clean_sync_at
-  END,
-  updated_at = NOW()
+  END
 WHERE machine_id = $2
 `
 
@@ -143,8 +142,7 @@ SET
   rules_hash = $1,
   rules_received = $2,
   rules_processed = $3,
-  last_rule_sync_attempt_at = $4,
-  updated_at = NOW()
+  last_rule_sync_attempt_at = $4
 WHERE machine_id = $5
 `
 
@@ -204,8 +202,7 @@ SET
   last_reported_counts_match_at = CASE
     WHEN machine_sync_states.desired_targets IS DISTINCT FROM EXCLUDED.desired_targets THEN NULL
     ELSE machine_sync_states.last_reported_counts_match_at
-  END,
-  updated_at = NOW()
+  END
 `
 
 type UpsertMachineDesiredTargetsParams struct {
@@ -315,8 +312,7 @@ SET
   last_reported_counts_match_at = CASE
     WHEN machine_sync_states.desired_targets IS DISTINCT FROM EXCLUDED.desired_targets THEN NULL
     ELSE EXCLUDED.last_reported_counts_match_at
-  END,
-  updated_at = NOW()
+  END
 `
 
 type UpsertMachineSyncStateParams struct {

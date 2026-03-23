@@ -395,8 +395,7 @@ SET
   identifier = $4,
   custom_message = $5,
   custom_url = $6,
-  enabled = $7,
-  updated_at = NOW()
+  enabled = $7
 WHERE id = $8
 RETURNING
   id,

@@ -14,7 +14,7 @@ func (handler *Server) ListMemberships(
 ) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -28,7 +28,7 @@ func (handler *Server) ListMemberships(
 		},
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (handler *Server) ListMemberships(
 func (handler *Server) CreateMembership(writer http.ResponseWriter, request *http.Request) {
 	var body CreateMembershipJSONRequestBody
 	if err := decodeJSONBody(request, &body); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func (handler *Server) CreateMembership(writer http.ResponseWriter, request *htt
 		},
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group membership dependencies not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (handler *Server) CreateMembership(writer http.ResponseWriter, request *htt
 func (handler *Server) GetMembership(writer http.ResponseWriter, request *http.Request, id MembershipId) {
 	membership, err := handler.memberships.GetMembership(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group membership not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (handler *Server) GetMembership(writer http.ResponseWriter, request *http.R
 
 func (handler *Server) DeleteMembership(writer http.ResponseWriter, request *http.Request, id MembershipId) {
 	if err := handler.memberships.DeleteMembership(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "group membership not found"})
+		writeError(writer, err)
 		return
 	}
 

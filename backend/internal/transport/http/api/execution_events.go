@@ -20,13 +20,13 @@ func (handler *Server) ListExecutionEvents(
 		params.Ids,
 	)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
 	decisions, err := parseOptionalValues(params.Decision, domain.ParseExecutionDecision)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -38,7 +38,7 @@ func (handler *Server) ListExecutionEvents(
 		Decisions:    decisions,
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -51,7 +51,7 @@ func (handler *Server) ListExecutionEvents(
 func (handler *Server) GetExecutionEvent(writer http.ResponseWriter, request *http.Request, id Id) {
 	event, err := handler.store.GetExecutionEvent(request.Context(), id)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "execution event not found"})
+		writeError(writer, err)
 		return
 	}
 
@@ -60,7 +60,7 @@ func (handler *Server) GetExecutionEvent(writer http.ResponseWriter, request *ht
 
 func (handler *Server) DeleteExecutionEvent(writer http.ResponseWriter, request *http.Request, id Id) {
 	if err := handler.store.DeleteExecutionEvent(request.Context(), id); err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{NotFoundMessage: "execution event not found"})
+		writeError(writer, err)
 		return
 	}
 

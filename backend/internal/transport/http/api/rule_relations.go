@@ -12,13 +12,13 @@ func (handler *Server) ListMachineRules(
 	params ListMachineRulesParams,
 ) {
 	if params.MachineId == nil {
-		writeClassifiedError(writer, badRequestError("machine_id is required"), apiErrorOptions{})
+		writeError(writer, badRequestError("machine_id is required"))
 		return
 	}
 
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -27,7 +27,7 @@ func (handler *Server) ListMachineRules(
 		MachineID:   params.MachineId,
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -43,13 +43,13 @@ func (handler *Server) ListRuleMachines(
 	params ListRuleMachinesParams,
 ) {
 	if params.RuleId == nil {
-		writeClassifiedError(writer, badRequestError("rule_id is required"), apiErrorOptions{})
+		writeError(writer, badRequestError("rule_id is required"))
 		return
 	}
 
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (handler *Server) ListRuleMachines(
 		RuleID:      params.RuleId,
 	})
 	if err != nil {
-		writeClassifiedError(writer, err, apiErrorOptions{})
+		writeError(writer, err)
 		return
 	}
 

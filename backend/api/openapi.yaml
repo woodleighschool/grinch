@@ -27,8 +27,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExecutableListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /executables/{id}:
     get:
       operationId: getExecutable
@@ -43,10 +41,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Executable'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
   /execution-events:
     get:
       operationId: listExecutionEvents
@@ -70,8 +64,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExecutionEventListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /execution-events/{id}:
     get:
       operationId: getExecutionEvent
@@ -86,10 +78,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExecutionEvent'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteExecutionEvent
       tags:
@@ -99,8 +87,6 @@ paths:
       responses:
         '204':
           description: Execution event deleted.
-        default:
-          $ref: '#/components/responses/Problem'
   /file-access-events:
     get:
       operationId: listFileAccessEvents
@@ -122,8 +108,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FileAccessEventListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /file-access-events/{id}:
     get:
       operationId: getFileAccessEvent
@@ -138,10 +122,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FileAccessEvent'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteFileAccessEvent
       tags:
@@ -151,8 +131,6 @@ paths:
       responses:
         '204':
           description: File access event deleted.
-        default:
-          $ref: '#/components/responses/Problem'
   /groups:
     get:
       operationId: listGroups
@@ -172,8 +150,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GroupListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
     post:
       operationId: createGroup
       tags:
@@ -191,8 +167,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Group'
-        default:
-          $ref: '#/components/responses/Problem'
   /groups/{id}:
     get:
       operationId: getGroup
@@ -207,10 +181,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Group'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     put:
       operationId: updateGroup
       tags:
@@ -230,10 +200,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Group'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteGroup
       tags:
@@ -243,10 +209,6 @@ paths:
       responses:
         '204':
           description: Group deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
   /machine-rules:
     get:
       operationId: listMachineRules
@@ -266,8 +228,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MachineRuleListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /machines:
     get:
       operationId: listMachines
@@ -290,8 +250,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MachineListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /machines/{id}:
     get:
       operationId: getMachine
@@ -306,10 +264,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Machine'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteMachine
       tags:
@@ -319,8 +273,6 @@ paths:
       responses:
         '204':
           description: Machine deleted.
-        default:
-          $ref: '#/components/responses/Problem'
   /memberships:
     get:
       operationId: listMemberships
@@ -342,8 +294,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MembershipListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
     post:
       operationId: createMembership
       tags:
@@ -361,8 +311,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Membership'
-        default:
-          $ref: '#/components/responses/Problem'
   /memberships/{id}:
     get:
       operationId: getMembership
@@ -377,10 +325,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Membership'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteMembership
       tags:
@@ -390,10 +334,6 @@ paths:
       responses:
         '204':
           description: Membership deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
   /rule-machines:
     get:
       operationId: listRuleMachines
@@ -413,8 +353,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RuleMachineListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /rules:
     get:
       operationId: listRules
@@ -436,8 +374,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RuleListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
     post:
       operationId: createRule
       tags:
@@ -455,8 +391,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rule'
-        default:
-          $ref: '#/components/responses/Problem'
   /rules/{id}:
     get:
       operationId: getRule
@@ -471,10 +405,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rule'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     put:
       operationId: updateRule
       tags:
@@ -494,10 +424,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rule'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
     delete:
       operationId: deleteRule
       tags:
@@ -507,10 +433,6 @@ paths:
       responses:
         '204':
           description: Rule deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
   /users:
     get:
       operationId: listUsers
@@ -530,8 +452,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserListResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /users/{id}:
     get:
       operationId: getUser
@@ -546,10 +466,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     sessionAuth:
@@ -714,19 +630,6 @@ components:
         type: array
         items:
           $ref: '#/components/schemas/FileAccessDecision'
-  responses:
-    Problem:
-      description: Problem response.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    NotFound:
-      description: Resource not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
   schemas:
     ExcludedGroup:
       x-go-type: domain.ExcludedGroup
@@ -964,18 +867,6 @@ components:
         created_at:
           type: string
           format: date-time
-    FieldError:
-      type: object
-      required:
-        - field
-        - message
-      properties:
-        field:
-          type: string
-        message:
-          type: string
-        code:
-          type: string
     FileAccessDecision:
       x-go-type: domain.FileAccessDecision
       x-go-type-import:
@@ -1505,29 +1396,6 @@ components:
           format: uuid
         name:
           type: string
-    Problem:
-      type: object
-      required:
-        - type
-        - title
-        - status
-        - detail
-        - code
-      properties:
-        type:
-          type: string
-        title:
-          type: string
-        status:
-          type: integer
-        detail:
-          type: string
-        code:
-          type: string
-        field_errors:
-          type: array
-          items:
-            $ref: '#/components/schemas/FieldError'
     Rule:
       x-go-type: domain.Rule
       x-go-type-import:

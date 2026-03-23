@@ -9,7 +9,6 @@ interface ApiResult<T> {
   response: Response;
 }
 
-type Problem = components["schemas"]["Problem"];
 type Executable = components["schemas"]["Executable"];
 type ExecutableListResponse = components["schemas"]["ExecutableListResponse"];
 type ExecutionEvent = components["schemas"]["ExecutionEvent"];
@@ -43,30 +42,15 @@ const client = createClient<paths>({
     ),
 });
 
-const isProblem = (value: unknown): value is Problem =>
-  typeof value === "object" &&
-  value !== null &&
-  "detail" in value &&
-  typeof (value as { detail?: unknown }).detail === "string" &&
-  "status" in value &&
-  typeof (value as { status?: unknown }).status === "number";
-
-const problemToBody = (problem: Problem): Record<string, unknown> => {
-  const errors = Object.fromEntries(
-    (problem.field_errors ?? []).map((fieldError): [string, string] => [fieldError.field, fieldError.message]),
-  );
-
-  return {
-    ...problem,
-    ...(Object.keys(errors).length > 0 ? { errors } : {}),
-  };
-};
+const isValidationBody = (value: unknown): value is { errors: Record<string, unknown> } =>
+  typeof value === "object" && value !== null && "errors" in value;
 
 const toHttpError = (error: unknown, response: Response): HttpError => {
-  const message =
-    isProblem(error) && error.detail.trim() !== "" ? error.detail : response.statusText || "Request failed";
-
-  return new HttpError(message, response.status, isProblem(error) ? problemToBody(error) : error);
+  if (isValidationBody(error)) {
+    const root = (error.errors.root as { serverError?: string } | undefined)?.serverError;
+    return new HttpError(root ?? "Validation failed", response.status, error);
+  }
+  return new HttpError(response.statusText || "Request failed", response.status);
 };
 
 const expectBody = async <T>(resultPromise: Promise<ApiResult<T>>): Promise<T> => {
