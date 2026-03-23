@@ -114,8 +114,7 @@ SET
   last_reported_counts_match_at = CASE
     WHEN machine_sync_states.desired_targets IS DISTINCT FROM EXCLUDED.desired_targets THEN NULL
     ELSE EXCLUDED.last_reported_counts_match_at
-  END,
-  updated_at = NOW();
+  END;
 
 -- name: UpsertMachineDesiredTargets :exec
 INSERT INTO machine_sync_states (
@@ -151,8 +150,7 @@ SET
   last_reported_counts_match_at = CASE
     WHEN machine_sync_states.desired_targets IS DISTINCT FROM EXCLUDED.desired_targets THEN NULL
     ELSE machine_sync_states.last_reported_counts_match_at
-  END,
-  updated_at = NOW();
+  END;
 
 -- name: RecordMachineSyncPostflight :execrows
 UPDATE machine_sync_states
@@ -160,8 +158,7 @@ SET
   rules_hash = sqlc.arg(rules_hash),
   rules_received = sqlc.arg(rules_received),
   rules_processed = sqlc.arg(rules_processed),
-  last_rule_sync_attempt_at = sqlc.arg(last_rule_sync_attempt_at),
-  updated_at = NOW()
+  last_rule_sync_attempt_at = sqlc.arg(last_rule_sync_attempt_at)
 WHERE machine_id = sqlc.arg(machine_id);
 
 -- name: PromoteMachineSyncPendingSnapshot :execrows
@@ -177,6 +174,5 @@ SET
   last_clean_sync_at = CASE
     WHEN pending_full_sync THEN sqlc.arg(last_rule_sync_success_at)
     ELSE last_clean_sync_at
-  END,
-  updated_at = NOW()
+  END
 WHERE machine_id = sqlc.arg(machine_id);

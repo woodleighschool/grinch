@@ -36,8 +36,7 @@ SET
   primary_user = EXCLUDED.primary_user,
   primary_user_groups = EXCLUDED.primary_user_groups,
   client_mode = EXCLUDED.client_mode,
-  last_seen_at = EXCLUDED.last_seen_at,
-  updated_at = NOW()
+  last_seen_at = EXCLUDED.last_seen_at
 RETURNING
   id,
   serial_number,

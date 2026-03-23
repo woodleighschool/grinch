@@ -1,16 +1,14 @@
 -- name: ConvertMissingEntraUsersToLocal :exec
 UPDATE users
 SET
-  source = 'local',
-  updated_at = NOW()
+  source = 'local'
 WHERE source = 'entra'
   AND id <> ALL(sqlc.arg(user_ids)::UUID[]);
 
 -- name: ConvertMissingEntraGroupsToLocal :exec
 UPDATE groups
 SET
-  source = 'local',
-  updated_at = NOW()
+  source = 'local'
 WHERE source = 'entra'
   AND id <> ALL(sqlc.arg(group_ids)::UUID[]);
 
@@ -32,5 +30,4 @@ SELECT
   'synced'
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
-  origin = 'synced',
-  updated_at = NOW();
+  origin = 'synced';

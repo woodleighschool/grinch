@@ -15,8 +15,7 @@ ON CONFLICT (id) DO UPDATE
 SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
-  source = EXCLUDED.source,
-  updated_at = NOW()
+  source = EXCLUDED.source
 RETURNING
   id,
   name,
@@ -36,8 +35,7 @@ updated AS (
   UPDATE groups AS g
   SET
     name = sqlc.arg(name),
-    description = sqlc.arg(description),
-    updated_at = NOW()
+    description = sqlc.arg(description)
   WHERE g.id = sqlc.arg(id)
     AND g.source = 'local'
   RETURNING

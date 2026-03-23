@@ -15,8 +15,7 @@ ON CONFLICT (id) DO UPDATE
 SET
   upn = EXCLUDED.upn,
   display_name = EXCLUDED.display_name,
-  source = EXCLUDED.source,
-  updated_at = NOW()
+  source = EXCLUDED.source
 RETURNING
   id,
   upn,

@@ -55,8 +55,7 @@ SET
   identifier = sqlc.arg(identifier),
   custom_message = sqlc.arg(custom_message),
   custom_url = sqlc.arg(custom_url),
-  enabled = sqlc.arg(enabled),
-  updated_at = NOW()
+  enabled = sqlc.arg(enabled)
 WHERE id = sqlc.arg(id)
 RETURNING
   id,
