@@ -38,37 +38,28 @@ docker compose up --build
 The app listens on `http://localhost:8080`.
 The Docker image builds the frontend and serves it from the backend automatically.
 
-### Production notes
-
-- ⚠️ Put it behind HTTPS (Caddy, Nginx, Traefik, whatever you like). ⚠️
-- Set `GRINCH_BASE_URL` to the public URL. It is used for auth callbacks and cookie security.
-- Set a strong `JWT_SECRET`.
-- Set `SYNC_SHARED_SECRET` if you want `/sync` authenticated.
-- Keep Postgres data on a volume.
-
 ## 🧰 Configuration
 
-| Name                       | What it does                               | Required                  | Notes                                                         |
-| -------------------------- | ------------------------------------------ | ------------------------- | ------------------------------------------------------------- |
-| `GRINCH_PORT`              | HTTP listen port                           | No                        | Defaults to `8080`.                                           |
-| `GRINCH_BASE_URL`          | Public URL for cookies and OAuth           | Yes, when auth is enabled | Must be the externally reachable URL.                         |
-| `LOG_LEVEL`                | Log verbosity                              | No                        | `debug`, `info`, `warn`, `error`.                             |
-| `DATABASE_HOST`            | Postgres host                              | Yes                       |                                                               |
-| `DATABASE_PORT`            | Postgres port                              | No                        | Defaults to `5432`.                                           |
-| `DATABASE_USER`            | Postgres user                              | Yes                       |                                                               |
-| `DATABASE_PASSWORD`        | Postgres password                          | Yes                       |                                                               |
-| `DATABASE_NAME`            | Postgres database name                     | Yes                       |                                                               |
-| `DATABASE_SSLMODE`         | Postgres SSL mode                          | No                        | Defaults to `disable`.                                        |
-| `JWT_SECRET`               | Signing secret for auth                    | Yes, when auth is enabled | Keep it dedicated to JWT signing.                             |
-| `LOCAL_ADMIN_PASSWORD`     | Enable local admin login                   | No                        | Username is always `admin`.                                   |
-| `ENTRA_TENANT_ID`          | Entra tenant ID                            | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync.    |
-| `ENTRA_CLIENT_ID`          | Entra client ID                            | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync.    |
-| `ENTRA_CLIENT_SECRET`      | Entra client secret                        | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync.    |
-| `SYNC_SHARED_SECRET`       | Shared secret for `/sync`                  | No                        | When set, Santa clients must send the matching secret header. |
-| `ENTRA_SYNC_ENABLED`       | Enable periodic Entra sync                 | No                        | Defaults to `false`.                                          |
-| `ENTRA_SYNC_INTERVAL`      | Entra sync interval                        | No                        | Defaults to `1h` when enabled.                                |
-| `EVENT_RETENTION_DAYS`     | How long to keep stored events             | No                        | Defaults to `90`.                                             |
-| `EVENT_DECISION_ALLOWLIST` | Optional decision filter for stored events | No                        | Comma-separated decision names.                               |
+| Name                       | What it does                               | Required                  | Notes                                                      |
+| -------------------------- | ------------------------------------------ | ------------------------- | ---------------------------------------------------------- |
+| `GRINCH_PORT`              | HTTP listen port                           | No                        | Defaults to `8080`.                                        |
+| `GRINCH_BASE_URL`          | Public URL for cookies and OAuth           | Yes, when auth is enabled | Must be the externally reachable URL.                      |
+| `LOG_LEVEL`                | Log verbosity                              | No                        | `debug`, `info`, `warn`, `error`.                          |
+| `DATABASE_HOST`            | Postgres host                              | Yes                       |                                                            |
+| `DATABASE_PORT`            | Postgres port                              | No                        | Defaults to `5432`.                                        |
+| `DATABASE_USER`            | Postgres user                              | Yes                       |                                                            |
+| `DATABASE_PASSWORD`        | Postgres password                          | Yes                       |                                                            |
+| `DATABASE_NAME`            | Postgres database name                     | Yes                       |                                                            |
+| `DATABASE_SSLMODE`         | Postgres SSL mode                          | No                        | Defaults to `disable`.                                     |
+| `JWT_SECRET`               | Signing secret for auth                    | Yes, when auth is enabled | Keep it dedicated to JWT signing.                          |
+| `LOCAL_ADMIN_PASSWORD`     | Enable local admin login                   | No                        | Username is always `admin`.                                |
+| `ENTRA_TENANT_ID`          | Entra tenant ID                            | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync. |
+| `ENTRA_CLIENT_ID`          | Entra client ID                            | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync. |
+| `ENTRA_CLIENT_SECRET`      | Entra client secret                        | No                        | Set with the other `ENTRA_*` vars for Entra auth and sync. |
+| `ENTRA_SYNC_ENABLED`       | Enable periodic Entra sync                 | No                        | Defaults to `false`.                                       |
+| `ENTRA_SYNC_INTERVAL`      | Entra sync interval                        | No                        | Defaults to `1h` when enabled.                             |
+| `EVENT_RETENTION_DAYS`     | How long to keep stored events             | No                        | Defaults to `90`.                                          |
+| `EVENT_DECISION_ALLOWLIST` | Optional decision filter for stored events | No                        | Comma-separated decision names.                            |
 
 ## 🖥️ Santa client setup
 
@@ -93,16 +84,6 @@ Set these keys in your Santa configuration profile:
 
 `MachineOwner` is optional, but if you use it, it should be the user's UPN/email.
 Grinch uses it for primary-user matching and user-group targeting.
-
-If `SYNC_SHARED_SECRET` is set on the server, clients also need to send the matching shared secret header on `/sync` requests using `SyncExtraHeaders`, for example:
-
-```xml
-<key>SyncExtraHeaders</key>
-<dict>
-  <key>X-Grinch-Shared-Secret</key>
-  <string>replace-with-your-secret</string>
-</dict>
-```
 
 ## 🧾 Rules and targeting
 
@@ -160,6 +141,7 @@ The backend serves the built frontend in container deployments.
 
 - No RBAC; anyone who can log in is an admin.
 - Entra is the only directory sync source implemented.
+- No rate limiting.
 
 ## 🤝 Contributing / PRs
 

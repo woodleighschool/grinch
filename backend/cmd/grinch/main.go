@@ -112,7 +112,6 @@ func buildServer(
 
 	syncHandler := synchttp.New(
 		syncService,
-		cfg.Sync.SharedSecret,
 	)
 
 	apiHandler := apihttp.New(

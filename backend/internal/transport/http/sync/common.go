@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -21,11 +20,7 @@ import (
 const (
 	protobufContentType = "application/x-protobuf"
 	maxRequestBodyBytes = 16 << 20
-
-	sharedSecretHeaderName = "X-Grinch-Shared-Secret" //nolint:gosec // Fixed protocol header name.
 )
-
-var errUnauthorized = errors.New("sync authentication failed")
 
 type Service interface {
 	HandlePreflight(context.Context, uuid.UUID, *syncv1.PreflightRequest) (*syncv1.PreflightResponse, error)
@@ -35,14 +30,12 @@ type Service interface {
 }
 
 type Handler struct {
-	service      Service
-	sharedSecret string
+	service Service
 }
 
-func New(service Service, sharedSecret string) *Handler {
+func New(service Service) *Handler {
 	return &Handler{
-		service:      service,
-		sharedSecret: sharedSecret,
+		service: service,
 	}
 }
 
@@ -130,10 +123,6 @@ func (h *Handler) postflight(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) decodeRequest(r *http.Request, msg proto.Message) error {
-	if !h.authenticate(r) {
-		return errUnauthorized
-	}
-
 	gr, err := gzip.NewReader(r.Body)
 	if err != nil {
 		return fmt.Errorf("%w: new gzip reader: %w", appsanta.ErrInvalidSyncRequest, err)
@@ -171,19 +160,8 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	writeStatusOnly(w, statusCodeForError(err))
 }
 
-func (h *Handler) authenticate(r *http.Request) bool {
-	if h.sharedSecret == "" {
-		return true
-	}
-
-	got := r.Header.Get(sharedSecretHeaderName)
-	return subtle.ConstantTimeCompare([]byte(got), []byte(h.sharedSecret)) == 1
-}
-
 func statusCodeForError(err error) int {
 	switch {
-	case errors.Is(err, errUnauthorized):
-		return http.StatusUnauthorized
 	case errors.Is(err, appsanta.ErrInvalidSyncRequest):
 		return http.StatusBadRequest
 	default:

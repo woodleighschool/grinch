@@ -65,7 +65,7 @@ func (stubService) HandlePostflight(
 func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{}, "")
+	handler := synchttp.New(stubService{})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -100,40 +100,10 @@ func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
 	}
 }
 
-func TestPreflight_ReturnsUnauthorizedWhenSharedSecretIsMissing(t *testing.T) {
-	t.Parallel()
-
-	handler := synchttp.New(stubService{}, "secret")
-	router := chi.NewRouter()
-	handler.RegisterRoutes(router)
-
-	requestMessage := syncv1.PreflightRequest_builder{
-		MachineId: "00000000-0000-0000-0000-000000000001",
-	}.Build()
-	body := mustGzipProto(t, requestMessage)
-
-	request := httptest.NewRequest(
-		http.MethodPost,
-		"/preflight/00000000-0000-0000-0000-000000000001",
-		body,
-	)
-	request.Header.Set("Content-Type", "application/x-protobuf")
-	request.Header.Set("Content-Encoding", "gzip")
-	// Missing required auth header.
-
-	response := httptest.NewRecorder()
-	router.ServeHTTP(response, request)
-
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status 401, got %d", response.Code)
-	}
-	assertSyncFailureResponse(t, response)
-}
-
 func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{}, "")
+	handler := synchttp.New(stubService{})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -165,7 +135,7 @@ func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
 func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{preflightErr: santa.ErrInvalidSyncRequest}, "")
+	handler := synchttp.New(stubService{preflightErr: santa.ErrInvalidSyncRequest})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -194,7 +164,7 @@ func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
 func TestPreflight_ReturnsInternalServerErrorForUnexpectedServiceError(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{preflightErr: errors.New("boom")}, "")
+	handler := synchttp.New(stubService{preflightErr: errors.New("boom")})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 

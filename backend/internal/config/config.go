@@ -17,7 +17,6 @@ type Config struct {
 	Logging  LoggingConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
-	Sync     SyncConfig
 	Entra    EntraSyncConfig
 	Events   EventsConfig
 }
@@ -50,10 +49,6 @@ type AuthConfig struct {
 	EntraClientSecret string `env:"ENTRA_CLIENT_SECRET"`
 	JWTSecret         string `env:"JWT_SECRET"`
 	LocalAdminPass    string `env:"LOCAL_ADMIN_PASSWORD"`
-}
-
-type SyncConfig struct {
-	SharedSecret string `env:"SYNC_SHARED_SECRET"`
 }
 
 type EntraSyncConfig struct {
