@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,7 +66,7 @@ func (stubService) HandlePostflight(
 func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{})
+	handler := synchttp.New(testLogger(), stubService{})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -103,7 +104,7 @@ func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
 func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{})
+	handler := synchttp.New(testLogger(), stubService{})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -135,7 +136,7 @@ func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
 func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{preflightErr: santa.ErrInvalidSyncRequest})
+	handler := synchttp.New(testLogger(), stubService{preflightErr: santa.ErrInvalidSyncRequest})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -164,7 +165,7 @@ func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
 func TestPreflight_ReturnsInternalServerErrorForUnexpectedServiceError(t *testing.T) {
 	t.Parallel()
 
-	handler := synchttp.New(stubService{preflightErr: errors.New("boom")})
+	handler := synchttp.New(testLogger(), stubService{preflightErr: errors.New("boom")})
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
@@ -241,4 +242,8 @@ func assertSyncFailureResponse(t *testing.T, response *httptest.ResponseRecorder
 	if response.Body.Len() != 0 {
 		t.Fatalf("response body length = %d, want 0", response.Body.Len())
 	}
+}
+
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

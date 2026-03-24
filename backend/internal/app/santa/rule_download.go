@@ -17,13 +17,37 @@ func (s *Service) HandleRuleDownload(
 	machineID uuid.UUID,
 	_ *syncv1.RuleDownloadRequest,
 ) (*syncv1.RuleDownloadResponse, error) {
+	s.logger.DebugContext(ctx, "santa rule download started", syncLogAttrs(ctx, machineID)...)
+
 	pendingSnapshot, _, err := snapshot.LoadPendingSnapshot(ctx, s.dataStore, machineID)
 	if err != nil {
 		if errors.Is(err, snapshot.ErrPendingSnapshotNotFound) {
+			s.logger.WarnContext(ctx, "santa rule download rejected", syncLogAttrs(ctx, machineID, "error", err)...)
 			return nil, fmt.Errorf("%w: %w", ErrInvalidSyncRequest, err)
 		}
+		s.logger.ErrorContext(ctx, "santa rule download failed", syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, fmt.Errorf("get pending machine rule snapshot: %w", err)
 	}
 
-	return snapshot.BuildRuleDownloadResponse(pendingSnapshot.Payload)
+	s.logger.DebugContext(
+		ctx,
+		"santa rule download completed",
+		syncLogAttrs(
+			ctx,
+			machineID,
+			"payload_rule_count", pendingSnapshot.PayloadRuleCount,
+			"full_sync", pendingSnapshot.FullSync,
+		)...,
+	)
+
+	resp, err := snapshot.BuildRuleDownloadResponse(pendingSnapshot.Payload)
+	if err != nil {
+		s.logger.ErrorContext(
+			ctx,
+			"santa rule download build response failed",
+			syncLogAttrs(ctx, machineID, "error", err)...)
+		return nil, err
+	}
+
+	return resp, nil
 }

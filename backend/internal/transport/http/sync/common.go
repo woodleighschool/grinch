@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
@@ -30,11 +32,13 @@ type Service interface {
 }
 
 type Handler struct {
+	logger  *slog.Logger
 	service Service
 }
 
-func New(service Service) *Handler {
+func New(logger *slog.Logger, service Service) *Handler {
 	return &Handler{
+		logger:  logger,
 		service: service,
 	}
 }
@@ -49,77 +53,77 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) {
 	msg := &syncv1.PreflightRequest{}
 	if err := h.decodeRequest(r, msg); err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	resp, err := h.service.HandlePreflight(r.Context(), machineID, msg)
 	if err != nil {
-		h.writeError(w, err)
+		writeStatusOnly(w, statusCodeForError(err))
 		return
 	}
-	h.writeProtoResponse(w, resp)
+	h.writeProtoResponse(w, r, resp)
 }
 
 func (h *Handler) eventUpload(w http.ResponseWriter, r *http.Request) {
 	msg := &syncv1.EventUploadRequest{}
 	if err := h.decodeRequest(r, msg); err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	resp, err := h.service.HandleEventUpload(r.Context(), machineID, msg)
 	if err != nil {
-		h.writeError(w, err)
+		writeStatusOnly(w, statusCodeForError(err))
 		return
 	}
-	h.writeProtoResponse(w, resp)
+	h.writeProtoResponse(w, r, resp)
 }
 
 func (h *Handler) ruleDownload(w http.ResponseWriter, r *http.Request) {
 	msg := &syncv1.RuleDownloadRequest{}
 	if err := h.decodeRequest(r, msg); err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	resp, err := h.service.HandleRuleDownload(r.Context(), machineID, msg)
 	if err != nil {
-		h.writeError(w, err)
+		writeStatusOnly(w, statusCodeForError(err))
 		return
 	}
-	h.writeProtoResponse(w, resp)
+	h.writeProtoResponse(w, r, resp)
 }
 
 func (h *Handler) postflight(w http.ResponseWriter, r *http.Request) {
 	msg := &syncv1.PostflightRequest{}
 	if err := h.decodeRequest(r, msg); err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	machineID, err := parseMachineID(chi.URLParam(r, "machine_id"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(w, r, err)
 		return
 	}
 	resp, err := h.service.HandlePostflight(r.Context(), machineID, msg)
 	if err != nil {
-		h.writeError(w, err)
+		writeStatusOnly(w, statusCodeForError(err))
 		return
 	}
-	h.writeProtoResponse(w, resp)
+	h.writeProtoResponse(w, r, resp)
 }
 
 func (h *Handler) decodeRequest(r *http.Request, msg proto.Message) error {
@@ -141,9 +145,18 @@ func (h *Handler) decodeRequest(r *http.Request, msg proto.Message) error {
 	return nil
 }
 
-func (h *Handler) writeProtoResponse(w http.ResponseWriter, msg proto.Message) {
+func (h *Handler) writeProtoResponse(w http.ResponseWriter, r *http.Request, msg proto.Message) {
 	payload, err := marshalCompressedProto(msg)
 	if err != nil {
+		h.logger.ErrorContext(
+			r.Context(),
+			"sync response marshal failed",
+			"request_id", middleware.GetReqID(r.Context()),
+			"method", r.Method,
+			"path", r.URL.Path,
+			"machine_id", chi.URLParam(r, "machine_id"),
+			"error", err,
+		)
 		writeStatusOnly(w, http.StatusInternalServerError)
 		return
 	}
@@ -156,8 +169,30 @@ func (h *Handler) writeProtoResponse(w http.ResponseWriter, msg proto.Message) {
 	_, _ = w.Write(payload)
 }
 
-func (h *Handler) writeError(w http.ResponseWriter, err error) {
-	writeStatusOnly(w, statusCodeForError(err))
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
+	statusCode := statusCodeForError(err)
+	args := []any{
+		"request_id", middleware.GetReqID(r.Context()),
+		"method", r.Method,
+		"path", r.URL.Path,
+		"machine_id", chi.URLParam(r, "machine_id"),
+		"content_type", r.Header.Get("Content-Type"),
+		"content_encoding", r.Header.Get("Content-Encoding"),
+		"content_length", r.ContentLength,
+		"user_agent", r.UserAgent(),
+		"error", err,
+	}
+
+	switch {
+	case statusCode >= http.StatusInternalServerError:
+		h.logger.ErrorContext(r.Context(), "sync request failed", args...)
+	case statusCode >= http.StatusBadRequest:
+		h.logger.WarnContext(r.Context(), "sync request rejected", args...)
+	default:
+		h.logger.InfoContext(r.Context(), "sync request completed", args...)
+	}
+
+	writeStatusOnly(w, statusCode)
 }
 
 func statusCodeForError(err error) int {

@@ -45,19 +45,46 @@ func (s *Service) HandleEventUpload(
 	machineID uuid.UUID,
 	req *syncv1.EventUploadRequest,
 ) (*syncv1.EventUploadResponse, error) {
+	s.logger.DebugContext(
+		ctx,
+		"santa event upload started",
+		syncLogAttrs(
+			ctx,
+			machineID,
+			"execution_event_count", len(req.GetEvents()),
+			"file_access_event_count", len(req.GetFileAccessEvents()),
+		)...,
+	)
+
 	executionEvents, err := mapExecutionEvents(req.GetEvents(), s.eventAllowlist)
 	if err != nil {
+		err = fmt.Errorf("%w: %w", ErrInvalidSyncRequest, err)
+		s.logger.WarnContext(ctx, "santa event upload rejected", syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, err
 	}
 
 	fileAccessEvents, err := mapFileAccessEvents(req.GetFileAccessEvents())
 	if err != nil {
+		err = fmt.Errorf("%w: %w", ErrInvalidSyncRequest, err)
+		s.logger.WarnContext(ctx, "santa event upload rejected", syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, err
 	}
 
 	if err = s.dataStore.IngestEvents(ctx, machineID, executionEvents, fileAccessEvents); err != nil {
+		s.logger.ErrorContext(ctx, "santa event upload ingest failed", syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, err
 	}
+
+	s.logger.DebugContext(
+		ctx,
+		"santa event upload completed",
+		syncLogAttrs(
+			ctx,
+			machineID,
+			"execution_event_count", len(executionEvents),
+			"file_access_event_count", len(fileAccessEvents),
+		)...,
+	)
 
 	return syncv1.EventUploadResponse_builder{}.Build(), nil
 }

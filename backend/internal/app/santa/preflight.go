@@ -20,6 +20,19 @@ func (s *Service) HandlePreflight(
 	machineID uuid.UUID,
 	req *syncv1.PreflightRequest,
 ) (*syncv1.PreflightResponse, error) {
+	s.logger.DebugContext(
+		ctx,
+		"santa preflight started",
+		syncLogAttrs(
+			ctx,
+			machineID,
+			"hostname", req.GetHostname(),
+			"serial_number", req.GetSerialNumber(),
+			"client_mode", req.GetClientMode().String(),
+			"request_clean_sync", req.GetRequestCleanSync(),
+		)...,
+	)
+
 	err := s.dataStore.UpsertMachine(ctx, model.MachineUpsert{
 		MachineID:         machineID,
 		SerialNumber:      req.GetSerialNumber(),
@@ -34,10 +47,18 @@ func (s *Service) HandlePreflight(
 		LastSeenAt:        time.Now().UTC(),
 	})
 	if err != nil {
+		s.logger.ErrorContext(
+			ctx,
+			"santa preflight upsert machine failed",
+			syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, fmt.Errorf("upsert machine: %w", err)
 	}
 
 	if err = s.dataStore.UpdateMachineDesiredTargets(ctx, machineID); err != nil {
+		s.logger.ErrorContext(
+			ctx,
+			"santa preflight sync desired targets failed",
+			syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, fmt.Errorf("sync machine desired rule targets: %w", err)
 	}
 
@@ -50,10 +71,26 @@ func (s *Service) HandlePreflight(
 		time.Now().UTC(),
 	)
 	if err != nil {
+		s.logger.ErrorContext(
+			ctx,
+			"santa preflight prepare pending snapshot failed",
+			syncLogAttrs(ctx, machineID, "error", err)...)
 		return nil, fmt.Errorf("prepare pending rule snapshot: %w", err)
 	}
 
 	syncType := snapshot.SyncTypeFromPendingFullSync(pendingSnapshot.FullSync)
+	s.logger.DebugContext(
+		ctx,
+		"santa preflight completed",
+		syncLogAttrs(
+			ctx,
+			machineID,
+			"sync_type", syncType.String(),
+			"payload_rule_count", pendingSnapshot.PayloadRuleCount,
+			"full_sync", pendingSnapshot.FullSync,
+		)...,
+	)
+
 	return syncv1.PreflightResponse_builder{
 		ClientMode: req.GetClientMode(),
 		SyncType:   &syncType,

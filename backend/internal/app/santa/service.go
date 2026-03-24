@@ -2,8 +2,12 @@
 package santa
 
 import (
+	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 
 	"github.com/woodleighschool/grinch/internal/domain"
 	"github.com/woodleighschool/grinch/internal/santa/model"
@@ -36,4 +40,13 @@ func New(
 		eventAllowlist: allowlist,
 		ruleResolver:   ruleResolver,
 	}
+}
+
+func syncLogAttrs(ctx context.Context, machineID uuid.UUID, extra ...any) []any {
+	attrs := []any{
+		"request_id", middleware.GetReqID(ctx),
+		"machine_id", machineID,
+	}
+
+	return append(attrs, extra...)
 }

@@ -111,6 +111,7 @@ func buildServer(
 	}
 
 	syncHandler := synchttp.New(
+		logger,
 		syncService,
 	)
 
