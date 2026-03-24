@@ -37,7 +37,12 @@ func New(
 	r.Get("/healthz", healthHandler(logger))
 	r.Get("/readyz", readinessHandler(logger, readinessCheck))
 
-	r.Route("/sync", registerSyncRoutes)
+	r.Route("/sync", func(r chi.Router) {
+		registerSyncRoutes(r)
+		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		})
+	})
 	r.Route("/auth", registerAuthRoutes)
 	r.Route("/api/v1", registerAPIRoutes)
 
