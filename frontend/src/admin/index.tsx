@@ -57,7 +57,5 @@ export const App = (): ReactElement => (
     <Resource name="file-access-events" {...fileAccessEvents} />
     <Resource name="users" {...users} />
     <Resource name="groups" {...groups} />
-    {/* Registered for reference and mutation hooks used from other resource screens. */}
-    <Resource name="memberships" />
   </Admin>
 );

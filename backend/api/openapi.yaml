@@ -209,30 +209,48 @@ paths:
       responses:
         '204':
           description: Group deleted.
-  /machine-rules:
-    get:
-      operationId: listMachineRules
+  /groups/{id}/machines/{machine_id}:
+    put:
+      operationId: addGroupMachine
       tags:
-        - machine-rules
+        - groups
       parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - name: machine_id
-          in: query
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/MachineIdPath'
       responses:
-        '200':
-          description: Machine rules list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MachineRuleListResponse'
+        '204':
+          description: Machine added to group.
+    delete:
+      operationId: removeGroupMachine
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/MachineIdPath'
+      responses:
+        '204':
+          description: Machine removed from group.
+  /groups/{id}/users/{user_id}:
+    put:
+      operationId: addGroupUser
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '204':
+          description: User added to group.
+    delete:
+      operationId: removeGroupUser
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '204':
+          description: User removed from group.
   /machines:
     get:
       operationId: listMachines
@@ -278,91 +296,6 @@ paths:
       responses:
         '204':
           description: Machine deleted.
-  /memberships:
-    get:
-      operationId: listMemberships
-      tags:
-        - memberships
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - $ref: '#/components/parameters/GroupIdFilter'
-        - $ref: '#/components/parameters/UserIdFilter'
-        - $ref: '#/components/parameters/MachineIdFilter'
-      responses:
-        '200':
-          description: Membership list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MembershipListResponse'
-    post:
-      operationId: createMembership
-      tags:
-        - memberships
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MembershipCreateRequest'
-      responses:
-        '201':
-          description: Membership created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Membership'
-  /memberships/{id}:
-    get:
-      operationId: getMembership
-      tags:
-        - memberships
-      parameters:
-        - $ref: '#/components/parameters/MembershipId'
-      responses:
-        '200':
-          description: Membership detail.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Membership'
-    delete:
-      operationId: deleteMembership
-      tags:
-        - memberships
-      parameters:
-        - $ref: '#/components/parameters/MembershipId'
-      responses:
-        '204':
-          description: Membership deleted.
-  /rule-machines:
-    get:
-      operationId: listRuleMachines
-      tags:
-        - rule-machines
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-        - name: rule_id
-          in: query
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Rule machines list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RuleMachineListResponse'
   /rules:
     get:
       operationId: listRules
@@ -548,9 +481,23 @@ components:
       schema:
         type: string
         format: uuid
+    UserIdPath:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     MachineIdFilter:
       name: machine_id
       in: query
+      schema:
+        type: string
+        format: uuid
+    MachineIdPath:
+      name: machine_id
+      in: path
+      required: true
       schema:
         type: string
         format: uuid
@@ -575,13 +522,6 @@ components:
     SubjectIdFilter:
       name: subject_id
       in: query
-      schema:
-        type: string
-        format: uuid
-    MembershipId:
-      name: id
-      in: path
-      required: true
       schema:
         type: string
         format: uuid
@@ -1062,6 +1002,16 @@ components:
         member_count:
           type: integer
           format: int32
+        user_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        machine_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
         created_at:
           type: string
           format: date-time
@@ -1134,6 +1084,8 @@ components:
         - teamid_rule_count
         - signingid_rule_count
         - cdhash_rule_count
+        - group_ids
+        - rules
         - last_seen_at
         - created_at
         - updated_at
@@ -1178,6 +1130,15 @@ components:
         cdhash_rule_count:
           type: integer
           format: int32
+        group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/MachineRule'
         last_seen_at:
           type: string
           format: date-time
@@ -1218,16 +1179,9 @@ components:
         path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
-        - id
-        - machine_id
         - policy
         - applied
       properties:
-        id:
-          type: string
-        machine_id:
-          type: string
-          format: uuid
         rule_id:
           type: string
           format: uuid
@@ -1236,19 +1190,6 @@ components:
           $ref: '#/components/schemas/RulePolicy'
         applied:
           type: boolean
-    MachineRuleListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/MachineRule'
     MachineRuleSyncStatus:
       x-go-type: domain.MachineRuleSyncStatus
       x-go-type-import:
@@ -1308,104 +1249,6 @@ components:
         updated_at:
           type: string
           format: date-time
-    MemberKind:
-      x-go-type: domain.MemberKind
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: string
-      enum:
-        - user
-        - machine
-    Membership:
-      x-go-type: domain.Membership
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - id
-        - group
-        - member
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        group:
-          $ref: '#/components/schemas/MembershipGroup'
-        member:
-          $ref: '#/components/schemas/MembershipMember'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    MembershipCreateRequest:
-      type: object
-      required:
-        - group_id
-        - member_kind
-        - member_id
-      properties:
-        group_id:
-          type: string
-          format: uuid
-        member_kind:
-          $ref: '#/components/schemas/MemberKind'
-        member_id:
-          type: string
-          format: uuid
-    MembershipGroup:
-      x-go-type: domain.MembershipGroup
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - id
-        - name
-        - source
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        source:
-          $ref: '#/components/schemas/Source'
-    MembershipListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/Membership'
-    MembershipMember:
-      x-go-type: domain.MembershipMember
-      x-go-type-import:
-        name: domain
-        path: github.com/woodleighschool/grinch/internal/domain
-      type: object
-      required:
-        - kind
-        - id
-      properties:
-        kind:
-          $ref: '#/components/schemas/MemberKind'
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
     Rule:
       x-go-type: domain.Rule
       x-go-type-import:
@@ -1419,6 +1262,7 @@ components:
             - custom_url
             - enabled
             - targets
+            - machines
           properties:
             custom_message:
               type: string
@@ -1428,6 +1272,10 @@ components:
               type: boolean
             targets:
               $ref: '#/components/schemas/RuleTargets'
+            machines:
+              type: array
+              items:
+                $ref: '#/components/schemas/RuleMachine'
     RuleCreateRequest:
       type: object
       required:
@@ -1473,17 +1321,10 @@ components:
         path: github.com/woodleighschool/grinch/internal/domain
       type: object
       required:
-        - id
-        - rule_id
         - machine_id
         - policy
         - applied
       properties:
-        id:
-          type: string
-        rule_id:
-          type: string
-          format: uuid
         machine_id:
           type: string
           format: uuid
@@ -1491,19 +1332,6 @@ components:
           $ref: '#/components/schemas/RulePolicy'
         applied:
           type: boolean
-    RuleMachineListResponse:
-      type: object
-      required:
-        - total
-        - rows
-      properties:
-        total:
-          type: integer
-          format: int32
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/RuleMachine'
     RulePolicy:
       x-go-type: domain.RulePolicy
       x-go-type-import:
@@ -1653,6 +1481,11 @@ components:
           type: string
         source:
           $ref: '#/components/schemas/Source'
+        group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
         created_at:
           type: string
           format: date-time

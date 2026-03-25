@@ -120,7 +120,76 @@ func (s *Store) GetMachine(ctx context.Context, id uuid.UUID) (domain.Machine, e
 		return domain.Machine{}, err
 	}
 
-	return mapMachine(row)
+	machine, err := mapMachine(row)
+	if err != nil {
+		return domain.Machine{}, err
+	}
+
+	memberships, _, err := s.ListMemberships(ctx, domain.MembershipListOptions{
+		ListOptions: domain.ListOptions{},
+		MachineID:   &id,
+	})
+	if err != nil {
+		return domain.Machine{}, err
+	}
+
+	machine.GroupIDs = make([]uuid.UUID, 0, len(memberships))
+	for _, membership := range memberships {
+		machine.GroupIDs = append(machine.GroupIDs, membership.Group.ID)
+	}
+
+	rules, err := s.listMachineRulesForMachine(ctx, id)
+	if err != nil {
+		return domain.Machine{}, err
+	}
+
+	machine.Rules = rules
+
+	return machine, nil
+}
+
+func (s *Store) listMachineRulesForMachine(ctx context.Context, machineID uuid.UUID) ([]domain.MachineRule, error) {
+	rows, err := s.Pool().Query(ctx, machineRulesForMachineQuery, machineID)
+	if err != nil {
+		return nil, fmt.Errorf("list machine rules: %w", err)
+	}
+
+	rules := make([]domain.MachineRule, 0)
+	for rows.Next() {
+		rule, scanErr := scanMachineRuleDetail(rows)
+		if scanErr != nil {
+			rows.Close()
+			return nil, scanErr
+		}
+
+		rules = append(rules, rule)
+	}
+
+	if rowErr := rows.Err(); rowErr != nil {
+		return nil, rowErr
+	}
+
+	return rules, nil
+}
+
+func scanMachineRuleDetail(rows pgx.Rows) (domain.MachineRule, error) {
+	var (
+		rule       domain.MachineRule
+		policyText string
+	)
+
+	if err := rows.Scan(&rule.RuleID, &policyText, &rule.Applied); err != nil {
+		return domain.MachineRule{}, err
+	}
+
+	policy, err := domain.ParseRulePolicy(policyText)
+	if err != nil {
+		return domain.MachineRule{}, fmt.Errorf("parse machine rule policy: %w", err)
+	}
+
+	rule.Policy = policy
+
+	return rule, nil
 }
 
 func (s *Store) DeleteMachine(ctx context.Context, id uuid.UUID) error {
@@ -433,4 +502,112 @@ WHERE %s
 ORDER BY %s
 LIMIT NULLIF($%d::INT, 0)
 OFFSET $%d
+`
+
+const machineRulesForMachineQuery = `
+WITH effective_groups AS (
+  SELECT gmm.group_id
+  FROM group_machine_memberships AS gmm
+  WHERE gmm.machine_id = $1
+
+  UNION
+
+  SELECT gum.group_id
+  FROM machines AS m
+  JOIN users AS u
+    ON u.upn = NULLIF(m.primary_user, '')
+  JOIN group_user_memberships AS gum
+    ON gum.user_id = u.id
+  WHERE m.id = $1
+),
+machine_user AS (
+  SELECT u.id
+  FROM machines AS m
+  JOIN users AS u
+    ON u.upn = NULLIF(m.primary_user, '')
+  WHERE m.id = $1
+),
+matching_targets AS (
+  SELECT
+    rt.rule_id,
+    rt.subject_kind,
+    rt.subject_id,
+    rt.assignment,
+    rt.priority,
+    rt.policy,
+    rt.cel_expression
+  FROM rule_targets AS rt
+  WHERE rt.subject_kind = 'all_devices'
+    OR (
+      rt.subject_kind = 'all_users'
+      AND EXISTS (SELECT 1 FROM machine_user)
+    )
+    OR (
+      rt.subject_kind = 'group'
+      AND EXISTS (
+        SELECT 1
+        FROM effective_groups AS eg
+        WHERE eg.group_id = rt.subject_id
+      )
+    )
+),
+matching_excludes AS (
+  SELECT DISTINCT mt.rule_id
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'exclude'
+),
+matching_includes AS (
+  SELECT
+    mt.rule_id,
+    mt.policy,
+    mt.cel_expression,
+    ROW_NUMBER() OVER (
+      PARTITION BY mt.rule_id
+      ORDER BY mt.priority ASC, mt.subject_kind ASC, mt.subject_id ASC NULLS FIRST
+    ) AS include_rank
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'include'
+),
+winning_includes AS (
+  SELECT
+    rule_id,
+    policy,
+    cel_expression
+  FROM matching_includes
+  WHERE include_rank = 1
+)
+SELECT
+  r.id AS rule_id,
+  wi.policy,
+  EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(ms.applied_targets, '[]'::JSONB)) AS applied(target)
+    WHERE applied.target->>'rule_type' = r.rule_type::text
+      AND applied.target->>'identifier' = r.identifier
+      AND applied.target->>'payload_hash' = encode(
+        digest(
+          concat_ws(
+            E'\x1f',
+            r.rule_type::text,
+            r.identifier,
+            wi.policy::text,
+            r.custom_message,
+            r.custom_url,
+            wi.cel_expression
+          ),
+          'sha256'
+        ),
+        'hex'
+      )
+  ) AS applied
+FROM rules AS r
+JOIN winning_includes AS wi
+  ON wi.rule_id = r.id
+LEFT JOIN matching_excludes AS me
+  ON me.rule_id = r.id
+LEFT JOIN machine_sync_states AS ms
+  ON ms.machine_id = $1
+WHERE me.rule_id IS NULL
+  AND r.enabled = TRUE
+ORDER BY r.rule_type ASC, r.identifier ASC, r.id ASC
 `

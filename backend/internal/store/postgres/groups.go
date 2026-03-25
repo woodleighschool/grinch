@@ -107,7 +107,7 @@ func (s *Store) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error
 		return domain.Group{}, err
 	}
 
-	return mapGroupFields(
+	group, err := mapGroupFields(
 		row.ID,
 		row.Name,
 		row.Description,
@@ -116,6 +116,31 @@ func (s *Store) GetGroup(ctx context.Context, id uuid.UUID) (domain.Group, error
 		row.CreatedAt,
 		row.UpdatedAt,
 	)
+	if err != nil {
+		return domain.Group{}, err
+	}
+
+	memberships, _, err := s.ListMemberships(ctx, domain.MembershipListOptions{
+		ListOptions: domain.ListOptions{},
+		GroupID:     &id,
+	})
+	if err != nil {
+		return domain.Group{}, err
+	}
+
+	group.UserIDs = make([]uuid.UUID, 0, len(memberships))
+	group.MachineIDs = make([]uuid.UUID, 0, len(memberships))
+
+	for _, membership := range memberships {
+		switch membership.Member.Kind {
+		case domain.MemberKindUser:
+			group.UserIDs = append(group.UserIDs, membership.Member.ID)
+		case domain.MemberKindMachine:
+			group.MachineIDs = append(group.MachineIDs, membership.Member.ID)
+		}
+	}
+
+	return group, nil
 }
 
 func (s *Store) CreateLocalGroup(

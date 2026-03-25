@@ -1,11 +1,12 @@
 import { ShowActions } from "@/resources/shared/actions";
 import { ExecutionDecisionField } from "@/resources/shared/decisionField";
-import { MembershipGroupLinkField, MembershipGroupSourceField } from "@/resources/shared/membershipFields";
+import { SourceField } from "@/resources/shared/sourceField";
 import type { ReactElement } from "react";
 import {
   DataTable,
   DateField,
   Pagination,
+  ReferenceArrayField,
   ReferenceField,
   ReferenceManyField,
   Show,
@@ -24,16 +25,14 @@ export const UserShow = (): ReactElement => (
         <DateField source="updated_at" label="Updated" showTime />
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Groups">
-        <ReferenceManyField reference="memberships" target="user_id" pagination={<Pagination />}>
-          <DataTable bulkActionButtons={false}>
-            <DataTable.Col source="group.name" label="Name">
-              <MembershipGroupLinkField />
-            </DataTable.Col>
-            <DataTable.Col source="group.source" label="Source">
-              <MembershipGroupSourceField />
+        <ReferenceArrayField source="group_ids" reference="groups">
+          <DataTable rowClick="show" bulkActionButtons={false}>
+            <DataTable.Col source="name" label="Name" />
+            <DataTable.Col source="source" label="Source">
+              <SourceField />
             </DataTable.Col>
           </DataTable>
-        </ReferenceManyField>
+        </ReferenceArrayField>
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Machines">
         <ReferenceManyField reference="machines" target="user_id" pagination={<Pagination />}>

@@ -108,24 +108,6 @@ func (e ListGroupsParamsOrder) Valid() bool {
 	}
 }
 
-// Defines values for ListMachineRulesParamsOrder.
-const (
-	ListMachineRulesParamsOrderAsc  ListMachineRulesParamsOrder = "asc"
-	ListMachineRulesParamsOrderDesc ListMachineRulesParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListMachineRulesParamsOrder enum.
-func (e ListMachineRulesParamsOrder) Valid() bool {
-	switch e {
-	case ListMachineRulesParamsOrderAsc:
-		return true
-	case ListMachineRulesParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ListMachinesParamsOrder.
 const (
 	ListMachinesParamsOrderAsc  ListMachinesParamsOrder = "asc"
@@ -138,42 +120,6 @@ func (e ListMachinesParamsOrder) Valid() bool {
 	case ListMachinesParamsOrderAsc:
 		return true
 	case ListMachinesParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListMembershipsParamsOrder.
-const (
-	ListMembershipsParamsOrderAsc  ListMembershipsParamsOrder = "asc"
-	ListMembershipsParamsOrderDesc ListMembershipsParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListMembershipsParamsOrder enum.
-func (e ListMembershipsParamsOrder) Valid() bool {
-	switch e {
-	case ListMembershipsParamsOrderAsc:
-		return true
-	case ListMembershipsParamsOrderDesc:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListRuleMachinesParamsOrder.
-const (
-	ListRuleMachinesParamsOrderAsc  ListRuleMachinesParamsOrder = "asc"
-	ListRuleMachinesParamsOrderDesc ListRuleMachinesParamsOrder = "desc"
-)
-
-// Valid indicates whether the value is a known member of the ListRuleMachinesParamsOrder enum.
-func (e ListRuleMachinesParamsOrder) Valid() bool {
-	switch e {
-	case ListRuleMachinesParamsOrderAsc:
-		return true
-	case ListRuleMachinesParamsOrderDesc:
 		return true
 	default:
 		return false
@@ -200,16 +146,16 @@ func (e ListRulesParamsOrder) Valid() bool {
 
 // Defines values for ListUsersParamsOrder.
 const (
-	Asc  ListUsersParamsOrder = "asc"
-	Desc ListUsersParamsOrder = "desc"
+	ListUsersParamsOrderAsc  ListUsersParamsOrder = "asc"
+	ListUsersParamsOrderDesc ListUsersParamsOrder = "desc"
 )
 
 // Valid indicates whether the value is a known member of the ListUsersParamsOrder enum.
 func (e ListUsersParamsOrder) Valid() bool {
 	switch e {
-	case Asc:
+	case ListUsersParamsOrderAsc:
 		return true
-	case Desc:
+	case ListUsersParamsOrderDesc:
 		return true
 	default:
 		return false
@@ -297,42 +243,11 @@ type MachineListResponse struct {
 // MachineRule defines model for MachineRule.
 type MachineRule = domain.MachineRule
 
-// MachineRuleListResponse defines model for MachineRuleListResponse.
-type MachineRuleListResponse struct {
-	Rows  []MachineRule `json:"rows"`
-	Total int32         `json:"total"`
-}
-
 // MachineRuleSyncStatus defines model for MachineRuleSyncStatus.
 type MachineRuleSyncStatus = domain.MachineRuleSyncStatus
 
 // MachineSummary defines model for MachineSummary.
 type MachineSummary = domain.MachineSummary
-
-// MemberKind defines model for MemberKind.
-type MemberKind = domain.MemberKind
-
-// Membership defines model for Membership.
-type Membership = domain.Membership
-
-// MembershipCreateRequest defines model for MembershipCreateRequest.
-type MembershipCreateRequest struct {
-	GroupId    openapi_types.UUID `json:"group_id"`
-	MemberId   openapi_types.UUID `json:"member_id"`
-	MemberKind MemberKind         `json:"member_kind"`
-}
-
-// MembershipGroup defines model for MembershipGroup.
-type MembershipGroup = domain.MembershipGroup
-
-// MembershipListResponse defines model for MembershipListResponse.
-type MembershipListResponse struct {
-	Rows  []Membership `json:"rows"`
-	Total int32        `json:"total"`
-}
-
-// MembershipMember defines model for MembershipMember.
-type MembershipMember = domain.MembershipMember
 
 // Rule defines model for Rule.
 type Rule = domain.RuleSummary
@@ -359,12 +274,6 @@ type RuleListResponse struct {
 
 // RuleMachine defines model for RuleMachine.
 type RuleMachine = domain.RuleMachine
-
-// RuleMachineListResponse defines model for RuleMachineListResponse.
-type RuleMachineListResponse struct {
-	Rows  []RuleMachine `json:"rows"`
-	Total int32         `json:"total"`
-}
 
 // RulePolicy defines model for RulePolicy.
 type RulePolicy = domain.RulePolicy
@@ -429,11 +338,11 @@ type MachineClientModeFilter = []MachineClientMode
 // MachineIdFilter defines model for MachineIdFilter.
 type MachineIdFilter = openapi_types.UUID
 
+// MachineIdPath defines model for MachineIdPath.
+type MachineIdPath = openapi_types.UUID
+
 // MachineRuleSyncStatusFilter defines model for MachineRuleSyncStatusFilter.
 type MachineRuleSyncStatusFilter = []MachineRuleSyncStatus
-
-// MembershipId defines model for MembershipId.
-type MembershipId = openapi_types.UUID
 
 // Offset defines model for Offset.
 type Offset = int32
@@ -464,6 +373,9 @@ type SubjectKindFilter = RuleTargetSubjectKind
 
 // UserIdFilter defines model for UserIdFilter.
 type UserIdFilter = openapi_types.UUID
+
+// UserIdPath defines model for UserIdPath.
+type UserIdPath = openapi_types.UUID
 
 // ListExecutablesParams defines parameters for ListExecutables.
 type ListExecutablesParams struct {
@@ -531,21 +443,6 @@ type ListGroupsParams struct {
 // ListGroupsParamsOrder defines parameters for ListGroups.
 type ListGroupsParamsOrder string
 
-// ListMachineRulesParams defines parameters for ListMachineRules.
-type ListMachineRulesParams struct {
-	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-	Search *Search `form:"search,omitempty" json:"search,omitempty"`
-
-	// Sort Sort field name.
-	Sort      *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
-	Order     *ListMachineRulesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	MachineId openapi_types.UUID           `form:"machine_id" json:"machine_id"`
-}
-
-// ListMachineRulesParamsOrder defines parameters for ListMachineRules.
-type ListMachineRulesParamsOrder string
-
 // ListMachinesParams defines parameters for ListMachines.
 type ListMachinesParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
@@ -563,38 +460,6 @@ type ListMachinesParams struct {
 
 // ListMachinesParamsOrder defines parameters for ListMachines.
 type ListMachinesParamsOrder string
-
-// ListMembershipsParams defines parameters for ListMemberships.
-type ListMembershipsParams struct {
-	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-	Search *Search `form:"search,omitempty" json:"search,omitempty"`
-
-	// Sort Sort field name.
-	Sort      *Sort                       `form:"sort,omitempty" json:"sort,omitempty"`
-	Order     *ListMembershipsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	GroupId   *GroupIdFilter              `form:"group_id,omitempty" json:"group_id,omitempty"`
-	UserId    *UserIdFilter               `form:"user_id,omitempty" json:"user_id,omitempty"`
-	MachineId *MachineIdFilter            `form:"machine_id,omitempty" json:"machine_id,omitempty"`
-}
-
-// ListMembershipsParamsOrder defines parameters for ListMemberships.
-type ListMembershipsParamsOrder string
-
-// ListRuleMachinesParams defines parameters for ListRuleMachines.
-type ListRuleMachinesParams struct {
-	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
-	Search *Search `form:"search,omitempty" json:"search,omitempty"`
-
-	// Sort Sort field name.
-	Sort   *Sort                        `form:"sort,omitempty" json:"sort,omitempty"`
-	Order  *ListRuleMachinesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-	RuleId openapi_types.UUID           `form:"rule_id" json:"rule_id"`
-}
-
-// ListRuleMachinesParamsOrder defines parameters for ListRuleMachines.
-type ListRuleMachinesParamsOrder string
 
 // ListRulesParams defines parameters for ListRules.
 type ListRulesParams struct {
@@ -633,9 +498,6 @@ type CreateGroupJSONRequestBody = GroupCreateRequest
 
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = GroupCreateRequest
-
-// CreateMembershipJSONRequestBody defines body for CreateMembership for application/json ContentType.
-type CreateMembershipJSONRequestBody = MembershipCreateRequest
 
 // CreateRuleJSONRequestBody defines body for CreateRule for application/json ContentType.
 type CreateRuleJSONRequestBody = RuleCreateRequest
@@ -685,8 +547,17 @@ type ServerInterface interface {
 	// (PUT /groups/{id})
 	UpdateGroup(w http.ResponseWriter, r *http.Request, id Id)
 
-	// (GET /machine-rules)
-	ListMachineRules(w http.ResponseWriter, r *http.Request, params ListMachineRulesParams)
+	// (DELETE /groups/{id}/machines/{machine_id})
+	RemoveGroupMachine(w http.ResponseWriter, r *http.Request, id Id, machineId MachineIdPath)
+
+	// (PUT /groups/{id}/machines/{machine_id})
+	AddGroupMachine(w http.ResponseWriter, r *http.Request, id Id, machineId MachineIdPath)
+
+	// (DELETE /groups/{id}/users/{user_id})
+	RemoveGroupUser(w http.ResponseWriter, r *http.Request, id Id, userId UserIdPath)
+
+	// (PUT /groups/{id}/users/{user_id})
+	AddGroupUser(w http.ResponseWriter, r *http.Request, id Id, userId UserIdPath)
 
 	// (GET /machines)
 	ListMachines(w http.ResponseWriter, r *http.Request, params ListMachinesParams)
@@ -696,21 +567,6 @@ type ServerInterface interface {
 
 	// (GET /machines/{id})
 	GetMachine(w http.ResponseWriter, r *http.Request, id Id)
-
-	// (GET /memberships)
-	ListMemberships(w http.ResponseWriter, r *http.Request, params ListMembershipsParams)
-
-	// (POST /memberships)
-	CreateMembership(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /memberships/{id})
-	DeleteMembership(w http.ResponseWriter, r *http.Request, id MembershipId)
-
-	// (GET /memberships/{id})
-	GetMembership(w http.ResponseWriter, r *http.Request, id MembershipId)
-
-	// (GET /rule-machines)
-	ListRuleMachines(w http.ResponseWriter, r *http.Request, params ListRuleMachinesParams)
 
 	// (GET /rules)
 	ListRules(w http.ResponseWriter, r *http.Request, params ListRulesParams)
@@ -803,8 +659,23 @@ func (_ Unimplemented) UpdateGroup(w http.ResponseWriter, r *http.Request, id Id
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (GET /machine-rules)
-func (_ Unimplemented) ListMachineRules(w http.ResponseWriter, r *http.Request, params ListMachineRulesParams) {
+// (DELETE /groups/{id}/machines/{machine_id})
+func (_ Unimplemented) RemoveGroupMachine(w http.ResponseWriter, r *http.Request, id Id, machineId MachineIdPath) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /groups/{id}/machines/{machine_id})
+func (_ Unimplemented) AddGroupMachine(w http.ResponseWriter, r *http.Request, id Id, machineId MachineIdPath) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /groups/{id}/users/{user_id})
+func (_ Unimplemented) RemoveGroupUser(w http.ResponseWriter, r *http.Request, id Id, userId UserIdPath) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /groups/{id}/users/{user_id})
+func (_ Unimplemented) AddGroupUser(w http.ResponseWriter, r *http.Request, id Id, userId UserIdPath) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -820,31 +691,6 @@ func (_ Unimplemented) DeleteMachine(w http.ResponseWriter, r *http.Request, id 
 
 // (GET /machines/{id})
 func (_ Unimplemented) GetMachine(w http.ResponseWriter, r *http.Request, id Id) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (GET /memberships)
-func (_ Unimplemented) ListMemberships(w http.ResponseWriter, r *http.Request, params ListMembershipsParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (POST /memberships)
-func (_ Unimplemented) CreateMembership(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (DELETE /memberships/{id})
-func (_ Unimplemented) DeleteMembership(w http.ResponseWriter, r *http.Request, id MembershipId) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (GET /memberships/{id})
-func (_ Unimplemented) GetMembership(w http.ResponseWriter, r *http.Request, id MembershipId) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (GET /rule-machines)
-func (_ Unimplemented) ListRuleMachines(w http.ResponseWriter, r *http.Request, params ListRuleMachinesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1500,10 +1346,28 @@ func (siw *ServerInterfaceWrapper) UpdateGroup(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// ListMachineRules operation middleware
-func (siw *ServerInterfaceWrapper) ListMachineRules(w http.ResponseWriter, r *http.Request) {
+// RemoveGroupMachine operation middleware
+func (siw *ServerInterfaceWrapper) RemoveGroupMachine(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "machine_id" -------------
+	var machineId MachineIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "machine_id", chi.URLParam(r, "machine_id"), &machineId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "machine_id", Err: err})
+		return
+	}
 
 	ctx := r.Context()
 
@@ -1511,66 +1375,128 @@ func (siw *ServerInterfaceWrapper) ListMachineRules(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListMachineRulesParams
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveGroupMachine(w, r, id, machineId)
+	}))
 
-	// ------------- Optional query parameter "limit" -------------
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	handler.ServeHTTP(w, r)
+}
+
+// AddGroupMachine operation middleware
+func (siw *ServerInterfaceWrapper) AddGroupMachine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
 
-	// ------------- Optional query parameter "offset" -------------
+	// ------------- Path parameter "machine_id" -------------
+	var machineId MachineIdPath
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "search" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "sort" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		return
-	}
-
-	// ------------- Required query parameter "machine_id" -------------
-
-	if paramValue := r.URL.Query().Get("machine_id"); paramValue != "" {
-
-	} else {
-		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "machine_id"})
-		return
-	}
-
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	err = runtime.BindStyledParameterWithOptions("simple", "machine_id", chi.URLParam(r, "machine_id"), &machineId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "machine_id", Err: err})
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListMachineRules(w, r, params)
+		siw.Handler.AddGroupMachine(w, r, id, machineId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveGroupUser operation middleware
+func (siw *ServerInterfaceWrapper) RemoveGroupUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveGroupUser(w, r, id, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddGroupUser operation middleware
+func (siw *ServerInterfaceWrapper) AddGroupUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddGroupUser(w, r, id, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1730,257 +1656,6 @@ func (siw *ServerInterfaceWrapper) GetMachine(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMachine(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListMemberships operation middleware
-func (siw *ServerInterfaceWrapper) ListMemberships(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListMembershipsParams
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "search" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "sort" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "group_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "group_id", r.URL.Query(), &params.GroupId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_id", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "user_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "machine_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "machine_id", r.URL.Query(), &params.MachineId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "machine_id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListMemberships(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateMembership operation middleware
-func (siw *ServerInterfaceWrapper) CreateMembership(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateMembership(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteMembership operation middleware
-func (siw *ServerInterfaceWrapper) DeleteMembership(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id MembershipId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteMembership(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetMembership operation middleware
-func (siw *ServerInterfaceWrapper) GetMembership(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id MembershipId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetMembership(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListRuleMachines operation middleware
-func (siw *ServerInterfaceWrapper) ListRuleMachines(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListRuleMachinesParams
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "search" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "sort" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "order", r.URL.Query(), &params.Order, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "order", Err: err})
-		return
-	}
-
-	// ------------- Required query parameter "rule_id" -------------
-
-	if paramValue := r.URL.Query().Get("rule_id"); paramValue != "" {
-
-	} else {
-		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "rule_id"})
-		return
-	}
-
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "rule_id", r.URL.Query(), &params.RuleId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule_id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListRuleMachines(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2449,7 +2124,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/groups/{id}", wrapper.UpdateGroup)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/machine-rules", wrapper.ListMachineRules)
+		r.Delete(options.BaseURL+"/groups/{id}/machines/{machine_id}", wrapper.RemoveGroupMachine)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/groups/{id}/machines/{machine_id}", wrapper.AddGroupMachine)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/groups/{id}/users/{user_id}", wrapper.RemoveGroupUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/groups/{id}/users/{user_id}", wrapper.AddGroupUser)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines", wrapper.ListMachines)
@@ -2459,21 +2143,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/machines/{id}", wrapper.GetMachine)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/memberships", wrapper.ListMemberships)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/memberships", wrapper.CreateMembership)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/memberships/{id}", wrapper.DeleteMembership)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/memberships/{id}", wrapper.GetMembership)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/rule-machines", wrapper.ListRuleMachines)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/rules", wrapper.ListRules)

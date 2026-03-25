@@ -27,18 +27,6 @@ type MachineListOptions struct {
 	ClientModes      []MachineClientMode
 }
 
-type MachineRuleListOptions struct {
-	ListOptions
-
-	MachineID *uuid.UUID
-}
-
-type RuleMachineListOptions struct {
-	ListOptions
-
-	RuleID *uuid.UUID
-}
-
 type ExecutionEventListOptions struct {
 	ListOptions
 

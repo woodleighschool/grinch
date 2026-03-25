@@ -17,7 +17,6 @@ import (
 	appentrasync "github.com/woodleighschool/grinch/internal/app/entrasync"
 	appevents "github.com/woodleighschool/grinch/internal/app/events"
 	appgroups "github.com/woodleighschool/grinch/internal/app/groups"
-	appmemberships "github.com/woodleighschool/grinch/internal/app/memberships"
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
 	appsanta "github.com/woodleighschool/grinch/internal/app/santa"
 	"github.com/woodleighschool/grinch/internal/config"
@@ -85,7 +84,6 @@ func buildServer(
 ) (*http.Server, error) {
 	groupService := appgroups.New(store)
 	ruleService := apprules.New(store)
-	membershipService := appmemberships.New(store)
 	syncService := appsanta.New(
 		logger,
 		store,
@@ -116,7 +114,6 @@ func buildServer(
 		store,
 		groupService,
 		ruleService,
-		membershipService,
 	)
 
 	go eventService.RunRetention(ctx, retentionInterval)

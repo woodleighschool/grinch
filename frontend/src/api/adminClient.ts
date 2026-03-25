@@ -17,14 +17,10 @@ type FileAccessEvent = components["schemas"]["FileAccessEvent"];
 type FileAccessEventListResponse = components["schemas"]["FileAccessEventListResponse"];
 type Group = components["schemas"]["Group"];
 type GroupListResponse = components["schemas"]["GroupListResponse"];
-type Membership = components["schemas"]["Membership"];
-type MembershipListResponse = components["schemas"]["MembershipListResponse"];
 type Machine = components["schemas"]["Machine"];
 type MachineListResponse = components["schemas"]["MachineListResponse"];
-type MachineRuleListResponse = components["schemas"]["MachineRuleListResponse"];
 type Rule = components["schemas"]["Rule"];
 type RuleListResponse = components["schemas"]["RuleListResponse"];
-type RuleMachineListResponse = components["schemas"]["RuleMachineListResponse"];
 type User = components["schemas"]["User"];
 type UserListResponse = components["schemas"]["UserListResponse"];
 type QueryScalar = string | number | boolean;
@@ -95,6 +91,20 @@ const withPath = <T extends string>(id: T): { params: { path: { id: T } } } => (
   params: { path: { id } },
 });
 
+const withGroupUserPath = <T extends string, U extends string>(
+  groupID: T,
+  userID: U,
+): { params: { path: { id: T; user_id: U } } } => ({
+  params: { path: { id: groupID, user_id: userID } },
+});
+
+const withGroupMachinePath = <T extends string, U extends string>(
+  groupID: T,
+  machineID: U,
+): { params: { path: { id: T; machine_id: U } } } => ({
+  params: { path: { id: groupID, machine_id: machineID } },
+});
+
 const list =
   <R>(path: keyof paths) =>
   (query: QueryParameters, signal?: AbortSignal): Promise<R> =>
@@ -126,10 +136,6 @@ export const machinesApi = {
   delete: deleteOne("/machines/{id}"),
 };
 
-export const machineRulesApi = {
-  list: list<MachineRuleListResponse>("/machine-rules"),
-};
-
 export const executablesApi = {
   list: list<ExecutableListResponse>("/executables"),
   get: getOne<Executable>("/executables/{id}"),
@@ -155,23 +161,20 @@ export const rulesApi = {
   delete: deleteOne("/rules/{id}"),
 };
 
-export const ruleMachinesApi = {
-  list: list<RuleMachineListResponse>("/rule-machines"),
-};
-
 export const groupsApi = {
   list: list<GroupListResponse>("/groups"),
   get: getOne<Group>("/groups/{id}"),
   create: createOne<Group>("/groups"),
   update: updateOne<Group>("/groups/{id}"),
   delete: deleteOne("/groups/{id}"),
-};
-
-export const membershipsApi = {
-  list: list<MembershipListResponse>("/memberships"),
-  get: getOne<Membership>("/memberships/{id}"),
-  create: createOne<Membership>("/memberships"),
-  delete: deleteOne("/memberships/{id}"),
+  addUser: (groupID: string, userID: string): Promise<void> =>
+    expectOk(client.PUT("/groups/{id}/users/{user_id}", withGroupUserPath(groupID, userID))),
+  removeUser: (groupID: string, userID: string): Promise<void> =>
+    expectOk(client.DELETE("/groups/{id}/users/{user_id}", withGroupUserPath(groupID, userID))),
+  addMachine: (groupID: string, machineID: string): Promise<void> =>
+    expectOk(client.PUT("/groups/{id}/machines/{machine_id}", withGroupMachinePath(groupID, machineID))),
+  removeMachine: (groupID: string, machineID: string): Promise<void> =>
+    expectOk(client.DELETE("/groups/{id}/machines/{machine_id}", withGroupMachinePath(groupID, machineID))),
 };
 
 export const usersApi = {

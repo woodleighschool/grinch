@@ -2,14 +2,16 @@ import { CLIENT_MODE_CHOICES, RULE_SYNC_STATUS_CHOICES } from "@/resources/machi
 import { RULE_POLICY_CHOICES } from "@/resources/rules/choices";
 import { EditableShowActions } from "@/resources/shared/actions";
 import { ExecutionDecisionField, FileAccessDecisionField } from "@/resources/shared/decisionField";
-import { MembershipGroupLinkField, MembershipGroupSourceField } from "@/resources/shared/membershipFields";
+import { SourceField } from "@/resources/shared/sourceField";
 import type { ReactElement } from "react";
 import {
+  ArrayField,
   BooleanField,
   DataTable,
   DateField,
   NumberField,
   Pagination,
+  ReferenceArrayField,
   ReferenceField,
   ReferenceManyField,
   SelectField,
@@ -44,10 +46,10 @@ export const MachineShow = (): ReactElement => (
         <DateField source="updated_at" label="Updated" showTime />
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Rules">
-        <ReferenceManyField reference="machine-rules" target="machine_id" pagination={<Pagination />}>
-          <DataTable bulkActionButtons={false}>
+        <ArrayField source="rules">
+          <DataTable bulkActionButtons={false} rowClick={false}>
             <DataTable.Col source="rule_id" label="Rule">
-              <ReferenceField source="rule_id" reference="rules" label="Rule">
+              <ReferenceField source="rule_id" reference="rules" link="show">
                 <TextField source="name" />
               </ReferenceField>
             </DataTable.Col>
@@ -58,19 +60,17 @@ export const MachineShow = (): ReactElement => (
               <BooleanField source="applied" />
             </DataTable.Col>
           </DataTable>
-        </ReferenceManyField>
+        </ArrayField>
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Groups">
-        <ReferenceManyField reference="memberships" target="machine_id" pagination={<Pagination />}>
-          <DataTable bulkActionButtons={false}>
-            <DataTable.Col source="group.name" label="Name">
-              <MembershipGroupLinkField />
-            </DataTable.Col>
-            <DataTable.Col source="group.source" label="Source">
-              <MembershipGroupSourceField />
+        <ReferenceArrayField source="group_ids" reference="groups">
+          <DataTable rowClick="show" bulkActionButtons={false}>
+            <DataTable.Col source="name" label="Name" />
+            <DataTable.Col source="source" label="Source">
+              <SourceField />
             </DataTable.Col>
           </DataTable>
-        </ReferenceManyField>
+        </ReferenceArrayField>
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Events">
         <ReferenceManyField reference="execution-events" target="machine_id" pagination={<Pagination />}>

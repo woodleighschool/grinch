@@ -3,21 +3,15 @@ import {
   executionEventsApi,
   fileAccessEventsApi,
   groupsApi,
-  machineRulesApi,
   machinesApi,
-  membershipsApi,
-  ruleMachinesApi,
   rulesApi,
   usersApi,
 } from "@/api/adminClient";
-import type { components } from "@/api/openapi";
 import type {
   CreateParams,
   CreateResult,
   DataProvider,
-  DeleteManyParams,
   DeleteManyResult,
-  DeleteParams,
   DeleteResult,
   GetListParams,
   GetListResult,
@@ -29,14 +23,11 @@ import type {
   GetOneResult,
   Identifier,
   RaRecord,
-  UpdateManyParams,
   UpdateManyResult,
   UpdateParams,
   UpdateResult,
 } from "react-admin";
 
-type MembershipCreateRequest = components["schemas"]["MembershipCreateRequest"];
-type MembershipListItem = components["schemas"]["Membership"];
 type RecordShape = Record<string, unknown>;
 type QueryScalar = string | number | boolean;
 type QueryValue = QueryScalar | QueryScalar[];
@@ -124,35 +115,22 @@ const toListResult = (payload: { rows: unknown[]; total: number }): ListResult =
   total: payload.total,
 });
 
-const toMembershipRecord = (item: MembershipListItem): RaRecord => ({
-  ...item,
-});
-
-const toMembershipListResult = (payload: { rows: MembershipListItem[]; total: number }): ListResult => ({
-  data: payload.rows.map((item): RaRecord => toMembershipRecord(item)),
-  total: payload.total,
-});
-
 const unsupported = (operation: string, resource: string): never => {
   throw new Error(`${operation} not supported for resource: ${resource}`);
 };
 
 type ListHandler = (parameters: GetListParams | GetManyReferenceParams, signal?: AbortSignal) => Promise<ListResult>;
 type GetOneHandler = (id: Identifier, signal?: AbortSignal) => Promise<RaRecord>;
-type CreateHandler = (data: RecordShape) => Promise<RaRecord>;
 type UpdateHandler = (id: Identifier, data: RecordShape) => Promise<RaRecord>;
 type DeleteHandler = (id: Identifier) => Promise<void>;
 
 type ResourceName =
   | "users"
   | "groups"
-  | "memberships"
   | "machines"
-  | "machine-rules"
   | "executables"
   | "execution-events"
   | "file-access-events"
-  | "rule-machines"
   | "rules";
 
 const listHandlers: Record<ResourceName, ListHandler> = {
@@ -161,21 +139,6 @@ const listHandlers: Record<ResourceName, ListHandler> = {
 
   groups: async (parameters, signal): Promise<ListResult> =>
     toListResult(await groupsApi.list(asListQuery(parameters), signal)),
-
-  memberships: async (parameters, signal): Promise<ListResult> => {
-    const filter = asRecord(parameters.filter);
-
-    return toMembershipListResult(
-      await membershipsApi.list(
-        asListQuery(parameters, {
-          group_id: getOptionalString(filter.group_id),
-          user_id: getOptionalString(filter.user_id),
-          machine_id: getOptionalString(filter.machine_id),
-        }),
-        signal,
-      ),
-    );
-  },
 
   machines: async (parameters, signal): Promise<ListResult> => {
     const filter = asRecord(parameters.filter);
@@ -186,19 +149,6 @@ const listHandlers: Record<ResourceName, ListHandler> = {
           user_id: getOptionalString(filter.user_id),
           "rule_sync_status[]": getOptionalStringArray(filter.rule_sync_status),
           "client_mode[]": getOptionalStringArray(filter.client_mode),
-        }),
-        signal,
-      ),
-    );
-  },
-
-  "machine-rules": async (parameters, signal): Promise<ListResult> => {
-    const filter = asRecord(parameters.filter);
-
-    return toListResult(
-      await machineRulesApi.list(
-        asListQuery(parameters, {
-          machine_id: getOptionalString(filter.machine_id),
         }),
         signal,
       ),
@@ -262,25 +212,11 @@ const listHandlers: Record<ResourceName, ListHandler> = {
       ),
     );
   },
-
-  "rule-machines": async (parameters, signal): Promise<ListResult> => {
-    const filter = asRecord(parameters.filter);
-
-    return toListResult(
-      await ruleMachinesApi.list(
-        asListQuery(parameters, {
-          rule_id: getOptionalString(filter.rule_id),
-        }),
-        signal,
-      ),
-    );
-  },
 };
 
 const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   users: (id, signal): Promise<RaRecord> => usersApi.get(String(id), signal) as Promise<RaRecord>,
   groups: (id, signal): Promise<RaRecord> => groupsApi.get(String(id), signal) as Promise<RaRecord>,
-  memberships: (id, signal): Promise<RaRecord> => membershipsApi.get(String(id), signal) as Promise<RaRecord>,
   machines: (id, signal): Promise<RaRecord> => machinesApi.get(String(id), signal) as Promise<RaRecord>,
   executables: (id, signal): Promise<RaRecord> => executablesApi.get(String(id), signal) as Promise<RaRecord>,
   "execution-events": (id, signal): Promise<RaRecord> =>
@@ -290,19 +226,12 @@ const getOneHandlers: Partial<Record<ResourceName, GetOneHandler>> = {
   rules: (id, signal): Promise<RaRecord> => rulesApi.get(String(id), signal) as Promise<RaRecord>,
 };
 
-const createHandlers: Partial<Record<ResourceName, CreateHandler>> = {
-  rules: (data): Promise<RaRecord> => rulesApi.create(data) as Promise<RaRecord>,
-  groups: (data): Promise<RaRecord> => groupsApi.create(data) as Promise<RaRecord>,
-  memberships: (data): Promise<RaRecord> => membershipsApi.create(data as MembershipCreateRequest) as Promise<RaRecord>,
-};
-
 const updateHandlers: Partial<Record<ResourceName, UpdateHandler>> = {
   rules: (id, data): Promise<RaRecord> => rulesApi.update(String(id), data) as Promise<RaRecord>,
   groups: (id, data): Promise<RaRecord> => groupsApi.update(String(id), data) as Promise<RaRecord>,
 };
 
 const deleteHandlers: Partial<Record<ResourceName, DeleteHandler>> = {
-  memberships: (id): Promise<void> => membershipsApi.delete(String(id)),
   rules: (id): Promise<void> => rulesApi.delete(String(id)),
   groups: (id): Promise<void> => groupsApi.delete(String(id)),
   machines: (id): Promise<void> => machinesApi.delete(String(id)),
@@ -353,28 +282,10 @@ export const dataProvider: DataProvider = {
     parameters: GetManyParams<RecordType>,
   ): Promise<GetManyResult<RecordType>> {
     const resourceName = assertResourceName("GetMany", resource);
-    const listHandler =
-      resourceName === "users" ||
-      resourceName === "groups" ||
-      resourceName === "machines" ||
-      resourceName === "executables" ||
-      resourceName === "execution-events" ||
-      resourceName === "file-access-events" ||
-      resourceName === "rules"
-        ? listHandlers[resourceName]
-        : undefined;
+    const listHandler = listHandlers[resourceName];
     const requestedIds = [...new Set(parameters.ids.map(String))];
     if (requestedIds.length === 0) {
       return { data: [] };
-    }
-
-    if (!listHandler) {
-      const handler = getOneHandlers[resourceName];
-      if (!handler) {
-        return unsupported("GetMany", resourceName);
-      }
-      const records = await Promise.all(parameters.ids.map((id): Promise<RaRecord> => handler(id, parameters.signal)));
-      return { data: records as RecordType[] };
     }
 
     const result = await listHandler(
@@ -423,13 +334,17 @@ export const dataProvider: DataProvider = {
     ResultRecordType extends RaRecord = RecordType & RaRecord,
   >(resource: string, parameters: CreateParams<RecordType>): Promise<CreateResult<ResultRecordType>> {
     const resourceName = assertResourceName("Create", resource);
-    const handler = createHandlers[resourceName];
-    if (!handler) {
-      return unsupported("Create", resourceName);
+    switch (resourceName) {
+      case "rules": {
+        return { data: (await rulesApi.create(asRecord(parameters.data))) as unknown as ResultRecordType };
+      }
+      case "groups": {
+        return { data: (await groupsApi.create(asRecord(parameters.data))) as unknown as ResultRecordType };
+      }
+      default: {
+        return unsupported("Create", resourceName);
+      }
     }
-
-    const created = await handler(asRecord(parameters.data));
-    return { data: created as ResultRecordType };
   },
 
   async update<RecordType extends RaRecord = RaRecord>(
@@ -447,19 +362,13 @@ export const dataProvider: DataProvider = {
     return { data: updated as RecordType };
   },
 
-  updateMany<RecordType extends RaRecord = RaRecord>(
-    resource: string,
-    parameters: UpdateManyParams,
-  ): Promise<UpdateManyResult<RecordType>> {
+  updateMany(resource: string, parameters): Promise<UpdateManyResult> {
     return Promise.reject(
       new Error(`UpdateMany is not supported for ${resource} (${String(parameters.ids.length)} ids)`),
     );
   },
 
-  async delete<RecordType extends RaRecord = RaRecord>(
-    resource: string,
-    parameters: DeleteParams<RecordType>,
-  ): Promise<DeleteResult<RecordType>> {
+  async delete(resource: string, parameters): Promise<DeleteResult> {
     const resourceName = assertResourceName("Delete", resource);
     const handler = deleteHandlers[resourceName];
     if (!handler) {
@@ -476,10 +385,7 @@ export const dataProvider: DataProvider = {
     };
   },
 
-  async deleteMany<RecordType extends RaRecord = RaRecord>(
-    resource: string,
-    parameters: DeleteManyParams<RecordType>,
-  ): Promise<DeleteManyResult<RecordType>> {
+  async deleteMany(resource: string, parameters): Promise<DeleteManyResult> {
     const resourceName = assertResourceName("DeleteMany", resource);
     const handler = deleteHandlers[resourceName];
     if (!handler) {

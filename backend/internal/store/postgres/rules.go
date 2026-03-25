@@ -107,7 +107,43 @@ func (s *Store) GetRule(ctx context.Context, id uuid.UUID) (domain.Rule, error) 
 		return domain.Rule{}, err
 	}
 
-	return mapRule(row, targets)
+	rule, err := mapRule(row, targets)
+	if err != nil {
+		return domain.Rule{}, err
+	}
+
+	machines, err := s.listRuleMachinesForRule(ctx, id)
+	if err != nil {
+		return domain.Rule{}, err
+	}
+
+	rule.Machines = machines
+
+	return rule, nil
+}
+
+func (s *Store) listRuleMachinesForRule(ctx context.Context, ruleID uuid.UUID) ([]domain.RuleMachine, error) {
+	rows, err := s.Pool().Query(ctx, ruleMachinesForRuleQuery, ruleID)
+	if err != nil {
+		return nil, fmt.Errorf("list rule machines: %w", err)
+	}
+
+	machines := make([]domain.RuleMachine, 0)
+	for rows.Next() {
+		machine, scanErr := scanRuleMachineDetail(rows)
+		if scanErr != nil {
+			rows.Close()
+			return nil, scanErr
+		}
+
+		machines = append(machines, machine)
+	}
+
+	if rowErr := rows.Err(); rowErr != nil {
+		return nil, rowErr
+	}
+
+	return machines, nil
 }
 
 func (s *Store) CreateRule(ctx context.Context, input domain.RuleWriteInput) (domain.Rule, error) {
@@ -300,6 +336,26 @@ func mapResolvedMachineRule(row db.ListResolvedRulesForMachineRow) (domain.Machi
 	}, nil
 }
 
+func scanRuleMachineDetail(rows pgx.Rows) (domain.RuleMachine, error) {
+	var (
+		machine    domain.RuleMachine
+		policyText string
+	)
+
+	if err := rows.Scan(&machine.MachineID, &policyText, &machine.Applied); err != nil {
+		return domain.RuleMachine{}, err
+	}
+
+	policy, err := domain.ParseRulePolicy(policyText)
+	if err != nil {
+		return domain.RuleMachine{}, fmt.Errorf("parse rule machine policy: %w", err)
+	}
+
+	machine.Policy = policy
+
+	return machine, nil
+}
+
 func (s *Store) listRuleTargets(
 	ctx context.Context,
 	queries *db.Queries,
@@ -426,3 +482,119 @@ func appendRuleTarget(targets *domain.RuleTargets, row db.ListRuleTargetsByRuleR
 
 	return nil
 }
+
+const ruleMachinesForRuleQuery = `
+WITH machine_users AS (
+  SELECT
+    m.id AS machine_id,
+    u.id AS user_id
+  FROM machines AS m
+  LEFT JOIN users AS u
+    ON u.upn = NULLIF(m.primary_user, '')
+),
+effective_groups AS (
+  SELECT
+    gmm.machine_id,
+    gmm.group_id
+  FROM group_machine_memberships AS gmm
+
+  UNION
+
+  SELECT
+    mu.machine_id,
+    gum.group_id
+  FROM machine_users AS mu
+  JOIN group_user_memberships AS gum
+    ON gum.user_id = mu.user_id
+),
+matching_targets AS (
+  SELECT
+    m.id AS machine_id,
+    rt.subject_kind,
+    rt.subject_id,
+    rt.assignment,
+    rt.priority,
+    rt.policy,
+    rt.cel_expression
+  FROM machines AS m
+  LEFT JOIN machine_users AS mu
+    ON mu.machine_id = m.id
+  JOIN rule_targets AS rt
+    ON rt.rule_id = $1
+  WHERE rt.subject_kind = 'all_devices'
+    OR (
+      rt.subject_kind = 'all_users'
+      AND mu.user_id IS NOT NULL
+    )
+    OR (
+      rt.subject_kind = 'group'
+      AND EXISTS (
+        SELECT 1
+        FROM effective_groups AS eg
+        WHERE eg.machine_id = m.id
+          AND eg.group_id = rt.subject_id
+      )
+    )
+),
+matching_excludes AS (
+  SELECT DISTINCT mt.machine_id
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'exclude'
+),
+matching_includes AS (
+  SELECT
+    mt.machine_id,
+    mt.policy,
+    mt.cel_expression,
+    ROW_NUMBER() OVER (
+      PARTITION BY mt.machine_id
+      ORDER BY mt.priority ASC, mt.subject_kind ASC, mt.subject_id ASC NULLS FIRST
+    ) AS include_rank
+  FROM matching_targets AS mt
+  WHERE mt.assignment = 'include'
+),
+winning_includes AS (
+  SELECT
+    machine_id,
+    policy,
+    cel_expression
+  FROM matching_includes
+  WHERE include_rank = 1
+)
+SELECT
+  m.id AS machine_id,
+  wi.policy,
+  EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(ms.applied_targets, '[]'::JSONB)) AS applied(target)
+    WHERE applied.target->>'rule_type' = r.rule_type::text
+      AND applied.target->>'identifier' = r.identifier
+      AND applied.target->>'payload_hash' = encode(
+        digest(
+          concat_ws(
+            E'\x1f',
+            r.rule_type::text,
+            r.identifier,
+            wi.policy::text,
+            r.custom_message,
+            r.custom_url,
+            wi.cel_expression
+          ),
+          'sha256'
+        ),
+        'hex'
+      )
+  ) AS applied
+FROM winning_includes AS wi
+JOIN machines AS m
+  ON m.id = wi.machine_id
+JOIN rules AS r
+  ON r.id = $1
+LEFT JOIN matching_excludes AS me
+  ON me.machine_id = m.id
+LEFT JOIN machine_sync_states AS ms
+  ON ms.machine_id = m.id
+WHERE r.enabled = TRUE
+  AND me.machine_id IS NULL
+ORDER BY m.id ASC
+`

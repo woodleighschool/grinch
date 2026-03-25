@@ -82,7 +82,25 @@ func (s *Store) GetUser(ctx context.Context, id uuid.UUID) (domain.User, error) 
 		return domain.User{}, err
 	}
 
-	return mapUser(row)
+	user, err := mapUser(row)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	memberships, _, err := s.ListMemberships(ctx, domain.MembershipListOptions{
+		ListOptions: domain.ListOptions{},
+		UserID:      &id,
+	})
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user.GroupIDs = make([]uuid.UUID, 0, len(memberships))
+	for _, membership := range memberships {
+		user.GroupIDs = append(user.GroupIDs, membership.Group.ID)
+	}
+
+	return user, nil
 }
 
 func scanUserRow(rows pgx.Rows) (domain.User, int32, error) {

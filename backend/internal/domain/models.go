@@ -95,6 +95,8 @@ type Machine struct {
 	TeamIDRuleCount      int32                 `json:"teamid_rule_count"`
 	SigningIDRuleCount   int32                 `json:"signingid_rule_count"`
 	CDHashRuleCount      int32                 `json:"cdhash_rule_count"`
+	GroupIDs             []uuid.UUID           `json:"group_ids"`
+	Rules                []MachineRule         `json:"rules"`
 	LastSeenAt           time.Time             `json:"last_seen_at"`
 	CreatedAt            time.Time             `json:"created_at"`
 	UpdatedAt            time.Time             `json:"updated_at"`
@@ -123,16 +125,12 @@ type MachineResolvedRule struct {
 }
 
 type MachineRule struct {
-	ID        string     `json:"id"`
-	MachineID uuid.UUID  `json:"machine_id"`
-	RuleID    *uuid.UUID `json:"rule_id,omitempty"`
-	Policy    RulePolicy `json:"policy"`
-	Applied   bool       `json:"applied"`
+	RuleID  *uuid.UUID `json:"rule_id,omitempty"`
+	Policy  RulePolicy `json:"policy"`
+	Applied bool       `json:"applied"`
 }
 
 type RuleMachine struct {
-	ID        string     `json:"id"`
-	RuleID    uuid.UUID  `json:"rule_id"`
 	MachineID uuid.UUID  `json:"machine_id"`
 	Policy    RulePolicy `json:"policy"`
 	Applied   bool       `json:"applied"`
@@ -250,17 +248,18 @@ type FileAccessEventSummary struct {
 }
 
 type Rule struct {
-	ID            uuid.UUID   `json:"id"`
-	Name          string      `json:"name"`
-	Description   string      `json:"description"`
-	RuleType      RuleType    `json:"rule_type"`
-	Identifier    string      `json:"identifier"`
-	CustomMessage string      `json:"custom_message"`
-	CustomURL     string      `json:"custom_url"`
-	Enabled       bool        `json:"enabled"`
-	Targets       RuleTargets `json:"targets"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	ID            uuid.UUID     `json:"id"`
+	Name          string        `json:"name"`
+	Description   string        `json:"description"`
+	RuleType      RuleType      `json:"rule_type"`
+	Identifier    string        `json:"identifier"`
+	CustomMessage string        `json:"custom_message"`
+	CustomURL     string        `json:"custom_url"`
+	Enabled       bool          `json:"enabled"`
+	Targets       RuleTargets   `json:"targets"`
+	Machines      []RuleMachine `json:"machines"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
 }
 
 type RuleSummary struct {
@@ -306,6 +305,7 @@ type User struct {
 	UPN         string          `json:"upn"`
 	DisplayName string          `json:"display_name"`
 	Source      PrincipalSource `json:"source"`
+	GroupIDs    []uuid.UUID     `json:"group_ids,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
@@ -316,6 +316,8 @@ type Group struct {
 	Description string          `json:"description"`
 	Source      PrincipalSource `json:"source"`
 	MemberCount int32           `json:"member_count"`
+	UserIDs     []uuid.UUID     `json:"user_ids,omitempty"`
+	MachineIDs  []uuid.UUID     `json:"machine_ids,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }

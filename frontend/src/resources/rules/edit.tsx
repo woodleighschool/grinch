@@ -3,12 +3,11 @@ import { RuleDetailsFields, RuleTargetsFields } from "@/resources/rules/fields";
 import { ShowActions } from "@/resources/shared/actions";
 import type { ReactElement } from "react";
 import {
+  ArrayField,
   BooleanField,
   DataTable,
   Edit,
-  Pagination,
   ReferenceField,
-  ReferenceManyField,
   SelectField,
   TabbedForm,
   TextField,
@@ -24,10 +23,10 @@ export const RuleEdit = (): ReactElement => (
         <RuleTargetsFields />
       </TabbedForm.Tab>
       <TabbedForm.Tab label="Machines">
-        <ReferenceManyField reference="rule-machines" target="rule_id" pagination={<Pagination />}>
-          <DataTable bulkActionButtons={false}>
+        <ArrayField source="machines">
+          <DataTable bulkActionButtons={false} rowClick={false}>
             <DataTable.Col source="machine_id" label="Machine">
-              <ReferenceField source="machine_id" reference="machines" label="Machine">
+              <ReferenceField source="machine_id" reference="machines" link="show">
                 <TextField source="hostname" />
               </ReferenceField>
             </DataTable.Col>
@@ -38,7 +37,7 @@ export const RuleEdit = (): ReactElement => (
               <BooleanField source="applied" />
             </DataTable.Col>
           </DataTable>
-        </ReferenceManyField>
+        </ArrayField>
       </TabbedForm.Tab>
     </TabbedForm>
   </Edit>
