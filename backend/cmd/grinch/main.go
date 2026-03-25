@@ -16,7 +16,6 @@ import (
 
 	appentrasync "github.com/woodleighschool/grinch/internal/app/entrasync"
 	appevents "github.com/woodleighschool/grinch/internal/app/events"
-	appfileaccessevents "github.com/woodleighschool/grinch/internal/app/fileaccessevents"
 	appgroups "github.com/woodleighschool/grinch/internal/app/groups"
 	appmemberships "github.com/woodleighschool/grinch/internal/app/memberships"
 	apprules "github.com/woodleighschool/grinch/internal/app/rules"
@@ -87,8 +86,6 @@ func buildServer(
 	groupService := appgroups.New(store)
 	ruleService := apprules.New(store)
 	membershipService := appmemberships.New(store)
-	fileAccessEventService := appfileaccessevents.New(store)
-
 	syncService := appsanta.New(
 		logger,
 		store,
@@ -118,7 +115,6 @@ func buildServer(
 	apiHandler := apihttp.New(
 		store,
 		groupService,
-		fileAccessEventService,
 		ruleService,
 		membershipService,
 	)

@@ -30,7 +30,7 @@ func (s *Server) ListFileAccessEvents(
 		return
 	}
 
-	items, total, err := s.fileAccessEvents.ListFileAccessEvents(
+	items, total, err := s.store.ListFileAccessEvents(
 		r.Context(),
 		domain.FileAccessEventListOptions{
 			ListOptions: listOptions,
@@ -50,7 +50,7 @@ func (s *Server) ListFileAccessEvents(
 }
 
 func (s *Server) GetFileAccessEvent(w http.ResponseWriter, r *http.Request, id Id) {
-	event, err := s.fileAccessEvents.GetFileAccessEvent(r.Context(), id)
+	event, err := s.store.GetFileAccessEvent(r.Context(), id)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -60,7 +60,7 @@ func (s *Server) GetFileAccessEvent(w http.ResponseWriter, r *http.Request, id I
 }
 
 func (s *Server) DeleteFileAccessEvent(w http.ResponseWriter, r *http.Request, id Id) {
-	if err := s.fileAccessEvents.DeleteFileAccessEvent(r.Context(), id); err != nil {
+	if err := s.store.DeleteFileAccessEvent(r.Context(), id); err != nil {
 		writeError(w, err)
 		return
 	}
