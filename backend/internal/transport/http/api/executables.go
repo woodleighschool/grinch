@@ -4,9 +4,9 @@ import (
 	"net/http"
 )
 
-func (handler *Server) ListExecutables(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListExecutables(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListExecutablesParams,
 ) {
 	listOptions, err := parseListOptions(
@@ -18,28 +18,28 @@ func (handler *Server) ListExecutables(
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListExecutables(request.Context(), listOptions)
+	items, total, err := s.store.ListExecutables(r.Context(), listOptions)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, ExecutableListResponse{
+	writeJSON(w, http.StatusOK, ExecutableListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) GetExecutable(writer http.ResponseWriter, request *http.Request, id Id) {
-	executable, err := handler.store.GetExecutable(request.Context(), id)
+func (s *Server) GetExecutable(w http.ResponseWriter, r *http.Request, id Id) {
+	executable, err := s.store.GetExecutable(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, executable)
+	writeJSON(w, http.StatusOK, executable)
 }

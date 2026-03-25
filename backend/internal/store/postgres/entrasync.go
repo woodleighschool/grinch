@@ -12,7 +12,7 @@ import (
 )
 
 // ReconcileSnapshot upserts current Entra objects and converts missing Entra objects to local.
-func (store *Store) ReconcileSnapshot(
+func (s *Store) ReconcileSnapshot(
 	ctx context.Context,
 	snapshot *graphsync.Snapshot,
 ) (domain.EntraSyncResult, error) {
@@ -27,7 +27,7 @@ func (store *Store) ReconcileSnapshot(
 	userIDs := collectUserIDs(snapshot.Users)
 	groupIDs := collectGroupIDs(snapshot.Groups)
 
-	err := store.RunInTx(ctx, func(queries *db.Queries) error {
+	err := s.RunInTx(ctx, func(queries *db.Queries) error {
 		if upsertErr := upsertEntraUsers(ctx, queries, snapshot.Users); upsertErr != nil {
 			return upsertErr
 		}

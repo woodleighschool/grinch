@@ -6,9 +6,9 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-func (handler *Server) ListFileAccessEvents(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListFileAccessEvents(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListFileAccessEventsParams,
 ) {
 	listOptions, err := parseListOptions(
@@ -20,18 +20,18 @@ func (handler *Server) ListFileAccessEvents(
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
 	decisions, err := parseOptionalValues(params.Decision, domain.ParseFileAccessDecision)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.fileAccessEvents.ListFileAccessEvents(
-		request.Context(),
+	items, total, err := s.fileAccessEvents.ListFileAccessEvents(
+		r.Context(),
 		domain.FileAccessEventListOptions{
 			ListOptions: listOptions,
 			MachineID:   params.MachineId,
@@ -39,31 +39,31 @@ func (handler *Server) ListFileAccessEvents(
 		},
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, FileAccessEventListResponse{
+	writeJSON(w, http.StatusOK, FileAccessEventListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) GetFileAccessEvent(writer http.ResponseWriter, request *http.Request, id Id) {
-	event, err := handler.fileAccessEvents.GetFileAccessEvent(request.Context(), id)
+func (s *Server) GetFileAccessEvent(w http.ResponseWriter, r *http.Request, id Id) {
+	event, err := s.fileAccessEvents.GetFileAccessEvent(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, event)
+	writeJSON(w, http.StatusOK, event)
 }
 
-func (handler *Server) DeleteFileAccessEvent(writer http.ResponseWriter, request *http.Request, id Id) {
-	if err := handler.fileAccessEvents.DeleteFileAccessEvent(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteFileAccessEvent(w http.ResponseWriter, r *http.Request, id Id) {
+	if err := s.fileAccessEvents.DeleteFileAccessEvent(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }

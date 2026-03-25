@@ -6,9 +6,9 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-func (handler *Server) ListExecutionEvents(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListExecutionEvents(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListExecutionEventsParams,
 ) {
 	listOptions, err := parseListOptions(
@@ -20,17 +20,17 @@ func (handler *Server) ListExecutionEvents(
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
 	decisions, err := parseOptionalValues(params.Decision, domain.ParseExecutionDecision)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListExecutionEvents(request.Context(), domain.ExecutionEventListOptions{
+	items, total, err := s.store.ListExecutionEvents(r.Context(), domain.ExecutionEventListOptions{
 		ListOptions:  listOptions,
 		MachineID:    params.MachineId,
 		UserID:       params.UserId,
@@ -38,31 +38,31 @@ func (handler *Server) ListExecutionEvents(
 		Decisions:    decisions,
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, ExecutionEventListResponse{
+	writeJSON(w, http.StatusOK, ExecutionEventListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) GetExecutionEvent(writer http.ResponseWriter, request *http.Request, id Id) {
-	event, err := handler.store.GetExecutionEvent(request.Context(), id)
+func (s *Server) GetExecutionEvent(w http.ResponseWriter, r *http.Request, id Id) {
+	event, err := s.store.GetExecutionEvent(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, event)
+	writeJSON(w, http.StatusOK, event)
 }
 
-func (handler *Server) DeleteExecutionEvent(writer http.ResponseWriter, request *http.Request, id Id) {
-	if err := handler.store.DeleteExecutionEvent(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteExecutionEvent(w http.ResponseWriter, r *http.Request, id Id) {
+	if err := s.store.DeleteExecutionEvent(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }

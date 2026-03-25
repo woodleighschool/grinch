@@ -11,7 +11,7 @@ type groupWriteRequestBody struct {
 	Description *string `json:"description,omitempty"`
 }
 
-func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Request, params ListGroupsParams) {
+func (s *Server) ListGroups(w http.ResponseWriter, r *http.Request, params ListGroupsParams) {
 	listOptions, err := parseListOptions(
 		params.Limit,
 		params.Offset,
@@ -21,60 +21,60 @@ func (handler *Server) ListGroups(writer http.ResponseWriter, request *http.Requ
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.groups.ListGroups(request.Context(), listOptions)
+	items, total, err := s.groups.ListGroups(r.Context(), listOptions)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, GroupListResponse{
+	writeJSON(w, http.StatusOK, GroupListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) CreateGroup(writer http.ResponseWriter, request *http.Request) {
+func (s *Server) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	var body groupWriteRequestBody
-	if err := decodeJSONBody(request, &body); err != nil {
-		writeError(writer, err)
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	group, err := handler.groups.CreateGroup(request.Context(), appgroups.WriteInput{
+	group, err := s.groups.CreateGroup(r.Context(), appgroups.WriteInput{
 		Name:        body.Name,
 		Description: optionalString(body.Description),
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusCreated, group)
+	writeJSON(w, http.StatusCreated, group)
 }
 
-func (handler *Server) GetGroup(writer http.ResponseWriter, request *http.Request, id Id) {
-	group, err := handler.groups.GetGroup(request.Context(), id)
+func (s *Server) GetGroup(w http.ResponseWriter, r *http.Request, id Id) {
+	group, err := s.groups.GetGroup(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, group)
+	writeJSON(w, http.StatusOK, group)
 }
 
-func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Request, id Id) {
+func (s *Server) UpdateGroup(w http.ResponseWriter, r *http.Request, id Id) {
 	var body groupWriteRequestBody
-	if err := decodeJSONBody(request, &body); err != nil {
-		writeError(writer, err)
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	updated, err := handler.groups.UpdateGroup(
-		request.Context(),
+	updated, err := s.groups.UpdateGroup(
+		r.Context(),
 		id,
 		appgroups.WriteInput{
 			Name:        body.Name,
@@ -82,18 +82,18 @@ func (handler *Server) UpdateGroup(writer http.ResponseWriter, request *http.Req
 		},
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, updated)
+	writeJSON(w, http.StatusOK, updated)
 }
 
-func (handler *Server) DeleteGroup(writer http.ResponseWriter, request *http.Request, id Id) {
-	if err := handler.groups.DeleteGroup(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteGroup(w http.ResponseWriter, r *http.Request, id Id) {
+	if err := s.groups.DeleteGroup(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }

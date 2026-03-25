@@ -6,53 +6,53 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-func (handler *Server) ListMachineRules(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListMachineRules(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListMachineRulesParams,
 ) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListMachineRules(request.Context(), domain.MachineRuleListOptions{
+	items, total, err := s.store.ListMachineRules(r.Context(), domain.MachineRuleListOptions{
 		ListOptions: listOptions,
 		MachineID:   &params.MachineId,
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, MachineRuleListResponse{
+	writeJSON(w, http.StatusOK, MachineRuleListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) ListRuleMachines(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListRuleMachines(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListRuleMachinesParams,
 ) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListRuleMachines(request.Context(), domain.RuleMachineListOptions{
+	items, total, err := s.store.ListRuleMachines(r.Context(), domain.RuleMachineListOptions{
 		ListOptions: listOptions,
 		RuleID:      &params.RuleId,
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, RuleMachineListResponse{
+	writeJSON(w, http.StatusOK, RuleMachineListResponse{
 		Rows:  items,
 		Total: total,
 	})

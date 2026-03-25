@@ -11,11 +11,11 @@ import (
 // RequestLogger writes one structured log line per HTTP request.
 func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			started := time.Now()
-			wrapped := middleware.NewWrapResponseWriter(writer, request.ProtoMajor)
+			wrapped := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-			next.ServeHTTP(wrapped, request)
+			next.ServeHTTP(wrapped, r)
 
 			status := wrapped.Status()
 			if status == 0 {
@@ -23,15 +23,15 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 
 			args := []any{
-				"request_id", middleware.GetReqID(request.Context()),
-				"method", request.Method,
-				"path", request.URL.Path,
-				"query", request.URL.RawQuery,
+				"request_id", middleware.GetReqID(r.Context()),
+				"method", r.Method,
+				"path", r.URL.Path,
+				"query", r.URL.RawQuery,
 				"status", status,
 				"bytes", wrapped.BytesWritten(),
 				"duration_ms", time.Since(started).Milliseconds(),
-				"remote_addr", request.RemoteAddr,
-				"user_agent", request.UserAgent(),
+				"remote_addr", r.RemoteAddr,
+				"user_agent", r.UserAgent(),
 			}
 
 			switch {

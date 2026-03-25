@@ -14,7 +14,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/santa/model"
 )
 
-var eventDecisionMap = map[syncv1.Decision]domain.ExecutionDecision{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
+var executionDecisionMap = map[syncv1.Decision]domain.ExecutionDecision{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
 	syncv1.Decision_DECISION_UNKNOWN:  domain.ExecutionDecisionUnknown,
 	syncv1.Decision_ALLOW_UNKNOWN:     domain.ExecutionDecisionAllowUnknown,
 	syncv1.Decision_ALLOW_BINARY:      domain.ExecutionDecisionAllowBinary,
@@ -100,7 +100,7 @@ func mapExecutionEvents(
 			continue
 		}
 
-		decision, err := mapDecision(event.GetDecision())
+		decision, err := mapExecutionDecision(event.GetDecision())
 		if err != nil {
 			return nil, err
 		}
@@ -200,8 +200,8 @@ func mapProcessChain(processes []*syncv1.Process) ([]model.ProcessWrite, error) 
 	return writes, nil
 }
 
-func mapDecision(value syncv1.Decision) (domain.ExecutionDecision, error) {
-	decision, ok := eventDecisionMap[value]
+func mapExecutionDecision(value syncv1.Decision) (domain.ExecutionDecision, error) {
+	decision, ok := executionDecisionMap[value]
 	if !ok {
 		return "", fmt.Errorf("unsupported decision %q", value)
 	}

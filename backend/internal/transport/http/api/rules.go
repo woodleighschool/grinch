@@ -17,7 +17,7 @@ type ruleWriteRequestBody struct {
 	Targets       domain.RuleTargets `json:"targets"`
 }
 
-func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Request, params ListRulesParams) {
+func (s *Server) ListRules(w http.ResponseWriter, r *http.Request, params ListRulesParams) {
 	listOptions, err := parseListOptions(
 		params.Limit,
 		params.Offset,
@@ -27,81 +27,81 @@ func (handler *Server) ListRules(writer http.ResponseWriter, request *http.Reque
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
 	ruleTypes, err := parseOptionalValues(params.RuleType, domain.ParseRuleType)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.rules.ListRules(request.Context(), domain.RuleListOptions{
+	items, total, err := s.rules.ListRules(r.Context(), domain.RuleListOptions{
 		ListOptions: listOptions,
 		Enabled:     cloneBools(params.Enabled),
 		RuleTypes:   ruleTypes,
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, RuleListResponse{
+	writeJSON(w, http.StatusOK, RuleListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) CreateRule(writer http.ResponseWriter, request *http.Request) {
+func (s *Server) CreateRule(w http.ResponseWriter, r *http.Request) {
 	var body ruleWriteRequestBody
-	if err := decodeJSONBody(request, &body); err != nil {
-		writeError(writer, err)
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	rule, err := handler.rules.CreateRule(request.Context(), decodeRuleWriteRequest(body))
+	rule, err := s.rules.CreateRule(r.Context(), decodeRuleWriteRequest(body))
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusCreated, rule)
+	writeJSON(w, http.StatusCreated, rule)
 }
 
-func (handler *Server) GetRule(writer http.ResponseWriter, request *http.Request, id Id) {
-	rule, err := handler.rules.GetRule(request.Context(), id)
+func (s *Server) GetRule(w http.ResponseWriter, r *http.Request, id Id) {
+	rule, err := s.rules.GetRule(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, rule)
+	writeJSON(w, http.StatusOK, rule)
 }
 
-func (handler *Server) UpdateRule(writer http.ResponseWriter, request *http.Request, id Id) {
+func (s *Server) UpdateRule(w http.ResponseWriter, r *http.Request, id Id) {
 	var body ruleWriteRequestBody
-	if err := decodeJSONBody(request, &body); err != nil {
-		writeError(writer, err)
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	updated, err := handler.rules.UpdateRule(request.Context(), id, decodeRuleWriteRequest(body))
+	updated, err := s.rules.UpdateRule(r.Context(), id, decodeRuleWriteRequest(body))
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, updated)
+	writeJSON(w, http.StatusOK, updated)
 }
 
-func (handler *Server) DeleteRule(writer http.ResponseWriter, request *http.Request, id Id) {
-	if err := handler.rules.DeleteRule(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteRule(w http.ResponseWriter, r *http.Request, id Id) {
+	if err := s.rules.DeleteRule(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }
 
 func decodeRuleWriteRequest(body ruleWriteRequestBody) domain.RuleWriteInput {

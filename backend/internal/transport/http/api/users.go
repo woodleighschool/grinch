@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Request, params ListUsersParams) {
+func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
 	listOptions, err := parseListOptions(
 		params.Limit,
 		params.Offset,
@@ -14,28 +14,28 @@ func (handler *Server) ListUsers(writer http.ResponseWriter, request *http.Reque
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListUsers(request.Context(), listOptions)
+	items, total, err := s.store.ListUsers(r.Context(), listOptions)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, UserListResponse{
+	writeJSON(w, http.StatusOK, UserListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) GetUser(writer http.ResponseWriter, request *http.Request, id Id) {
-	user, err := handler.store.GetUser(request.Context(), id)
+func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, id Id) {
+	user, err := s.store.GetUser(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, user)
+	writeJSON(w, http.StatusOK, user)
 }

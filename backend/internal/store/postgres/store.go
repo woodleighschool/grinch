@@ -48,28 +48,28 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
 }
 
 // Ping checks database connectivity for readiness probes.
-func (store *Store) Ping(ctx context.Context) error {
-	return store.pool.Ping(ctx)
+func (s *Store) Ping(ctx context.Context) error {
+	return s.pool.Ping(ctx)
 }
 
 // Close closes the Postgres connection pool.
-func (store *Store) Close() {
-	store.pool.Close()
+func (s *Store) Close() {
+	s.pool.Close()
 }
 
 // Queries returns a sqlc query runner bound to the store pool.
-func (store *Store) Queries() *db.Queries {
-	return db.New(store.pool)
+func (s *Store) Queries() *db.Queries {
+	return db.New(s.pool)
 }
 
 // Pool exposes the underlying pgx pool for read queries that are awkward to express via sqlc.
-func (store *Store) Pool() *pgxpool.Pool {
-	return store.pool
+func (s *Store) Pool() *pgxpool.Pool {
+	return s.pool
 }
 
 // RunInTx executes the given function in a database transaction.
-func (store *Store) RunInTx(ctx context.Context, fn func(*db.Queries) error) error {
-	tx, err := store.pool.BeginTx(ctx, pgx.TxOptions{})
+func (s *Store) RunInTx(ctx context.Context, fn func(*db.Queries) error) error {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}

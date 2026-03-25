@@ -7,19 +7,19 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-func (handler *Server) ListMemberships(
-	writer http.ResponseWriter,
-	request *http.Request,
+func (s *Server) ListMemberships(
+	w http.ResponseWriter,
+	r *http.Request,
 	params ListMembershipsParams,
 ) {
 	listOptions, err := parseListOptions(params.Limit, params.Offset, params.Search, params.Sort, params.Order, nil)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.memberships.ListMemberships(
-		request.Context(),
+	items, total, err := s.memberships.ListMemberships(
+		r.Context(),
 		domain.MembershipListOptions{
 			ListOptions: listOptions,
 			GroupID:     params.GroupId,
@@ -28,25 +28,25 @@ func (handler *Server) ListMemberships(
 		},
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, MembershipListResponse{
+	writeJSON(w, http.StatusOK, MembershipListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) CreateMembership(writer http.ResponseWriter, request *http.Request) {
+func (s *Server) CreateMembership(w http.ResponseWriter, r *http.Request) {
 	var body CreateMembershipJSONRequestBody
-	if err := decodeJSONBody(request, &body); err != nil {
-		writeError(writer, err)
+	if err := decodeJSONBody(r, &body); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	membership, err := handler.memberships.CreateMembership(
-		request.Context(),
+	membership, err := s.memberships.CreateMembership(
+		r.Context(),
 		appmemberships.CreateInput{
 			GroupID:    body.GroupId,
 			MemberKind: body.MemberKind,
@@ -54,28 +54,28 @@ func (handler *Server) CreateMembership(writer http.ResponseWriter, request *htt
 		},
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusCreated, membership)
+	writeJSON(w, http.StatusCreated, membership)
 }
 
-func (handler *Server) GetMembership(writer http.ResponseWriter, request *http.Request, id MembershipId) {
-	membership, err := handler.memberships.GetMembership(request.Context(), id)
+func (s *Server) GetMembership(w http.ResponseWriter, r *http.Request, id MembershipId) {
+	membership, err := s.memberships.GetMembership(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, membership)
+	writeJSON(w, http.StatusOK, membership)
 }
 
-func (handler *Server) DeleteMembership(writer http.ResponseWriter, request *http.Request, id MembershipId) {
-	if err := handler.memberships.DeleteMembership(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteMembership(w http.ResponseWriter, r *http.Request, id MembershipId) {
+	if err := s.memberships.DeleteMembership(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }

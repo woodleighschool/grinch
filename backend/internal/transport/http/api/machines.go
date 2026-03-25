@@ -6,7 +6,7 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Request, params ListMachinesParams) {
+func (s *Server) ListMachines(w http.ResponseWriter, r *http.Request, params ListMachinesParams) {
 	listOptions, err := parseListOptions(
 		params.Limit,
 		params.Offset,
@@ -16,54 +16,54 @@ func (handler *Server) ListMachines(writer http.ResponseWriter, request *http.Re
 		params.Ids,
 	)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
 	ruleSyncStatuses, err := parseOptionalValues(params.RuleSyncStatus, domain.ParseMachineRuleSyncStatus)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
 	clientModes, err := parseOptionalValues(params.ClientMode, domain.ParseMachineClientMode)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	items, total, err := handler.store.ListMachines(request.Context(), domain.MachineListOptions{
+	items, total, err := s.store.ListMachines(r.Context(), domain.MachineListOptions{
 		ListOptions:      listOptions,
 		UserID:           params.UserId,
 		RuleSyncStatuses: ruleSyncStatuses,
 		ClientModes:      clientModes,
 	})
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, MachineListResponse{
+	writeJSON(w, http.StatusOK, MachineListResponse{
 		Rows:  items,
 		Total: total,
 	})
 }
 
-func (handler *Server) GetMachine(writer http.ResponseWriter, request *http.Request, id Id) {
-	machine, err := handler.store.GetMachine(request.Context(), id)
+func (s *Server) GetMachine(w http.ResponseWriter, r *http.Request, id Id) {
+	machine, err := s.store.GetMachine(r.Context(), id)
 	if err != nil {
-		writeError(writer, err)
+		writeError(w, err)
 		return
 	}
 
-	writeJSON(writer, http.StatusOK, machine)
+	writeJSON(w, http.StatusOK, machine)
 }
 
-func (handler *Server) DeleteMachine(writer http.ResponseWriter, request *http.Request, id Id) {
-	if err := handler.store.DeleteMachine(request.Context(), id); err != nil {
-		writeError(writer, err)
+func (s *Server) DeleteMachine(w http.ResponseWriter, r *http.Request, id Id) {
+	if err := s.store.DeleteMachine(r.Context(), id); err != nil {
+		writeError(w, err)
 		return
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	writeNoContent(w)
 }
