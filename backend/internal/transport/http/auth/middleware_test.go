@@ -11,17 +11,34 @@ import (
 	authhttp "github.com/woodleighschool/grinch/internal/transport/http/auth"
 )
 
-func sessionAuthStub(next http.Handler) http.Handler {
+type errorBody struct {
+	Type   string `json:"type"`
+	Title  string `json:"title"`
+	Status int    `json:"status"`
+	Detail string `json:"detail"`
+	Code   string `json:"code"`
+}
+
+func testSessionAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		user := token.User{ID: "session_user", Name: "Session User"}
 		next.ServeHTTP(writer, token.SetUserInfo(request, user))
 	})
 }
 
-func TestAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
-	t.Parallel()
+func readErrorBody(t *testing.T, response *httptest.ResponseRecorder) errorBody {
+	t.Helper()
 
-	middleware := authhttp.APIMiddleware(sessionAuthStub)
+	var body errorBody
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	return body
+}
+
+func TestAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
+	middleware := authhttp.APIMiddleware(testSessionAuth)
 
 	called := false
 	handler := middleware(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
@@ -35,16 +52,14 @@ func TestAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
+		t.Fatalf("Code = %d, want 200", response.Code)
 	}
 	if !called {
-		t.Fatalf("expected downstream handler to be called")
+		t.Fatalf("called = false, want true")
 	}
 }
 
 func TestAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
-	t.Parallel()
-
 	middleware := authhttp.APIMiddleware(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			next.ServeHTTP(writer, request)
@@ -61,28 +76,13 @@ func TestAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", response.Code)
+		t.Fatalf("Code = %d, want 401", response.Code)
 	}
-	assertAuthErrorBody(t, response)
-}
-
-func assertAuthErrorBody(t *testing.T, response *httptest.ResponseRecorder) {
-	t.Helper()
-
-	if got := response.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf("Content-Type = %q, want application/json", got)
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
 	}
 
-	var body struct {
-		Type   string `json:"type"`
-		Title  string `json:"title"`
-		Status int    `json:"status"`
-		Detail string `json:"detail"`
-		Code   string `json:"code"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
+	body := readErrorBody(t, response)
 	if body.Type != "urn:grinch:problem:unauthorized" {
 		t.Fatalf("Type = %q, want unauthorized problem type", body.Type)
 	}

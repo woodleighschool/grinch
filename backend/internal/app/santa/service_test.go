@@ -17,69 +17,58 @@ import (
 	santamodel "github.com/woodleighschool/grinch/internal/santa/model"
 )
 
-type fakeDataStore struct {
-	ruleResolver   *fakeRuleResolver
-	ruleSyncStates map[uuid.UUID]santamodel.MachineSyncState
-	upsertErr      error
-	upsertMachine  santamodel.MachineUpsert
-	upsertCalls    int
+type testStore struct {
+	resolver    *testRuleResolver
+	syncStates  map[uuid.UUID]santamodel.MachineSyncState
+	upsertErr   error
+	lastUpsert  santamodel.MachineUpsert
+	upsertCalls int
 }
 
-type fakeRuleResolver struct {
-	resolvedTargets []domain.MachineResolvedRule
+type testRuleResolver struct {
+	resolvedRules []domain.MachineResolvedRule
 }
 
-func (store *fakeDataStore) UpsertMachine(_ context.Context, machine santamodel.MachineUpsert) error {
-	store.upsertCalls++
-	store.upsertMachine = machine
-	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
-	}
-	if _, exists := store.ruleSyncStates[machine.MachineID]; !exists {
-		store.ruleSyncStates[machine.MachineID] = santamodel.MachineSyncState{MachineID: machine.MachineID}
-	}
-	return store.upsertErr
+func (s *testStore) UpsertMachine(_ context.Context, machine santamodel.MachineUpsert) error {
+	s.upsertCalls++
+	s.lastUpsert = machine
+
+	state := s.ensureSyncState(machine.MachineID)
+	s.syncStates[machine.MachineID] = state
+
+	return s.upsertErr
 }
 
-func (store *fakeDataStore) GetMachineSyncState(
+func (s *testStore) GetMachineSyncState(
 	_ context.Context,
 	machineID uuid.UUID,
 ) (santamodel.MachineSyncState, error) {
-	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
-	}
-	state, exists := store.ruleSyncStates[machineID]
-	if !exists {
-		state = santamodel.MachineSyncState{MachineID: machineID}
-		store.ruleSyncStates[machineID] = state
-	}
+	state := s.ensureSyncState(machineID)
 	return state, nil
 }
 
-func (store *fakeDataStore) UpdateMachineDesiredTargets(_ context.Context, machineID uuid.UUID) error {
-	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
-	}
-	state := store.ruleSyncStates[machineID]
-	desired := make([]santamodel.AppliedRuleTarget, 0, len(store.ruleResolver.resolvedTargets))
-	for _, rule := range store.ruleResolver.resolvedTargets {
-		desired = append(desired, santamodel.AppliedRuleTarget{
+func (s *testStore) UpdateMachineDesiredTargets(_ context.Context, machineID uuid.UUID) error {
+	state := s.ensureSyncState(machineID)
+
+	desiredTargets := make([]santamodel.AppliedRuleTarget, 0, len(s.resolver.resolvedRules))
+	for _, rule := range s.resolver.resolvedRules {
+		desiredTargets = append(desiredTargets, santamodel.AppliedRuleTarget{
 			RuleType:    rule.RuleType,
 			Identifier:  rule.Identifier,
 			PayloadHash: domain.MachineRuleTargetPayloadHash(rule.MachineRuleTarget),
 		})
 	}
-	state.DesiredTargets = desired
-	store.ruleSyncStates[machineID] = state
+
+	state.DesiredTargets = desiredTargets
+	s.syncStates[machineID] = state
+
 	return nil
 }
 
-func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending santamodel.PendingSnapshotWrite) error {
-	if store.ruleSyncStates == nil {
-		store.ruleSyncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
-	}
+func (s *testStore) ReplacePendingSnapshot(_ context.Context, pending santamodel.PendingSnapshotWrite) error {
+	s.ensureSyncState(pending.MachineID)
 
-	store.ruleSyncStates[pending.MachineID] = santamodel.MachineSyncState{
+	s.syncStates[pending.MachineID] = santamodel.MachineSyncState{
 		MachineID:                   pending.MachineID,
 		RulesHash:                   pending.RulesHash,
 		DesiredTargets:              slices.Clone(pending.DesiredTargets),
@@ -105,26 +94,29 @@ func (store *fakeDataStore) ReplacePendingSnapshot(_ context.Context, pending sa
 		LastRuleSyncSuccessAt:       pending.LastRuleSyncSuccessAt,
 		LastReportedCountsMatchAt:   pending.LastReportedCountsMatchAt,
 	}
+
 	return nil
 }
 
-func (store *fakeDataStore) RecordPostflight(_ context.Context, write santamodel.PostflightWrite) error {
-	state := store.ruleSyncStates[write.MachineID]
+func (s *testStore) RecordPostflight(_ context.Context, write santamodel.PostflightWrite) error {
+	state := s.ensureSyncState(write.MachineID)
 	state.RulesHash = strings.TrimSpace(write.RulesHash)
 	state.RulesReceived = write.RulesReceived
 	state.RulesProcessed = write.RulesProcessed
 	state.LastRuleSyncAttemptAt = &write.LastRuleSyncAttemptAt
-	store.ruleSyncStates[write.MachineID] = state
+	s.syncStates[write.MachineID] = state
+
 	return nil
 }
 
-func (store *fakeDataStore) PromotePendingSnapshot(
+func (s *testStore) PromotePendingSnapshot(
 	_ context.Context,
 	machineID uuid.UUID,
 	completedAt time.Time,
 ) error {
-	state := store.ruleSyncStates[machineID]
+	state := s.ensureSyncState(machineID)
 	pendingFullSync := state.PendingFullSync
+
 	state.AppliedTargets = slices.Clone(state.SentTargets)
 	state.SentTargets = nil
 	state.PendingPayload = nil
@@ -135,11 +127,12 @@ func (store *fakeDataStore) PromotePendingSnapshot(
 	if pendingFullSync {
 		state.LastCleanSyncAt = &completedAt
 	}
-	store.ruleSyncStates[machineID] = state
+
+	s.syncStates[machineID] = state
 	return nil
 }
 
-func (store *fakeDataStore) IngestEvents(
+func (s *testStore) IngestEvents(
 	context.Context,
 	uuid.UUID,
 	[]santamodel.ExecutionEventWrite,
@@ -148,28 +141,42 @@ func (store *fakeDataStore) IngestEvents(
 	return nil
 }
 
-func (resolver *fakeRuleResolver) ResolveMachineRuleTargets(
+func (r *testRuleResolver) ResolveMachineRuleTargets(
 	context.Context,
 	uuid.UUID,
 ) ([]domain.MachineResolvedRule, error) {
-	return resolver.resolvedTargets, nil
+	return r.resolvedRules, nil
 }
 
-func newService(store *fakeDataStore, resolver *fakeRuleResolver) *santa.Service {
-	store.ruleResolver = resolver
-	return santa.New(testLogger(), store, nil, resolver)
+func (s *testStore) ensureSyncState(machineID uuid.UUID) santamodel.MachineSyncState {
+	if s.syncStates == nil {
+		s.syncStates = make(map[uuid.UUID]santamodel.MachineSyncState)
+	}
+
+	state, ok := s.syncStates[machineID]
+	if !ok {
+		state = santamodel.MachineSyncState{MachineID: machineID}
+		s.syncStates[machineID] = state
+	}
+
+	return state
 }
 
-func testLogger() *slog.Logger {
+func newTestService(store *testStore, resolver *testRuleResolver) *santa.Service {
+	store.resolver = resolver
+	return santa.New(newTestLogger(), store, nil, resolver)
+}
+
+func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 	machineID := uuid.New()
-	store := &fakeDataStore{}
-	service := newService(store, &fakeRuleResolver{})
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{})
 
-	request := syncv1.PreflightRequest_builder{
+	req := syncv1.PreflightRequest_builder{
 		MachineId:         machineID.String(),
 		ClientMode:        syncv1.ClientMode_LOCKDOWN,
 		SerialNumber:      "SER123",
@@ -184,7 +191,7 @@ func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 	}.Build()
 
 	before := time.Now().UTC()
-	response, err := service.HandlePreflight(context.Background(), machineID, request)
+	resp, err := service.HandlePreflight(context.Background(), machineID, req)
 	after := time.Now().UTC()
 	if err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
@@ -193,44 +200,46 @@ func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {
 	if store.upsertCalls != 1 {
 		t.Fatalf("upsertCalls = %d, want 1", store.upsertCalls)
 	}
-	if store.upsertMachine.MachineID != machineID {
-		t.Fatalf("MachineID = %q, want %q", store.upsertMachine.MachineID, machineID)
+	if store.lastUpsert.MachineID != machineID {
+		t.Fatalf("MachineID = %q, want %q", store.lastUpsert.MachineID, machineID)
 	}
-	if store.upsertMachine.LastSeenAt.Before(before) || store.upsertMachine.LastSeenAt.After(after) {
-		t.Fatalf("LastSeenAt out of expected range: %s", store.upsertMachine.LastSeenAt)
+	if store.lastUpsert.LastSeenAt.Before(before) || store.lastUpsert.LastSeenAt.After(after) {
+		t.Fatalf("LastSeenAt out of expected range: %s", store.lastUpsert.LastSeenAt)
 	}
 
-	if groups := store.upsertMachine.PrimaryUserGroups; len(groups) != 2 || groups[0] != "g1" || groups[1] != "g2" {
+	if groups := store.lastUpsert.PrimaryUserGroups; len(groups) != 2 || groups[0] != "g1" || groups[1] != "g2" {
 		t.Fatalf("PrimaryUserGroups = %#v, want [g1 g2]", groups)
 	}
-	if response.GetSyncType() != syncv1.SyncType_CLEAN {
-		t.Fatalf("SyncType = %v, want CLEAN", response.GetSyncType())
+	if resp.GetSyncType() != syncv1.SyncType_CLEAN {
+		t.Fatalf("SyncType = %v, want CLEAN", resp.GetSyncType())
 	}
-	if store.upsertMachine.ClientMode != domain.MachineClientModeLockdown {
-		t.Fatalf("ClientMode = %q, want lockdown", store.upsertMachine.ClientMode)
+	if store.lastUpsert.ClientMode != domain.MachineClientModeLockdown {
+		t.Fatalf("ClientMode = %q, want lockdown", store.lastUpsert.ClientMode)
 	}
 }
 
 func TestHandlePreflight_ReturnsNormalWhenManagedCountsMatch(t *testing.T) {
 	machineID := uuid.New()
-	acknowledgedTarget := domain.MachineRuleTarget{
+	acknowledgedRule := domain.MachineRuleTarget{
 		RuleType:   domain.RuleTypeBinary,
 		Identifier: "com.example.existing",
 		Policy:     domain.RulePolicyAllowlist,
 	}
-	acknowledged := storedTarget(acknowledgedTarget)
-	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
+	acknowledgedTarget := appliedTargetFromRuleTarget(acknowledgedRule)
+
+	store := &testStore{
+		syncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
 				MachineID:      machineID,
-				AppliedTargets: []santamodel.AppliedRuleTarget{acknowledged},
+				AppliedTargets: []santamodel.AppliedRuleTarget{acknowledgedTarget},
 			},
 		},
 	}
-	service := newService(store, &fakeRuleResolver{
-		resolvedTargets: []domain.MachineResolvedRule{
-			resolvedTarget(uuid.New(), "Existing", acknowledgedTarget),
-			resolvedTarget(uuid.New(), "Cert", domain.MachineRuleTarget{
+
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Existing", acknowledgedRule),
+			resolvedRule(uuid.New(), "Cert", domain.MachineRuleTarget{
 				RuleType:   domain.RuleTypeCertificate,
 				Identifier: "ABCD",
 				Policy:     domain.RulePolicyBlocklist,
@@ -238,7 +247,7 @@ func TestHandlePreflight_ReturnsNormalWhenManagedCountsMatch(t *testing.T) {
 		},
 	})
 
-	response, err := service.HandlePreflight(
+	resp, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
@@ -250,29 +259,30 @@ func TestHandlePreflight_ReturnsNormalWhenManagedCountsMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
-	if response.GetSyncType() != syncv1.SyncType_NORMAL {
-		t.Fatalf("SyncType = %v, want NORMAL", response.GetSyncType())
+	if resp.GetSyncType() != syncv1.SyncType_NORMAL {
+		t.Fatalf("SyncType = %v, want NORMAL", resp.GetSyncType())
 	}
 }
 
 func TestHandlePreflight_ReturnsNormalWhenDesiredRulesChangedEvenIfManagedCountsDiverge(t *testing.T) {
 	machineID := uuid.New()
-	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
-			machineID: {
-				MachineID: machineID,
-			},
+	store := &testStore{
+		syncStates: map[uuid.UUID]santamodel.MachineSyncState{
+			machineID: {MachineID: machineID},
 		},
 	}
 
-	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
-		resolvedTarget(uuid.New(), "Binary", domain.MachineRuleTarget{
-			RuleType:   domain.RuleTypeBinary,
-			Identifier: "com.example.binary",
-			Policy:     domain.RulePolicyAllowlist,
-		}),
-	}})
-	response, err := service.HandlePreflight(
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Binary", domain.MachineRuleTarget{
+				RuleType:   domain.RuleTypeBinary,
+				Identifier: "com.example.binary",
+				Policy:     domain.RulePolicyAllowlist,
+			}),
+		},
+	})
+
+	resp, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
@@ -283,32 +293,36 @@ func TestHandlePreflight_ReturnsNormalWhenDesiredRulesChangedEvenIfManagedCounts
 	if err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
-	if response.GetSyncType() != syncv1.SyncType_NORMAL {
-		t.Fatalf("SyncType = %v, want NORMAL", response.GetSyncType())
+	if resp.GetSyncType() != syncv1.SyncType_NORMAL {
+		t.Fatalf("SyncType = %v, want NORMAL", resp.GetSyncType())
 	}
 }
 
 func TestHandlePreflight_ReturnsCleanWhenAppliedMatchesDesiredAndReportedCountsDiverge(t *testing.T) {
 	machineID := uuid.New()
-	target := domain.MachineRuleTarget{
+	ruleTarget := domain.MachineRuleTarget{
 		RuleType:   domain.RuleTypeBinary,
 		Identifier: "com.example.binary",
 		Policy:     domain.RulePolicyAllowlist,
 	}
-	applied := storedTarget(target)
-	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
+	appliedTarget := appliedTargetFromRuleTarget(ruleTarget)
+
+	store := &testStore{
+		syncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
 				MachineID:      machineID,
-				AppliedTargets: []santamodel.AppliedRuleTarget{applied},
+				AppliedTargets: []santamodel.AppliedRuleTarget{appliedTarget},
 			},
 		},
 	}
 
-	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
-		resolvedTarget(uuid.New(), "Binary", target),
-	}})
-	response, err := service.HandlePreflight(
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Binary", ruleTarget),
+		},
+	})
+
+	resp, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
 		syncv1.PreflightRequest_builder{
@@ -319,29 +333,31 @@ func TestHandlePreflight_ReturnsCleanWhenAppliedMatchesDesiredAndReportedCountsD
 	if err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
-	if response.GetSyncType() != syncv1.SyncType_CLEAN {
-		t.Fatalf("SyncType = %v, want CLEAN", response.GetSyncType())
+	if resp.GetSyncType() != syncv1.SyncType_CLEAN {
+		t.Fatalf("SyncType = %v, want CLEAN", resp.GetSyncType())
 	}
 }
 
 func TestHandleRuleDownload_ReturnsChangedRulesAndRemovalsDuringNormalSync(t *testing.T) {
 	machineID := uuid.New()
-	removed := storedTarget(domain.MachineRuleTarget{
+	removedTarget := appliedTargetFromRuleTarget(domain.MachineRuleTarget{
 		RuleType:   domain.RuleTypeBinary,
 		Identifier: "com.example.removed",
 		Policy:     domain.RulePolicyAllowlist,
 	})
-	store := &fakeDataStore{
-		ruleSyncStates: map[uuid.UUID]santamodel.MachineSyncState{
+
+	store := &testStore{
+		syncStates: map[uuid.UUID]santamodel.MachineSyncState{
 			machineID: {
 				MachineID:      machineID,
-				AppliedTargets: []santamodel.AppliedRuleTarget{removed},
+				AppliedTargets: []santamodel.AppliedRuleTarget{removedTarget},
 			},
 		},
 	}
-	service := newService(store, &fakeRuleResolver{
-		resolvedTargets: []domain.MachineResolvedRule{
-			resolvedTarget(uuid.New(), "Cert", domain.MachineRuleTarget{
+
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Cert", domain.MachineRuleTarget{
 				RuleType:   domain.RuleTypeCertificate,
 				Identifier: "ABCD",
 				Policy:     domain.RulePolicyBlocklist,
@@ -361,46 +377,52 @@ func TestHandleRuleDownload_ReturnsChangedRulesAndRemovalsDuringNormalSync(t *te
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
 
-	response, err := service.HandleRuleDownload(
+	resp, err := service.HandleRuleDownload(
 		context.Background(),
 		machineID,
-		syncv1.RuleDownloadRequest_builder{MachineId: machineID.String()}.Build(),
+		syncv1.RuleDownloadRequest_builder{
+			MachineId: machineID.String(),
+		}.Build(),
 	)
 	if err != nil {
 		t.Fatalf("HandleRuleDownload() error = %v", err)
 	}
 
-	if len(response.GetRules()) != 2 {
-		t.Fatalf("len(response.Rules) = %d, want 2", len(response.GetRules()))
+	if len(resp.GetRules()) != 2 {
+		t.Fatalf("len(response.Rules) = %d, want 2", len(resp.GetRules()))
 	}
-	// Rules are sorted by type|identifier: binary < certificate.
-	if response.GetRules()[0].GetPolicy() != syncv1.Policy_REMOVE {
-		t.Fatalf("rules[0] policy = %v, want REMOVE", response.GetRules()[0].GetPolicy())
+	if resp.GetRules()[0].GetPolicy() != syncv1.Policy_REMOVE {
+		t.Fatalf("rules[0] policy = %v, want REMOVE", resp.GetRules()[0].GetPolicy())
 	}
-	if response.GetRules()[0].GetIdentifier() != "com.example.removed" {
-		t.Fatalf("rules[0] identifier = %q, want com.example.removed", response.GetRules()[0].GetIdentifier())
+	if resp.GetRules()[0].GetIdentifier() != "com.example.removed" {
+		t.Fatalf("rules[0] identifier = %q, want com.example.removed", resp.GetRules()[0].GetIdentifier())
 	}
-	if response.GetRules()[1].GetPolicy() != syncv1.Policy_BLOCKLIST {
-		t.Fatalf("rules[1] policy = %v, want BLOCKLIST", response.GetRules()[1].GetPolicy())
+	if resp.GetRules()[1].GetPolicy() != syncv1.Policy_BLOCKLIST {
+		t.Fatalf("rules[1] policy = %v, want BLOCKLIST", resp.GetRules()[1].GetPolicy())
 	}
 }
 
 func TestHandlePostflight_PromotesPendingSnapshotOnMatchingProcessedCount(t *testing.T) {
 	machineID := uuid.New()
-	target := domain.MachineRuleTarget{
+	ruleTarget := domain.MachineRuleTarget{
 		RuleType:   domain.RuleTypeBinary,
 		Identifier: "com.example.binary",
 		Policy:     domain.RulePolicyAllowlist,
 	}
-	store := &fakeDataStore{}
-	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
-		resolvedTarget(uuid.New(), "Binary", target),
-	}})
+
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Binary", ruleTarget),
+		},
+	})
 
 	if _, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
-		syncv1.PreflightRequest_builder{MachineId: machineID.String()}.Build(),
+		syncv1.PreflightRequest_builder{
+			MachineId: machineID.String(),
+		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
@@ -418,37 +440,42 @@ func TestHandlePostflight_PromotesPendingSnapshotOnMatchingProcessedCount(t *tes
 		t.Fatalf("HandlePostflight() error = %v", err)
 	}
 
-	updated := store.ruleSyncStates[machineID]
-	if len(updated.AppliedTargets) != 1 {
-		t.Fatalf("len(AppliedTargets) = %d, want 1", len(updated.AppliedTargets))
+	state := store.syncStates[machineID]
+	if len(state.AppliedTargets) != 1 {
+		t.Fatalf("len(AppliedTargets) = %d, want 1", len(state.AppliedTargets))
 	}
-	if updated.PendingFullSync {
+	if state.PendingFullSync {
 		t.Fatalf("PendingFullSync = true, want false")
 	}
-	if updated.LastRuleSyncAttemptAt == nil {
+	if state.LastRuleSyncAttemptAt == nil {
 		t.Fatal("LastRuleSyncAttemptAt = nil, want timestamp")
 	}
-	if updated.LastRuleSyncSuccessAt == nil {
+	if state.LastRuleSyncSuccessAt == nil {
 		t.Fatal("LastRuleSyncSuccessAt = nil, want timestamp")
 	}
 }
 
 func TestHandlePostflight_LeavesPendingSnapshotOnProcessedCountMismatch(t *testing.T) {
 	machineID := uuid.New()
-	target := domain.MachineRuleTarget{
+	ruleTarget := domain.MachineRuleTarget{
 		RuleType:   domain.RuleTypeBinary,
 		Identifier: "com.example.binary",
 		Policy:     domain.RulePolicyAllowlist,
 	}
-	store := &fakeDataStore{}
-	service := newService(store, &fakeRuleResolver{resolvedTargets: []domain.MachineResolvedRule{
-		resolvedTarget(uuid.New(), "Binary", target),
-	}})
+
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{
+		resolvedRules: []domain.MachineResolvedRule{
+			resolvedRule(uuid.New(), "Binary", ruleTarget),
+		},
+	})
 
 	if _, err := service.HandlePreflight(
 		context.Background(),
 		machineID,
-		syncv1.PreflightRequest_builder{MachineId: machineID.String()}.Build(),
+		syncv1.PreflightRequest_builder{
+			MachineId: machineID.String(),
+		}.Build(),
 	); err != nil {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
@@ -466,22 +493,22 @@ func TestHandlePostflight_LeavesPendingSnapshotOnProcessedCountMismatch(t *testi
 		t.Fatalf("HandlePostflight() error = %v", err)
 	}
 
-	after := store.ruleSyncStates[machineID]
-	if len(after.AppliedTargets) != 0 {
-		t.Fatalf("len(AppliedTargets) = %d, want 0", len(after.AppliedTargets))
+	state := store.syncStates[machineID]
+	if len(state.AppliedTargets) != 0 {
+		t.Fatalf("len(AppliedTargets) = %d, want 0", len(state.AppliedTargets))
 	}
-	if after.RulesHash != "ignored-client-rules-hash" {
-		t.Fatalf("RulesHash = %q, want ignored-client-rules-hash", after.RulesHash)
+	if state.RulesHash != "ignored-client-rules-hash" {
+		t.Fatalf("RulesHash = %q, want ignored-client-rules-hash", state.RulesHash)
 	}
-	if after.LastRuleSyncAttemptAt == nil {
+	if state.LastRuleSyncAttemptAt == nil {
 		t.Fatal("LastRuleSyncAttemptAt = nil, want timestamp")
 	}
 }
 
 func TestHandleRuleDownload_AllowsEmptyPendingSnapshot(t *testing.T) {
 	machineID := uuid.New()
-	store := &fakeDataStore{}
-	service := newService(store, &fakeRuleResolver{})
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{})
 
 	if _, err := service.HandlePreflight(
 		context.Background(),
@@ -493,23 +520,25 @@ func TestHandleRuleDownload_AllowsEmptyPendingSnapshot(t *testing.T) {
 		t.Fatalf("HandlePreflight() error = %v", err)
 	}
 
-	response, err := service.HandleRuleDownload(
+	resp, err := service.HandleRuleDownload(
 		context.Background(),
 		machineID,
-		syncv1.RuleDownloadRequest_builder{MachineId: machineID.String()}.Build(),
+		syncv1.RuleDownloadRequest_builder{
+			MachineId: machineID.String(),
+		}.Build(),
 	)
 	if err != nil {
 		t.Fatalf("HandleRuleDownload() error = %v", err)
 	}
-	if len(response.GetRules()) != 0 {
-		t.Fatalf("len(response.Rules) = %d, want 0", len(response.GetRules()))
+	if len(resp.GetRules()) != 0 {
+		t.Fatalf("len(response.Rules) = %d, want 0", len(resp.GetRules()))
 	}
 }
 
 func TestHandlePostflight_PromotesEmptyPendingSnapshot(t *testing.T) {
 	machineID := uuid.New()
-	store := &fakeDataStore{}
-	service := newService(store, &fakeRuleResolver{})
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{})
 
 	if _, err := service.HandlePreflight(
 		context.Background(),
@@ -534,34 +563,30 @@ func TestHandlePostflight_PromotesEmptyPendingSnapshot(t *testing.T) {
 		t.Fatalf("HandlePostflight() error = %v", err)
 	}
 
-	updated := store.ruleSyncStates[machineID]
-	if updated.PendingPreflightAt != nil {
+	state := store.syncStates[machineID]
+	if state.PendingPreflightAt != nil {
 		t.Fatal("PendingPreflightAt != nil, want cleared")
 	}
-	if len(updated.AppliedTargets) != 0 {
-		t.Fatalf("len(AppliedTargets) = %d, want 0", len(updated.AppliedTargets))
+	if len(state.AppliedTargets) != 0 {
+		t.Fatalf("len(AppliedTargets) = %d, want 0", len(state.AppliedTargets))
 	}
-	if updated.LastRuleSyncSuccessAt == nil {
+	if state.LastRuleSyncSuccessAt == nil {
 		t.Fatal("LastRuleSyncSuccessAt = nil, want timestamp")
 	}
 }
 
-func storedTarget(target domain.MachineRuleTarget) santamodel.AppliedRuleTarget {
+func appliedTargetFromRuleTarget(target domain.MachineRuleTarget) santamodel.AppliedRuleTarget {
 	return santamodel.AppliedRuleTarget{
 		RuleType:    target.RuleType,
 		Identifier:  target.Identifier,
-		PayloadHash: testPayloadHash(target),
+		PayloadHash: domain.MachineRuleTargetPayloadHash(target),
 	}
 }
 
-func resolvedTarget(ruleID uuid.UUID, name string, target domain.MachineRuleTarget) domain.MachineResolvedRule {
+func resolvedRule(ruleID uuid.UUID, name string, target domain.MachineRuleTarget) domain.MachineResolvedRule {
 	return domain.MachineResolvedRule{
 		MachineRuleTarget: target,
 		RuleID:            ruleID,
 		Name:              name,
 	}
-}
-
-func testPayloadHash(target domain.MachineRuleTarget) string {
-	return domain.MachineRuleTargetPayloadHash(target)
 }

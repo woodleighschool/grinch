@@ -11,13 +11,13 @@ import (
 	"github.com/woodleighschool/grinch/internal/domain"
 )
 
-type fakeStore struct {
+type testStore struct {
 	t *testing.T
 
-	group              domain.Group
-	getGroupErr        error
-	memberships        []domain.Membership
-	listMembershipsErr error
+	group          domain.Group
+	getGroupErr    error
+	memberships    []domain.Membership
+	listMembersErr error
 
 	createMembershipCalls int
 	deleteMembershipCalls int
@@ -26,12 +26,12 @@ type fakeStore struct {
 	syncedUserIDs    []uuid.UUID
 }
 
-func (s *fakeStore) ListGroups(context.Context, domain.ListOptions) ([]domain.Group, int32, error) {
+func (s *testStore) ListGroups(context.Context, domain.ListOptions) ([]domain.Group, int32, error) {
 	s.unexpectedCall("ListGroups")
 	return nil, 0, nil
 }
 
-func (s *fakeStore) GetGroup(context.Context, uuid.UUID) (domain.Group, error) {
+func (s *testStore) GetGroup(context.Context, uuid.UUID) (domain.Group, error) {
 	if s.getGroupErr != nil {
 		return domain.Group{}, s.getGroupErr
 	}
@@ -39,30 +39,33 @@ func (s *fakeStore) GetGroup(context.Context, uuid.UUID) (domain.Group, error) {
 	return s.group, nil
 }
 
-func (s *fakeStore) CreateLocalGroup(context.Context, string, string) (domain.Group, error) {
+func (s *testStore) CreateLocalGroup(context.Context, string, string) (domain.Group, error) {
 	s.unexpectedCall("CreateLocalGroup")
 	return domain.Group{}, nil
 }
 
-func (s *fakeStore) UpdateGroup(context.Context, uuid.UUID, string, string) (domain.Group, error) {
+func (s *testStore) UpdateGroup(context.Context, uuid.UUID, string, string) (domain.Group, error) {
 	s.unexpectedCall("UpdateGroup")
 	return domain.Group{}, nil
 }
 
-func (s *fakeStore) DeleteGroup(context.Context, uuid.UUID) error {
+func (s *testStore) DeleteGroup(context.Context, uuid.UUID) error {
 	s.unexpectedCall("DeleteGroup")
 	return nil
 }
 
-func (s *fakeStore) ListMemberships(context.Context, domain.MembershipListOptions) ([]domain.Membership, int32, error) {
-	if s.listMembershipsErr != nil {
-		return nil, 0, s.listMembershipsErr
+func (s *testStore) ListMemberships(
+	context.Context,
+	domain.MembershipListOptions,
+) ([]domain.Membership, int32, error) {
+	if s.listMembersErr != nil {
+		return nil, 0, s.listMembersErr
 	}
 
 	return s.memberships, int32(len(s.memberships)), nil
 }
 
-func (s *fakeStore) CreateMembership(
+func (s *testStore) CreateMembership(
 	context.Context,
 	uuid.UUID,
 	domain.MemberKind,
@@ -73,43 +76,43 @@ func (s *fakeStore) CreateMembership(
 	return domain.Membership{}, nil
 }
 
-func (s *fakeStore) DeleteMembership(context.Context, uuid.UUID, domain.MemberKind) error {
+func (s *testStore) DeleteMembership(context.Context, uuid.UUID, domain.MemberKind) error {
 	s.deleteMembershipCalls++
 	return nil
 }
 
-func (s *fakeStore) UpdateMachineDesiredTargets(_ context.Context, machineID uuid.UUID) error {
+func (s *testStore) UpdateMachineDesiredTargets(_ context.Context, machineID uuid.UUID) error {
 	s.syncedMachineIDs = append(s.syncedMachineIDs, machineID)
 	return nil
 }
 
-func (s *fakeStore) UpdateMachineDesiredTargetsByPrimaryUserID(_ context.Context, userID uuid.UUID) error {
+func (s *testStore) UpdateMachineDesiredTargetsByPrimaryUserID(_ context.Context, userID uuid.UUID) error {
 	s.syncedUserIDs = append(s.syncedUserIDs, userID)
 	return nil
 }
 
-func (s *fakeStore) unexpectedCall(method string) {
+func (s *testStore) unexpectedCall(method string) {
 	s.t.Helper()
 	s.t.Fatalf("unexpected %s call", method)
 }
 
-func newService(t *testing.T, store *fakeStore) *groups.Service {
+func newTestService(t *testing.T, store *testStore) *groups.Service {
 	t.Helper()
 	store.t = t
 	return groups.New(store)
 }
 
-func TestAddUserCreatesMembershipAndSyncsPrimaryUserTargets(t *testing.T) {
+func TestAddUser_CreatesMembershipAndSyncsPrimaryUserTargets(t *testing.T) {
 	groupID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
-	store := &fakeStore{
+	store := &testStore{
 		group: domain.Group{
 			ID:     groupID,
 			Source: domain.PrincipalSourceLocal,
 		},
 	}
-	service := newService(t, store)
+	service := newTestService(t, store)
 
 	if err := service.AddUser(context.Background(), groupID, userID); err != nil {
 		t.Fatalf("AddUser() error = %v", err)
@@ -126,11 +129,11 @@ func TestAddUserCreatesMembershipAndSyncsPrimaryUserTargets(t *testing.T) {
 	}
 }
 
-func TestAddUserIsIdempotentWhenMembershipExists(t *testing.T) {
+func TestAddUser_IsIdempotentWhenMembershipExists(t *testing.T) {
 	groupID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
 	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 
-	store := &fakeStore{
+	store := &testStore{
 		group: domain.Group{
 			ID:     groupID,
 			Source: domain.PrincipalSourceLocal,
@@ -145,7 +148,7 @@ func TestAddUserIsIdempotentWhenMembershipExists(t *testing.T) {
 			},
 		},
 	}
-	service := newService(t, store)
+	service := newTestService(t, store)
 
 	if err := service.AddUser(context.Background(), groupID, userID); err != nil {
 		t.Fatalf("AddUser() error = %v", err)
@@ -159,17 +162,17 @@ func TestAddUserIsIdempotentWhenMembershipExists(t *testing.T) {
 	}
 }
 
-func TestRemoveMachineIsIdempotentWhenMembershipMissing(t *testing.T) {
+func TestRemoveMachine_IsIdempotentWhenMembershipMissing(t *testing.T) {
 	groupID := uuid.MustParse("00000000-0000-0000-0000-000000000006")
 	machineID := uuid.MustParse("00000000-0000-0000-0000-000000000007")
 
-	store := &fakeStore{
+	store := &testStore{
 		group: domain.Group{
 			ID:     groupID,
 			Source: domain.PrincipalSourceLocal,
 		},
 	}
-	service := newService(t, store)
+	service := newTestService(t, store)
 
 	if err := service.RemoveMachine(context.Background(), groupID, machineID); err != nil {
 		t.Fatalf("RemoveMachine() error = %v", err)
@@ -183,17 +186,17 @@ func TestRemoveMachineIsIdempotentWhenMembershipMissing(t *testing.T) {
 	}
 }
 
-func TestAddMachineRejectsReadOnlyGroup(t *testing.T) {
+func TestAddMachine_RejectsReadOnlyGroup(t *testing.T) {
 	groupID := uuid.MustParse("00000000-0000-0000-0000-000000000008")
 	machineID := uuid.MustParse("00000000-0000-0000-0000-000000000009")
 
-	store := &fakeStore{
+	store := &testStore{
 		group: domain.Group{
 			ID:     groupID,
 			Source: domain.PrincipalSourceEntra,
 		},
 	}
-	service := newService(t, store)
+	service := newTestService(t, store)
 
 	err := service.AddMachine(context.Background(), groupID, machineID)
 	if !errors.Is(err, domain.ErrGroupReadOnly) {
