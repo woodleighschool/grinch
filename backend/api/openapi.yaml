@@ -642,6 +642,7 @@ components:
         - signing_id
         - team_id
         - cdhash
+        - occurrences
         - created_at
       properties:
         id:
@@ -661,6 +662,9 @@ components:
           type: string
         cdhash:
           type: string
+        occurrences:
+          type: integer
+          format: int32
         created_at:
           type: string
           format: date-time
