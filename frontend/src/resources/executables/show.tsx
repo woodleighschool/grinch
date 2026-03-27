@@ -1,7 +1,7 @@
 import { ShowActions } from "@/resources/shared/actions";
 import { ExecutableEntitlementsArrayField, SigningChainArrayField } from "@/resources/shared/executableFields";
 import type { ReactElement } from "react";
-import { DateField, Show, TabbedShowLayout, TextField } from "react-admin";
+import { DateField, Labeled, NumberField, Show, TabbedShowLayout, TextField } from "react-admin";
 
 export const ExecutableShow = (): ReactElement => (
   <Show actions={<ShowActions />}>
@@ -14,6 +14,9 @@ export const ExecutableShow = (): ReactElement => (
         <TextField source="file_bundle_path" label="Bundle Path" />
         <TextField source="signing_id" label="Signing ID" />
         <TextField source="team_id" label="Team ID" />
+        <Labeled label="Occurrences">
+          <NumberField source="occurrences" />
+        </Labeled>
         <DateField source="created_at" label="Created" showTime />
       </TabbedShowLayout.Tab>
       <TabbedShowLayout.Tab label="Signing">

@@ -17,6 +17,7 @@ var (
 		"id":          "e.id",
 		"file_name":   "e.file_name",
 		"file_sha256": "e.file_sha256",
+		"occurrences": "occurrences",
 		"created_at":  "e.created_at",
 		"signing_id":  "e.signing_id",
 		"team_id":     "e.team_id",
@@ -101,6 +102,7 @@ func scanExecutableSummaryRow(rows pgx.Rows) (domain.ExecutableSummary, int32, e
 		&item.SigningID,
 		&item.TeamID,
 		&item.CDHash,
+		&item.Occurrences,
 		&item.CreatedAt,
 		&total,
 	); err != nil {
@@ -110,7 +112,7 @@ func scanExecutableSummaryRow(rows pgx.Rows) (domain.ExecutableSummary, int32, e
 	return item, total, nil
 }
 
-func mapExecutable(row db.Executable) (domain.Executable, error) {
+func mapExecutable(row db.GetExecutableRow) (domain.Executable, error) {
 	entitlements, err := unmarshalEntitlements(row.Entitlements)
 	if err != nil {
 		return domain.Executable{}, fmt.Errorf("unmarshal entitlements: %w", err)
@@ -130,6 +132,7 @@ func mapExecutable(row db.Executable) (domain.Executable, error) {
 		SigningID:      row.SigningID,
 		TeamID:         row.TeamID,
 		CDHash:         row.Cdhash,
+		Occurrences:    row.Occurrences,
 		Entitlements:   entitlements,
 		SigningChain:   signingChain,
 		CreatedAt:      row.CreatedAt,
@@ -146,9 +149,18 @@ SELECT
   e.signing_id,
   e.team_id,
   e.cdhash,
+  COALESCE(event_counts.occurrences, 0)::INT4 AS occurrences,
   e.created_at,
   COUNT(*) OVER()::INT4 AS total
 FROM executables AS e
+LEFT JOIN (
+  SELECT
+    executable_id,
+    COUNT(*)::INT4 AS occurrences
+  FROM execution_events
+  GROUP BY executable_id
+) AS event_counts
+  ON event_counts.executable_id = e.id
 WHERE %s
 ORDER BY %s
 LIMIT NULLIF($%d::INT, 0)

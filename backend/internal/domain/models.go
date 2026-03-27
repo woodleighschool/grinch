@@ -147,6 +147,7 @@ type Executable struct {
 	SigningID      string              `json:"signing_id"`
 	TeamID         string              `json:"team_id"`
 	CDHash         string              `json:"cdhash"`
+	Occurrences    int32               `json:"occurrences"`
 	Entitlements   map[string]any      `json:"entitlements"`
 	SigningChain   []SigningChainEntry `json:"signing_chain"`
 	CreatedAt      time.Time           `json:"created_at"`
@@ -161,6 +162,7 @@ type ExecutableSummary struct {
 	SigningID      string    `json:"signing_id"`
 	TeamID         string    `json:"team_id"`
 	CDHash         string    `json:"cdhash"`
+	Occurrences    int32     `json:"occurrences"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 

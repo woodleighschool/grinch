@@ -7,30 +7,55 @@ package db
 
 import (
 	"context"
+	"time"
 
 	uuid "github.com/google/uuid"
 )
 
 const getExecutable = `-- name: GetExecutable :one
 SELECT
-  id,
-  file_sha256,
-  file_name,
-  file_bundle_id,
-  file_bundle_path,
-  signing_id,
-  team_id,
-  cdhash,
-  entitlements,
-  signing_chain,
-  created_at
-FROM executables
-WHERE id = $1
+  e.id,
+  e.file_sha256,
+  e.file_name,
+  e.file_bundle_id,
+  e.file_bundle_path,
+  e.signing_id,
+  e.team_id,
+  e.cdhash,
+  COALESCE(event_counts.occurrences, 0)::INT4 AS occurrences,
+  e.entitlements,
+  e.signing_chain,
+  e.created_at
+FROM executables AS e
+LEFT JOIN (
+  SELECT
+    executable_id,
+    COUNT(*)::INT4 AS occurrences
+  FROM execution_events
+  GROUP BY executable_id
+) AS event_counts
+  ON event_counts.executable_id = e.id
+WHERE e.id = $1
 `
 
-func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (Executable, error) {
+type GetExecutableRow struct {
+	ID             uuid.UUID
+	FileSHA256     string
+	FileName       string
+	FileBundleID   string
+	FileBundlePath string
+	SigningID      string
+	TeamID         string
+	Cdhash         string
+	Occurrences    int32
+	Entitlements   []byte
+	SigningChain   []byte
+	CreatedAt      time.Time
+}
+
+func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (GetExecutableRow, error) {
 	row := q.db.QueryRow(ctx, getExecutable, id)
-	var i Executable
+	var i GetExecutableRow
 	err := row.Scan(
 		&i.ID,
 		&i.FileSHA256,
@@ -40,6 +65,7 @@ func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (Executable, 
 		&i.SigningID,
 		&i.TeamID,
 		&i.Cdhash,
+		&i.Occurrences,
 		&i.Entitlements,
 		&i.SigningChain,
 		&i.CreatedAt,

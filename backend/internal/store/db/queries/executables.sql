@@ -38,16 +38,25 @@ RETURNING
 
 -- name: GetExecutable :one
 SELECT
-  id,
-  file_sha256,
-  file_name,
-  file_bundle_id,
-  file_bundle_path,
-  signing_id,
-  team_id,
-  cdhash,
-  entitlements,
-  signing_chain,
-  created_at
-FROM executables
-WHERE id = sqlc.arg(id);
+  e.id,
+  e.file_sha256,
+  e.file_name,
+  e.file_bundle_id,
+  e.file_bundle_path,
+  e.signing_id,
+  e.team_id,
+  e.cdhash,
+  COALESCE(event_counts.occurrences, 0)::INT4 AS occurrences,
+  e.entitlements,
+  e.signing_chain,
+  e.created_at
+FROM executables AS e
+LEFT JOIN (
+  SELECT
+    executable_id,
+    COUNT(*)::INT4 AS occurrences
+  FROM execution_events
+  GROUP BY executable_id
+) AS event_counts
+  ON event_counts.executable_id = e.id
+WHERE e.id = sqlc.arg(id);
