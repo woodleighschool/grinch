@@ -1,6 +1,6 @@
 import { RULE_ENABLED_CHOICES, RULE_TYPE_CHOICES } from "@/resources/rules/choices";
 import type { ReactElement } from "react";
-import { DataTable, List, SearchInput, SelectArrayInput, SelectField } from "react-admin";
+import { BooleanField, DataTable, List, SearchInput, SelectArrayInput, SelectField } from "react-admin";
 
 const ruleFilters = [
   <SearchInput key="search" source="search" alwaysOn />,
@@ -12,7 +12,9 @@ export const RuleList = (): ReactElement => (
   <List sort={{ field: "name", order: "ASC" }} filters={ruleFilters} perPage={25}>
     <DataTable rowClick="edit">
       <DataTable.Col source="name" label="Name" />
-      <DataTable.Col source="enabled" label="Enabled" />
+      <DataTable.Col source="enabled" label="Enabled">
+        <BooleanField source="enabled" />
+      </DataTable.Col>
       <DataTable.Col source="rule_type" label="Rule Type">
         <SelectField source="rule_type" choices={RULE_TYPE_CHOICES} optionText="name" />
       </DataTable.Col>
