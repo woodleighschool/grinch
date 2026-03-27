@@ -20,18 +20,19 @@ import (
 	synchttp "github.com/woodleighschool/grinch/internal/transport/http/sync"
 )
 
-type stubService struct {
+type testService struct {
 	preflightErr error
 }
 
-func (stub stubService) HandlePreflight(
+func (s *testService) HandlePreflight(
 	_ context.Context,
 	_ uuid.UUID,
 	_ *syncv1.PreflightRequest,
 ) (*syncv1.PreflightResponse, error) {
-	if stub.preflightErr != nil {
-		return nil, stub.preflightErr
+	if s.preflightErr != nil {
+		return nil, s.preflightErr
 	}
+
 	syncType := syncv1.SyncType_NORMAL
 	return syncv1.PreflightResponse_builder{
 		ClientMode: syncv1.ClientMode_MONITOR,
@@ -39,7 +40,7 @@ func (stub stubService) HandlePreflight(
 	}.Build(), nil
 }
 
-func (stubService) HandleEventUpload(
+func (*testService) HandleEventUpload(
 	_ context.Context,
 	_ uuid.UUID,
 	_ *syncv1.EventUploadRequest,
@@ -47,7 +48,7 @@ func (stubService) HandleEventUpload(
 	return syncv1.EventUploadResponse_builder{}.Build(), nil
 }
 
-func (stubService) HandleRuleDownload(
+func (*testService) HandleRuleDownload(
 	_ context.Context,
 	_ uuid.UUID,
 	_ *syncv1.RuleDownloadRequest,
@@ -55,7 +56,7 @@ func (stubService) HandleRuleDownload(
 	return syncv1.RuleDownloadResponse_builder{}.Build(), nil
 }
 
-func (stubService) HandlePostflight(
+func (*testService) HandlePostflight(
 	_ context.Context,
 	_ uuid.UUID,
 	_ *syncv1.PostflightRequest,
@@ -63,18 +64,25 @@ func (stubService) HandlePostflight(
 	return syncv1.PostflightResponse_builder{}.Build(), nil
 }
 
-func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
-	t.Parallel()
-
-	handler := synchttp.New(testLogger(), stubService{})
+func newTestRouter(service *testService) http.Handler {
+	handler := synchttp.New(newTestLogger(), service)
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
+	return router
+}
 
-	requestMessage := syncv1.PreflightRequest_builder{
+func newTestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
+	router := newTestRouter(&testService{})
+
+	req := syncv1.PreflightRequest_builder{
 		MachineId: "00000000-0000-0000-0000-000000000001",
 		Hostname:  "host1",
 	}.Build()
-	body := mustGzipProto(t, requestMessage)
+	body := mustGzipProto(t, req)
 
 	request := httptest.NewRequest(
 		http.MethodPost,
@@ -88,32 +96,28 @@ func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {
 	router.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", response.Code)
+		t.Fatalf("Code = %d, want 200", response.Code)
 	}
-	if got := response.Header().Get("Content-Encoding"); got != "gzip" {
-		t.Fatalf("expected gzip response, got %q", got)
+	if contentEncoding := response.Header().Get("Content-Encoding"); contentEncoding != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", contentEncoding)
 	}
 
-	decoded := &syncv1.PreflightResponse{}
-	mustUnzipProto(t, response.Body.Bytes(), decoded)
-	if decoded.GetSyncType() != syncv1.SyncType_NORMAL {
-		t.Fatalf("expected sync type NORMAL, got %v", decoded.GetSyncType())
+	resp := &syncv1.PreflightResponse{}
+	mustUnzipProto(t, response.Body.Bytes(), resp)
+	if resp.GetSyncType() != syncv1.SyncType_NORMAL {
+		t.Fatalf("SyncType = %v, want NORMAL", resp.GetSyncType())
 	}
 }
 
 func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
-	t.Parallel()
+	router := newTestRouter(&testService{})
 
-	handler := synchttp.New(testLogger(), stubService{})
-	router := chi.NewRouter()
-	handler.RegisterRoutes(router)
-
-	requestMessage := syncv1.PreflightRequest_builder{
+	req := syncv1.PreflightRequest_builder{
 		MachineId: "00000000-0000-0000-0000-000000000001",
 	}.Build()
-	payload, err := proto.Marshal(requestMessage)
+	payload, err := proto.Marshal(req)
 	if err != nil {
-		t.Fatalf("marshal proto: %v", err)
+		t.Fatalf("proto.Marshal() error = %v", err)
 	}
 
 	request := httptest.NewRequest(
@@ -128,22 +132,18 @@ func TestPreflight_ReturnsBadRequestForNonGzipBody(t *testing.T) {
 	router.ServeHTTP(response, request)
 
 	if response.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", response.Code)
+		t.Fatalf("Code = %d, want 400", response.Code)
 	}
 	assertSyncFailureResponse(t, response)
 }
 
 func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
-	t.Parallel()
+	router := newTestRouter(&testService{preflightErr: santa.ErrInvalidSyncRequest})
 
-	handler := synchttp.New(testLogger(), stubService{preflightErr: santa.ErrInvalidSyncRequest})
-	router := chi.NewRouter()
-	handler.RegisterRoutes(router)
-
-	requestMessage := syncv1.PreflightRequest_builder{
+	req := syncv1.PreflightRequest_builder{
 		MachineId: "00000000-0000-0000-0000-000000000001",
 	}.Build()
-	body := mustGzipProto(t, requestMessage)
+	body := mustGzipProto(t, req)
 
 	request := httptest.NewRequest(
 		http.MethodPost,
@@ -157,22 +157,18 @@ func TestPreflight_ReturnsBadRequestForInvalidSyncRequest(t *testing.T) {
 	router.ServeHTTP(response, request)
 
 	if response.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", response.Code)
+		t.Fatalf("Code = %d, want 400", response.Code)
 	}
 	assertSyncFailureResponse(t, response)
 }
 
 func TestPreflight_ReturnsInternalServerErrorForUnexpectedServiceError(t *testing.T) {
-	t.Parallel()
+	router := newTestRouter(&testService{preflightErr: errors.New("boom")})
 
-	handler := synchttp.New(testLogger(), stubService{preflightErr: errors.New("boom")})
-	router := chi.NewRouter()
-	handler.RegisterRoutes(router)
-
-	requestMessage := syncv1.PreflightRequest_builder{
+	req := syncv1.PreflightRequest_builder{
 		MachineId: "00000000-0000-0000-0000-000000000001",
 	}.Build()
-	body := mustGzipProto(t, requestMessage)
+	body := mustGzipProto(t, req)
 
 	request := httptest.NewRequest(
 		http.MethodPost,
@@ -186,7 +182,7 @@ func TestPreflight_ReturnsInternalServerErrorForUnexpectedServiceError(t *testin
 	router.ServeHTTP(response, request)
 
 	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", response.Code)
+		t.Fatalf("Code = %d, want 500", response.Code)
 	}
 	assertSyncFailureResponse(t, response)
 }
@@ -196,16 +192,16 @@ func mustGzipProto(t *testing.T, message proto.Message) io.Reader {
 
 	payload, err := proto.Marshal(message)
 	if err != nil {
-		t.Fatalf("marshal proto: %v", err)
+		t.Fatalf("proto.Marshal() error = %v", err)
 	}
 
 	var buffer bytes.Buffer
 	writer := gzip.NewWriter(&buffer)
-	if _, writeErr := writer.Write(payload); writeErr != nil {
-		t.Fatalf("write gzip payload: %v", writeErr)
+	if _, err = writer.Write(payload); err != nil {
+		t.Fatalf("writer.Write() error = %v", err)
 	}
-	if closeErr := writer.Close(); closeErr != nil {
-		t.Fatalf("close gzip writer: %v", closeErr)
+	if err = writer.Close(); err != nil {
+		t.Fatalf("writer.Close() error = %v", err)
 	}
 
 	return bytes.NewReader(buffer.Bytes())
@@ -216,34 +212,29 @@ func mustUnzipProto(t *testing.T, payload []byte, message proto.Message) {
 
 	reader, err := gzip.NewReader(bytes.NewReader(payload))
 	if err != nil {
-		t.Fatalf("create gzip reader: %v", err)
+		t.Fatalf("gzip.NewReader() error = %v", err)
 	}
 	defer reader.Close()
 
 	decoded, err := io.ReadAll(reader)
 	if err != nil {
-		t.Fatalf("read gzip payload: %v", err)
+		t.Fatalf("io.ReadAll() error = %v", err)
 	}
-
-	if unmarshalErr := proto.Unmarshal(decoded, message); unmarshalErr != nil {
-		t.Fatalf("unmarshal proto: %v", unmarshalErr)
+	if err = proto.Unmarshal(decoded, message); err != nil {
+		t.Fatalf("proto.Unmarshal() error = %v", err)
 	}
 }
 
 func assertSyncFailureResponse(t *testing.T, response *httptest.ResponseRecorder) {
 	t.Helper()
 
-	if got := response.Header().Get("Content-Type"); got != "" {
-		t.Fatalf("Content-Type = %q, want empty", got)
+	if contentType := response.Header().Get("Content-Type"); contentType != "" {
+		t.Fatalf("Content-Type = %q, want empty", contentType)
 	}
-	if got := response.Header().Get("Content-Encoding"); got != "" {
-		t.Fatalf("Content-Encoding = %q, want empty", got)
+	if contentEncoding := response.Header().Get("Content-Encoding"); contentEncoding != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", contentEncoding)
 	}
 	if response.Body.Len() != 0 {
-		t.Fatalf("response body length = %d, want 0", response.Body.Len())
+		t.Fatalf("Body.Len() = %d, want 0", response.Body.Len())
 	}
-}
-
-func testLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
