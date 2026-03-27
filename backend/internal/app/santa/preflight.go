@@ -92,7 +92,7 @@ func (s *Service) HandlePreflight(
 	)
 
 	return syncv1.PreflightResponse_builder{
-		ClientMode: req.GetClientMode(),
-		SyncType:   &syncType,
+		//ClientMode: req.GetClientMode(),
+		SyncType: &syncType,
 	}.Build(), nil
 }
