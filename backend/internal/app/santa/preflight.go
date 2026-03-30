@@ -92,7 +92,8 @@ func (s *Service) HandlePreflight(
 	)
 
 	return syncv1.PreflightResponse_builder{
-		ClientMode: req.GetClientMode(),
-		SyncType:   &syncType,
+		// Does this cook the client if we send this...?
+		// ClientMode: req.GetClientMode(),
+		SyncType: &syncType,
 	}.Build(), nil
 }
