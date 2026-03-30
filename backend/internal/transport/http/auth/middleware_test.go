@@ -1,7 +1,6 @@
 package authhttp_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,30 +10,11 @@ import (
 	authhttp "github.com/woodleighschool/grinch/internal/transport/http/auth"
 )
 
-type errorBody struct {
-	Type   string `json:"type"`
-	Title  string `json:"title"`
-	Status int    `json:"status"`
-	Detail string `json:"detail"`
-	Code   string `json:"code"`
-}
-
 func testSessionAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		user := token.User{ID: "session_user", Name: "Session User"}
 		next.ServeHTTP(writer, token.SetUserInfo(request, user))
 	})
-}
-
-func readErrorBody(t *testing.T, response *httptest.ResponseRecorder) errorBody {
-	t.Helper()
-
-	var body errorBody
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
-
-	return body
 }
 
 func TestAPIMiddleware_AuthenticatesSessionRequests(t *testing.T) {
@@ -78,24 +58,7 @@ func TestAPIMiddleware_ReturnsUnauthorizedWithoutUserInfo(t *testing.T) {
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("Code = %d, want 401", response.Code)
 	}
-	if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
-		t.Fatalf("Content-Type = %q, want application/json", contentType)
-	}
-
-	body := readErrorBody(t, response)
-	if body.Type != "urn:grinch:problem:unauthorized" {
-		t.Fatalf("Type = %q, want unauthorized problem type", body.Type)
-	}
-	if body.Title != "Unauthorized" {
-		t.Fatalf("Title = %q, want Unauthorized", body.Title)
-	}
-	if body.Status != http.StatusUnauthorized {
-		t.Fatalf("Status = %d, want 401", body.Status)
-	}
-	if body.Detail != "Authentication is required." {
-		t.Fatalf("Detail = %q, want authentication detail", body.Detail)
-	}
-	if body.Code != "unauthorized" {
-		t.Fatalf("Code = %q, want unauthorized", body.Code)
+	if response.Body.Len() != 0 {
+		t.Fatalf("Body length = %d, want 0", response.Body.Len())
 	}
 }

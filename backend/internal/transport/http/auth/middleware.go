@@ -22,8 +22,5 @@ func APIMiddleware(
 }
 
 func writeUnauthorized(w http.ResponseWriter) {
-	const body = `{"type":"urn:grinch:problem:unauthorized","title":"Unauthorized","status":401,"code":"unauthorized","detail":"Authentication is required."}`
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
-	_, _ = w.Write([]byte(body))
 }
