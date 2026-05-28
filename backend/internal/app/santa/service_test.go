@@ -18,11 +18,12 @@ import (
 )
 
 type testStore struct {
-	resolver    *testRuleResolver
-	syncStates  map[uuid.UUID]santamodel.MachineSyncState
-	upsertErr   error
-	lastUpsert  santamodel.MachineUpsert
-	upsertCalls int
+	resolver           *testRuleResolver
+	syncStates         map[uuid.UUID]santamodel.MachineSyncState
+	upsertErr          error
+	lastUpsert         santamodel.MachineUpsert
+	upsertCalls        int
+	lastIngestedEvents []santamodel.ExecutionEventWrite
 }
 
 type testRuleResolver struct {
@@ -133,11 +134,12 @@ func (s *testStore) PromotePendingSnapshot(
 }
 
 func (s *testStore) IngestEvents(
-	context.Context,
-	uuid.UUID,
-	[]santamodel.ExecutionEventWrite,
-	[]santamodel.FileAccessEventWrite,
+	_ context.Context,
+	_ uuid.UUID,
+	events []santamodel.ExecutionEventWrite,
+	_ []santamodel.FileAccessEventWrite,
 ) error {
+	s.lastIngestedEvents = slices.Clone(events)
 	return nil
 }
 
@@ -264,6 +266,45 @@ func TestHandlePreflight_ReturnsNormalWhenManagedCountsMatch(t *testing.T) {
 	}
 	if resp.GetSyncType() != syncv1.SyncType_NORMAL {
 		t.Fatalf("SyncType = %v, want NORMAL", resp.GetSyncType())
+	}
+}
+
+func TestHandleEventUploadRemovesNULBytesFromSessionArrays(t *testing.T) {
+	machineID := uuid.New()
+	store := &testStore{}
+	service := newTestService(store, &testRuleResolver{})
+
+	_, err := service.HandleEventUpload(
+		context.Background(),
+		machineID,
+		syncv1.EventUploadRequest_builder{
+			Events: []*syncv1.Event{
+				syncv1.Event_builder{
+					FileSha256:      "abc123",
+					FilePath:        "/Applications/Example.app/Contents/MacOS/Example",
+					FileName:        "Example",
+					ExecutingUser:   "alice",
+					ExecutionTime:   float64(time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC).Unix()),
+					LoggedInUsers:   []string{"bo\x00b", "alice", "bob", "\x00"},
+					CurrentSessions: []string{"con\x00sole", "ssh\x00"},
+					Decision:        syncv1.Decision_BLOCK_BINARY,
+				}.Build(),
+			},
+		}.Build(),
+	)
+	if err != nil {
+		t.Fatalf("HandleEventUpload() error = %v", err)
+	}
+
+	if len(store.lastIngestedEvents) != 1 {
+		t.Fatalf("ingested events = %+v, want one", store.lastIngestedEvents)
+	}
+	event := store.lastIngestedEvents[0]
+	if !slices.Equal(event.LoggedInUsers, []string{"bob", "alice", "bob", ""}) {
+		t.Fatalf("LoggedInUsers = %#v, want NUL bytes removed", event.LoggedInUsers)
+	}
+	if !slices.Equal(event.CurrentSessions, []string{"console", "ssh"}) {
+		t.Fatalf("CurrentSessions = %#v, want NUL bytes removed", event.CurrentSessions)
 	}
 }
 

@@ -73,7 +73,49 @@ func (q *Queries) GetExecutable(ctx context.Context, id uuid.UUID) (GetExecutabl
 	return i, err
 }
 
-const getOrCreateExecutable = `-- name: GetOrCreateExecutable :one
+const getExecutableByIdentity = `-- name: GetExecutableByIdentity :one
+SELECT
+  id,
+  file_sha256,
+  file_name,
+  file_bundle_id,
+  file_bundle_path,
+  signing_id,
+  team_id,
+  cdhash,
+  entitlements,
+  signing_chain,
+  created_at
+FROM executables
+WHERE file_sha256 = $1
+  AND file_name = $2
+`
+
+type GetExecutableByIdentityParams struct {
+	FileSHA256 string
+	FileName   string
+}
+
+func (q *Queries) GetExecutableByIdentity(ctx context.Context, arg GetExecutableByIdentityParams) (Executable, error) {
+	row := q.db.QueryRow(ctx, getExecutableByIdentity, arg.FileSHA256, arg.FileName)
+	var i Executable
+	err := row.Scan(
+		&i.ID,
+		&i.FileSHA256,
+		&i.FileName,
+		&i.FileBundleID,
+		&i.FileBundlePath,
+		&i.SigningID,
+		&i.TeamID,
+		&i.Cdhash,
+		&i.Entitlements,
+		&i.SigningChain,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertExecutable = `-- name: InsertExecutable :one
 INSERT INTO executables (
   file_sha256,
   file_name,
@@ -96,8 +138,7 @@ VALUES (
   $8,
   $9
 )
-ON CONFLICT (file_sha256, file_name) DO UPDATE
-SET file_name = executables.file_name
+ON CONFLICT (file_sha256, file_name) DO NOTHING
 RETURNING
   id,
   file_sha256,
@@ -112,7 +153,7 @@ RETURNING
   created_at
 `
 
-type GetOrCreateExecutableParams struct {
+type InsertExecutableParams struct {
 	FileSHA256     string
 	FileName       string
 	FileBundleID   string
@@ -124,8 +165,8 @@ type GetOrCreateExecutableParams struct {
 	SigningChain   []byte
 }
 
-func (q *Queries) GetOrCreateExecutable(ctx context.Context, arg GetOrCreateExecutableParams) (Executable, error) {
-	row := q.db.QueryRow(ctx, getOrCreateExecutable,
+func (q *Queries) InsertExecutable(ctx context.Context, arg InsertExecutableParams) (Executable, error) {
+	row := q.db.QueryRow(ctx, insertExecutable,
 		arg.FileSHA256,
 		arg.FileName,
 		arg.FileBundleID,

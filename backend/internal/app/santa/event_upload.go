@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	syncv1 "buf.build/gen/go/northpolesec/protos/protocolbuffers/go/sync"
@@ -301,6 +302,9 @@ func normalizeTeamID(s string) string {
 func normalizeStrings(s []string) []string {
 	if s == nil {
 		return []string{}
+	}
+	for i := range s {
+		s[i] = strings.ReplaceAll(s[i], "\x00", "")
 	}
 	return s
 }

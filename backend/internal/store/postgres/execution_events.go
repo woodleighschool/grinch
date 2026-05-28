@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/woodleighschool/grinch/internal/domain"
 	"github.com/woodleighschool/grinch/internal/santa/model"
@@ -114,7 +116,39 @@ func (s *Store) IngestEvents(
 	events []model.ExecutionEventWrite,
 	fileAccessEvents []model.FileAccessEventWrite,
 ) error {
-	if err := s.RunInTx(ctx, func(q *db.Queries) error {
+	if err := s.ingestEventsWithRetry(ctx, machineID, events, fileAccessEvents); err != nil {
+		return fmt.Errorf("ingest events: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) ingestEventsWithRetry(
+	ctx context.Context,
+	machineID uuid.UUID,
+	events []model.ExecutionEventWrite,
+	fileAccessEvents []model.FileAccessEventWrite,
+) error {
+	const maxAttempts = 3
+
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err = s.ingestEventsOnce(ctx, machineID, events, fileAccessEvents)
+		if err == nil || !isRetryableEventIngestError(err) {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (s *Store) ingestEventsOnce(
+	ctx context.Context,
+	machineID uuid.UUID,
+	events []model.ExecutionEventWrite,
+	fileAccessEvents []model.FileAccessEventWrite,
+) error {
+	return s.RunInTx(ctx, func(q *db.Queries) error {
 		for _, event := range events {
 			executableID, err := upsertEventExecutable(ctx, q, event.Executable)
 			if err != nil {
@@ -133,11 +167,21 @@ func (s *Store) IngestEvents(
 		}
 
 		return nil
-	}); err != nil {
-		return fmt.Errorf("ingest events: %w", err)
-	}
+	})
+}
 
-	return nil
+func isRetryableEventIngestError(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	switch pgErr.Code {
+	case "40P01", // deadlock_detected
+		"40001": // serialization_failure
+		return true
+	default:
+		return false
+	}
 }
 
 func scanExecutionEventSummaryRow(rows pgx.Rows) (domain.ExecutionEventSummary, int32, error) {
@@ -216,7 +260,7 @@ func upsertEventExecutable(
 	queries *db.Queries,
 	exe model.ExecutableWrite,
 ) (uuid.UUID, error) {
-	row, err := queries.GetOrCreateExecutable(ctx, db.GetOrCreateExecutableParams{
+	row, err := queries.InsertExecutable(ctx, db.InsertExecutableParams{
 		FileSHA256:     exe.FileSHA256,
 		FileName:       exe.FileName,
 		FileBundleID:   exe.FileBundleID,
@@ -227,6 +271,12 @@ func upsertEventExecutable(
 		Entitlements:   exe.Entitlements,
 		SigningChain:   exe.SigningChain,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		row, err = queries.GetExecutableByIdentity(ctx, db.GetExecutableByIdentityParams{
+			FileSHA256: exe.FileSHA256,
+			FileName:   exe.FileName,
+		})
+	}
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("upsert event executable: %w", err)
 	}

@@ -1,4 +1,4 @@
--- name: GetOrCreateExecutable :one
+-- name: InsertExecutable :one
 INSERT INTO executables (
   file_sha256,
   file_name,
@@ -21,8 +21,7 @@ VALUES (
   sqlc.arg(entitlements),
   sqlc.arg(signing_chain)
 )
-ON CONFLICT (file_sha256, file_name) DO UPDATE
-SET file_name = executables.file_name
+ON CONFLICT (file_sha256, file_name) DO NOTHING
 RETURNING
   id,
   file_sha256,
@@ -35,6 +34,23 @@ RETURNING
   entitlements,
   signing_chain,
   created_at;
+
+-- name: GetExecutableByIdentity :one
+SELECT
+  id,
+  file_sha256,
+  file_name,
+  file_bundle_id,
+  file_bundle_path,
+  signing_id,
+  team_id,
+  cdhash,
+  entitlements,
+  signing_chain,
+  created_at
+FROM executables
+WHERE file_sha256 = sqlc.arg(file_sha256)
+  AND file_name = sqlc.arg(file_name);
 
 -- name: GetExecutable :one
 SELECT
