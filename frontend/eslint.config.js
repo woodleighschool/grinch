@@ -9,8 +9,6 @@ import tseslint from "typescript-eslint";
 
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import { createNodeResolver, importX } from "eslint-plugin-import-x";
-import jsxA11y from "eslint-plugin-jsx-a11y";
-import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
@@ -18,7 +16,7 @@ import unicorn from "eslint-plugin-unicorn";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(
-  { ignores: ["dist", "build", "coverage", "node_modules", "src/api/openapi.ts"] },
+  { ignores: ["dist", "build", "coverage", "node_modules", "src/api/openapi-generated"] },
 
   { files: ["**/*.{ts,tsx}"] },
 
@@ -26,11 +24,6 @@ export default defineConfig(
 
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
-
-  react.configs.flat.recommended,
-  react.configs.flat["jsx-runtime"],
-
-  jsxA11y.flatConfigs.strict,
 
   importX.flatConfigs.recommended,
   importX.flatConfigs.typescript,
@@ -53,8 +46,10 @@ export default defineConfig(
       },
     },
     settings: {
-      react: { version: "detect" },
-      "import-x/resolver-next": [createTypeScriptImportResolver(), createNodeResolver()],
+      "import-x/resolver-next": [
+        createTypeScriptImportResolver({ alwaysTryTypes: true, project: "./tsconfig.json" }),
+        createNodeResolver(),
+      ],
     },
     plugins: {
       "react-hooks": reactHooks,
@@ -64,6 +59,7 @@ export default defineConfig(
 
       "no-console": "error",
       "no-debugger": "error",
+      "import-x/no-unresolved": "off",
 
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
       "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false, ignoreIIFE: false }],
@@ -73,6 +69,12 @@ export default defineConfig(
         { allowExpressions: false, allowTypedFunctionExpressions: false },
       ],
       "unicorn/filename-case": "off",
+    },
+  },
+  {
+    files: ["src/api/openapi.ts"],
+    rules: {
+      "sonarjs/class-name": "off",
     },
   },
 );

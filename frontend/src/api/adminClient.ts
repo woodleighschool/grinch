@@ -1,6 +1,24 @@
 import { withXsrfHeaders } from "@/api/cookies";
-import type { components, paths } from "@/api/openapi";
-import createClient from "openapi-fetch";
+import type {
+  Executable,
+  ExecutableListResponse,
+  ExecutionEvent,
+  ExecutionEventListResponse,
+  FileAccessEvent,
+  FileAccessEventListResponse,
+  Group,
+  GroupListResponse,
+  Machine,
+  MachineListResponse,
+  MachineRuleListResponse,
+  Membership,
+  MembershipListResponse,
+  Rule,
+  RuleListResponse,
+  RuleMachineListResponse,
+  User,
+  UserListResponse,
+} from "@/api/openapi";
 import { HttpError } from "react-admin";
 
 interface ApiResult<T> {
@@ -9,38 +27,9 @@ interface ApiResult<T> {
   response: Response;
 }
 
-type Executable = components["schemas"]["Executable"];
-type ExecutableListResponse = components["schemas"]["ExecutableListResponse"];
-type ExecutionEvent = components["schemas"]["ExecutionEvent"];
-type ExecutionEventListResponse = components["schemas"]["ExecutionEventListResponse"];
-type FileAccessEvent = components["schemas"]["FileAccessEvent"];
-type FileAccessEventListResponse = components["schemas"]["FileAccessEventListResponse"];
-type Group = components["schemas"]["Group"];
-type GroupListResponse = components["schemas"]["GroupListResponse"];
-type Membership = components["schemas"]["Membership"];
-type MembershipListResponse = components["schemas"]["MembershipListResponse"];
-type Machine = components["schemas"]["Machine"];
-type MachineListResponse = components["schemas"]["MachineListResponse"];
-type MachineRuleListResponse = components["schemas"]["MachineRuleListResponse"];
-type Rule = components["schemas"]["Rule"];
-type RuleListResponse = components["schemas"]["RuleListResponse"];
-type RuleMachineListResponse = components["schemas"]["RuleMachineListResponse"];
-type User = components["schemas"]["User"];
-type UserListResponse = components["schemas"]["UserListResponse"];
 type QueryScalar = string | number | boolean;
 type QueryParameters = Record<string, QueryScalar | QueryScalar[] | undefined>;
 type Compacted<T extends QueryParameters> = { [K in keyof T]?: NonNullable<T[K]> };
-
-const client = createClient<paths>({
-  baseUrl: "/api/v1",
-  fetch: (request): Promise<Response> =>
-    fetch(
-      new Request(request, {
-        credentials: "include",
-        headers: withXsrfHeaders(request.headers),
-      }),
-    ),
-});
 
 const isValidationBody = (value: unknown): value is { errors: Record<string, unknown> } =>
   typeof value === "object" && value !== null && "errors" in value;
@@ -87,38 +76,88 @@ const compactQuery = <T extends QueryParameters>(query: T): Compacted<T> => {
   return result;
 };
 
-const withQuery = <T extends QueryParameters>(query: T): { params: { query: Compacted<T> } } => ({
-  params: { query: compactQuery(query) },
-});
+const appendQuery = (url: URL, query?: QueryParameters): void => {
+  if (!query) {
+    return;
+  }
 
-const withPath = <T extends string>(id: T): { params: { path: { id: T } } } => ({
-  params: { path: { id } },
-});
+  for (const [key, value] of Object.entries(compactQuery(query))) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        url.searchParams.append(key, String(item));
+      }
+    } else {
+      url.searchParams.set(key, String(value));
+    }
+  }
+};
+
+const parseResponseBody = async (response: Response): Promise<unknown> => {
+  if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+    return undefined;
+  }
+
+  const text = await response.text();
+  if (text === "") {
+    return undefined;
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  return contentType.includes("application/json") ? JSON.parse(text) : text;
+};
+
+const request = async <T>(
+  method: string,
+  path: string,
+  options: { body?: unknown; query?: QueryParameters; signal?: AbortSignal } = {},
+): Promise<ApiResult<T>> => {
+  const url = new URL(`/api/v1${path}`, globalThis.location.origin);
+  appendQuery(url, options.query);
+
+  const headers = withXsrfHeaders(options.body === undefined ? undefined : { "Content-Type": "application/json" });
+  const init: RequestInit = {
+    credentials: "include",
+    headers,
+    method,
+    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    ...(options.signal ? { signal: options.signal } : {}),
+  };
+  const response = await fetch(url, init);
+  const payload = await parseResponseBody(response);
+
+  if (!response.ok) {
+    return { error: payload, response };
+  }
+
+  return { data: payload as T, response };
+};
+
+const withId = (path: string, id: string): string => path.replace("{id}", encodeURIComponent(id));
 
 const list =
-  <R>(path: keyof paths) =>
+  <R>(path: string) =>
   (query: QueryParameters, signal?: AbortSignal): Promise<R> =>
-    expectBody(client.GET(path as never, { ...withQuery(query), signal } as never));
+    expectBody(request<R>("GET", path, { query, ...(signal ? { signal } : {}) }));
 
 const getOne =
-  <R>(path: keyof paths) =>
+  <R>(path: string) =>
   (id: string, signal?: AbortSignal): Promise<R> =>
-    expectBody(client.GET(path as never, { ...withPath(id), signal } as never));
+    expectBody(request<R>("GET", withId(path, id), signal ? { signal } : {}));
 
 const createOne =
-  <R>(path: keyof paths) =>
+  <R>(path: string) =>
   (body: unknown): Promise<R> =>
-    expectBody(client.POST(path as never, { body } as never));
+    expectBody(request<R>("POST", path, { body }));
 
 const updateOne =
-  <R>(path: keyof paths) =>
+  <R>(path: string) =>
   (id: string, body: unknown): Promise<R> =>
-    expectBody(client.PUT(path as never, { ...withPath(id), body } as never));
+    expectBody(request<R>("PUT", withId(path, id), { body }));
 
 const deleteOne =
-  (path: keyof paths) =>
+  (path: string) =>
   (id: string): Promise<void> =>
-    expectOk(client.DELETE(path as never, withPath(id) as never));
+    expectOk(request<unknown>("DELETE", withId(path, id)));
 
 export const machinesApi = {
   list: list<MachineListResponse>("/machines"),

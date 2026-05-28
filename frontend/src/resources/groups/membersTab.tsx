@@ -4,7 +4,7 @@ import { ResourceLink } from "@/resources/shared/resourceLinks";
 import { searchFilterToQuery } from "@/resources/shared/search";
 import AddIcon from "@mui/icons-material/Add";
 import LaptopMacOutlinedIcon from "@mui/icons-material/LaptopMacOutlined";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlineOutlined";
 import {
   Button,
   Dialog,
@@ -171,7 +171,7 @@ export const GroupMembersTab = (): ReactElement | undefined => {
 
   return (
     <Stack spacing={2} sx={{ width: "100%" }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
         {canManage ? (
           <Tooltip title="Add member">
             <IconButton

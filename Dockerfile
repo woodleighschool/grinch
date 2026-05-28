@@ -1,16 +1,15 @@
 # Build the frontend
-FROM node:25-alpine AS frontend
+FROM node:26-alpine AS frontend
 WORKDIR /workspace/frontend
 COPY frontend/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend .
 COPY backend/api/openapi.yaml /workspace/backend/api/openapi.yaml
 RUN npm run gen:api
-ENV NODE_ENV=production
 RUN npm run build
 
 # Build the grinch binary
-FROM golang:1.26.1 AS backend
+FROM golang:1.26.3 AS backend
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS
@@ -40,7 +39,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
 
 # Use distroless as minimal base image to package the grinch binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /
 COPY --from=backend /workspace/grinch .
 COPY --from=frontend /workspace/frontend/dist ./frontend

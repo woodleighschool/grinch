@@ -161,7 +161,7 @@ const CelExpressionInput = ({ source, showRequired }: { source: string; showRequ
       >
         <DialogTitle>CEL Expression</DialogTitle>
         <DialogContent>
-          <Box mb={1}>
+          <Box sx={{ mb: 1 }}>
             <MuiLink href={SANTA_CEL_PLAYGROUND_URL} target="_blank" rel="noreferrer" variant="body2">
               Open CEL playground
             </MuiLink>
