@@ -72,7 +72,7 @@ func newTestRouter(service *testService) http.Handler {
 }
 
 func newTestLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
+	return slog.New(slog.DiscardHandler)
 }
 
 func TestPreflight_ReturnsGzippedProtoResponse(t *testing.T) {

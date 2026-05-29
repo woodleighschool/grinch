@@ -13,11 +13,11 @@ import (
 
 var (
 	membershipListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":          "id",
-		"group_name":  "group_name",
-		"member_name": "member_name",
-		"created_at":  "created_at",
-		"updated_at":  "updated_at",
+		"id":               "id",
+		"group_name":       "group_name",
+		"member_name":      "member_name",
+		sortFieldCreatedAt: sortFieldCreatedAt,
+		sortFieldUpdatedAt: sortFieldUpdatedAt,
 	}
 
 	membershipListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

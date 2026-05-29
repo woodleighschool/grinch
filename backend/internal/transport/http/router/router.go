@@ -30,7 +30,6 @@ func New(
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(httpmiddleware.RequestLogger(logger))
 	r.Use(middleware.Recoverer)
 
@@ -68,7 +67,7 @@ func readinessHandler(logger *slog.Logger, readinessCheck func(context.Context) 
 		defer cancel()
 
 		if err := readinessCheck(ctx); err != nil {
-			logger.Warn("readiness check failed", "error", err)
+			logger.WarnContext(r.Context(), "readiness check failed", "error", err)
 			writeJSON(w, logger, http.StatusServiceUnavailable, statusResponse{Status: "not_ready"})
 			return
 		}

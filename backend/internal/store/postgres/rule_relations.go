@@ -15,12 +15,12 @@ var (
 	errRuleMachineListRuleIDRequired    = errors.New("rule id is required")
 
 	machineRuleListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":         "machine_rule_id",
-		"rule_id":    "rule_id",
-		"rule_type":  "r.rule_type",
-		"identifier": "r.identifier",
-		"policy":     "wi.policy",
-		"applied":    "applied",
+		"id":             "machine_rule_id",
+		"rule_id":        "rule_id",
+		"rule_type":      "r.rule_type",
+		"identifier":     "r.identifier",
+		"policy":         "wi.policy",
+		sortFieldApplied: sortFieldApplied,
 	}
 
 	machineRuleListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
@@ -30,10 +30,10 @@ var (
 	}
 
 	ruleMachineListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":         "m.id",
-		"machine_id": "m.id",
-		"policy":     "wi.policy",
-		"applied":    "applied",
+		"id":             machineIDColumn,
+		"machine_id":     machineIDColumn,
+		"policy":         "wi.policy",
+		sortFieldApplied: sortFieldApplied,
 	}
 
 	ruleMachineListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

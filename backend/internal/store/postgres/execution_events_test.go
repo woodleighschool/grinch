@@ -1,6 +1,7 @@
-package postgres
+package postgres //nolint:testpackage // exercises unexported retry classification without a database.
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -15,17 +16,17 @@ func TestIsRetryableEventIngestError(t *testing.T) {
 	}{
 		{
 			name: "deadlock",
-			err:  &pgconn.PgError{Code: "40P01"},
+			err:  &pgconn.PgError{Code: pgErrDeadlockDetected},
 			want: true,
 		},
 		{
 			name: "serialization failure",
-			err:  &pgconn.PgError{Code: "40001"},
+			err:  &pgconn.PgError{Code: pgErrSerializationFailure},
 			want: true,
 		},
 		{
 			name: "wrapped retryable",
-			err:  fmt.Errorf("ingest events: %w", &pgconn.PgError{Code: "40P01"}),
+			err:  fmt.Errorf("ingest events: %w", &pgconn.PgError{Code: pgErrDeadlockDetected}),
 			want: true,
 		},
 		{
@@ -34,7 +35,7 @@ func TestIsRetryableEventIngestError(t *testing.T) {
 		},
 		{
 			name: "non postgres error",
-			err:  fmt.Errorf("plain error"),
+			err:  errors.New("plain error"),
 		},
 	}
 

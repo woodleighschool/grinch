@@ -16,14 +16,14 @@ import (
 
 var (
 	ruleListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":          "r.id",
-		"name":        "r.name",
-		"description": "r.description",
-		"rule_type":   "r.rule_type",
-		"identifier":  "r.identifier",
-		"enabled":     "r.enabled",
-		"created_at":  "r.created_at",
-		"updated_at":  "r.updated_at",
+		"id":               "r.id",
+		"name":             "r.name",
+		"description":      "r.description",
+		"rule_type":        "r.rule_type",
+		"identifier":       "r.identifier",
+		"enabled":          "r.enabled",
+		sortFieldCreatedAt: "r.created_at",
+		sortFieldUpdatedAt: "r.updated_at",
 	}
 
 	ruleListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

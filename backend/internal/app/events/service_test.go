@@ -2,7 +2,6 @@ package events_test
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ func newTestService(store *testStore) *events.Service {
 }
 
 func newTestLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
+	return slog.New(slog.DiscardHandler)
 }
 
 func TestCleanupExpiredEvents_DeletesEventsBeforeRetentionCutoff(t *testing.T) {

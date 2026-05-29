@@ -13,6 +13,16 @@ import (
 const (
 	sortDirectionAsc  = "ASC"
 	sortDirectionDesc = "DESC"
+
+	sortFieldApplied   = "applied"
+	sortFieldCreatedAt = "created_at"
+	sortFieldID        = "id"
+	sortFieldUpdatedAt = "updated_at"
+
+	machineIDColumn = "m.id"
+
+	pgErrDeadlockDetected     = "40P01"
+	pgErrSerializationFailure = "40001"
 )
 
 func searchPattern(search string) string {

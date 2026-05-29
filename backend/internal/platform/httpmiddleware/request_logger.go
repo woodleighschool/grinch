@@ -36,11 +36,11 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			switch {
 			case status >= http.StatusInternalServerError:
-				logger.Error("http request", args...)
+				logger.ErrorContext(r.Context(), "http request", args...)
 			case status >= http.StatusBadRequest:
-				logger.Warn("http request", args...)
+				logger.WarnContext(r.Context(), "http request", args...)
 			default:
-				logger.Info("http request", args...)
+				logger.InfoContext(r.Context(), "http request", args...)
 			}
 		})
 	}

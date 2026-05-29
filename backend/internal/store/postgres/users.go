@@ -14,12 +14,12 @@ import (
 
 var (
 	userListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":           "u.id",
-		"display_name": "u.display_name",
-		"upn":          "u.upn",
-		"source":       "u.source",
-		"created_at":   "u.created_at",
-		"updated_at":   "u.updated_at",
+		"id":               "u.id",
+		"display_name":     "u.display_name",
+		"upn":              "u.upn",
+		"source":           "u.source",
+		sortFieldCreatedAt: "u.created_at",
+		sortFieldUpdatedAt: "u.updated_at",
 	}
 
 	userListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

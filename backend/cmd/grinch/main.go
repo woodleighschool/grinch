@@ -192,7 +192,7 @@ func serve(
 	serverErr := make(chan error, 1)
 
 	go func() {
-		logger.Info("starting server", "port", port)
+		logger.InfoContext(ctx, "starting server", "port", port)
 
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {

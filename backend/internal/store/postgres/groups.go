@@ -24,13 +24,13 @@ var (
 	errIncompleteGroupMutationRow = errors.New("group mutation returned incomplete row")
 
 	groupListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":           "g.id",
-		"name":         "g.name",
-		"description":  "g.description",
-		"source":       "g.source",
-		"member_count": "member_count",
-		"created_at":   "g.created_at",
-		"updated_at":   "g.updated_at",
+		"id":               "g.id",
+		"name":             "g.name",
+		"description":      "g.description",
+		"source":           "g.source",
+		"member_count":     "member_count",
+		sortFieldCreatedAt: "g.created_at",
+		sortFieldUpdatedAt: "g.updated_at",
 	}
 
 	groupListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

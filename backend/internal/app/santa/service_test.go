@@ -2,7 +2,6 @@ package santa_test
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -170,7 +169,7 @@ func newTestService(store *testStore, resolver *testRuleResolver) *santa.Service
 }
 
 func newTestLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
+	return slog.New(slog.DiscardHandler)
 }
 
 func TestHandlePreflight_UpsertsMachineAndReturnsSyncSettings(t *testing.T) {

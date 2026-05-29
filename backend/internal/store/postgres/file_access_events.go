@@ -17,12 +17,12 @@ import (
 
 var (
 	fileAccessEventListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":          "fe.id",
-		"occurred_at": "fe.occurred_at",
-		"decision":    "fe.decision",
-		"rule_name":   "fe.rule_name",
-		"target":      "fe.target",
-		"created_at":  "fe.created_at",
+		"id":               "fe.id",
+		"occurred_at":      "fe.occurred_at",
+		"decision":         "fe.decision",
+		"rule_name":        "fe.rule_name",
+		"target":           "fe.target",
+		sortFieldCreatedAt: "fe.created_at",
 	}
 
 	fileAccessEventListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state

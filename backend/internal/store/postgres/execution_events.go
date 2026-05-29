@@ -17,11 +17,11 @@ import (
 
 var (
 	executionEventListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":          "ee.id",
-		"occurred_at": "ee.occurred_at",
-		"decision":    "ee.decision",
-		"file_name":   "x.file_name",
-		"created_at":  "ee.created_at",
+		"id":               "ee.id",
+		"occurred_at":      "ee.occurred_at",
+		"decision":         "ee.decision",
+		"file_name":        "x.file_name",
+		sortFieldCreatedAt: "ee.created_at",
 	}
 
 	executionEventListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
@@ -176,8 +176,8 @@ func isRetryableEventIngestError(err error) bool {
 		return false
 	}
 	switch pgErr.Code {
-	case "40P01", // deadlock_detected
-		"40001": // serialization_failure
+	case pgErrDeadlockDetected, // deadlock_detected
+		pgErrSerializationFailure: // serialization_failure
 		return true
 	default:
 		return false

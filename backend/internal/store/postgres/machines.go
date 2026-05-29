@@ -17,13 +17,13 @@ import (
 
 var (
 	machineListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":               "m.id",
+		"id":               machineIDColumn,
 		"hostname":         "m.hostname",
 		"serial_number":    "m.serial_number",
 		"model_identifier": "m.model_identifier",
 		"os_version":       "m.os_version",
-		"created_at":       "m.created_at",
-		"updated_at":       "m.updated_at",
+		sortFieldCreatedAt: "m.created_at",
+		sortFieldUpdatedAt: "m.updated_at",
 		"last_seen_at":     "m.last_seen_at",
 	}
 

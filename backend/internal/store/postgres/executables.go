@@ -14,13 +14,13 @@ import (
 
 var (
 	executableListSortColumns = map[string]string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
-		"id":          "e.id",
-		"file_name":   "e.file_name",
-		"file_sha256": "e.file_sha256",
-		"occurrences": "occurrences",
-		"created_at":  "e.created_at",
-		"signing_id":  "e.signing_id",
-		"team_id":     "e.team_id",
+		"id":               "e.id",
+		"file_name":        "e.file_name",
+		"file_sha256":      "e.file_sha256",
+		"occurrences":      "occurrences",
+		sortFieldCreatedAt: "e.created_at",
+		"signing_id":       "e.signing_id",
+		"team_id":          "e.team_id",
 	}
 
 	executableListDefaultOrder = []string{ //nolint:gochecknoglobals // package-level lookup table, not mutable state
