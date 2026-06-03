@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260527183946-14f63aa75ed2.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260602162757-c1b9b7d6165e.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.3.0
@@ -16,7 +16,7 @@ require (
 	github.com/go-pkgz/rest v1.21.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/microsoftgraph/msgraph-sdk-go v1.99.0
 	github.com/oapi-codegen/runtime v1.4.1
 	github.com/pressly/goose/v3 v3.27.1
