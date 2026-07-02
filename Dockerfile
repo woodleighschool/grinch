@@ -9,7 +9,7 @@ RUN npm run gen:api
 RUN npm run build
 
 # Build the grinch binary
-FROM golang:1.26.3 AS backend
+FROM golang:1.26.4 AS backend
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS
