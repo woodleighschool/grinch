@@ -8,18 +8,18 @@ tool (
 )
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260602162757-c1b9b7d6165e.1
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260715141808-2e443f37a544.1
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-chi/chi/v5 v5.3.0
-	github.com/go-pkgz/auth/v2 v2.1.4
-	github.com/go-pkgz/rest v1.21.0
+	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-pkgz/auth/v2 v2.1.5
+	github.com/go-pkgz/rest v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/microsoftgraph/msgraph-sdk-go v1.99.0
-	github.com/oapi-codegen/runtime v1.4.1
-	github.com/pressly/goose/v3 v3.27.1
+	github.com/microsoftgraph/msgraph-sdk-go v1.100.0
+	github.com/oapi-codegen/runtime v1.5.0
+	github.com/pressly/goose/v3 v3.27.2
 	github.com/woodleighschool/go-entrasync v0.3.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/protobuf v1.36.11
@@ -29,7 +29,7 @@ require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.22.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.7.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -48,7 +48,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/go-pkgz/repeater/v2 v2.2.0 // indirect
-	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/go-sql-driver/mysql v1.10.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/cel-go v0.28.0 // indirect
@@ -74,7 +74,7 @@ require (
 	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/ncruces/go-sqlite3 v0.32.0 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
-	github.com/oapi-codegen/oapi-codegen/v2 v2.7.0 // indirect
+	github.com/oapi-codegen/oapi-codegen/v2 v2.7.2 // indirect
 	github.com/oasdiff/yaml v0.0.9 // indirect
 	github.com/oasdiff/yaml3 v0.0.9 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
@@ -118,7 +118,7 @@ require (
 	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
