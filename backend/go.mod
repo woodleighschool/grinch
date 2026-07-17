@@ -12,7 +12,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.3.1
-	github.com/go-pkgz/auth/v2 v2.1.4
+	github.com/go-pkgz/auth/v2 v2.1.5
 	github.com/go-pkgz/rest v1.23.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
