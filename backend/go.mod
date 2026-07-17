@@ -11,7 +11,7 @@ require (
 	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260602162757-c1b9b7d6165e.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-pkgz/auth/v2 v2.1.4
 	github.com/go-pkgz/rest v1.21.0
 	github.com/google/uuid v1.6.0
