@@ -18,7 +18,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/microsoftgraph/msgraph-sdk-go v1.99.0
-	github.com/oapi-codegen/runtime v1.4.1
+	github.com/oapi-codegen/runtime v1.6.0
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/woodleighschool/go-entrasync v0.3.0
 	golang.org/x/oauth2 v0.36.0
