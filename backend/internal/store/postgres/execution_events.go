@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -149,13 +150,19 @@ func (s *Store) ingestEventsOnce(
 	fileAccessEvents []model.FileAccessEventWrite,
 ) error {
 	return s.RunInTx(ctx, func(q *db.Queries) error {
-		for _, event := range events {
-			executableID, err := upsertEventExecutable(ctx, q, event.Executable)
+		executableIDs := make(map[executableIdentity]uuid.UUID, len(events))
+		for _, executable := range orderedDistinctExecutables(events) {
+			executableID, err := upsertEventExecutable(ctx, q, executable)
 			if err != nil {
 				return err
 			}
 
-			if err = ingestExecutionEvent(ctx, q, machineID, executableID, event); err != nil {
+			executableIDs[identityForExecutable(executable)] = executableID
+		}
+
+		for _, event := range events {
+			executableID := executableIDs[identityForExecutable(event.Executable)]
+			if err := ingestExecutionEvent(ctx, q, machineID, executableID, event); err != nil {
 				return err
 			}
 		}
@@ -168,6 +175,46 @@ func (s *Store) ingestEventsOnce(
 
 		return nil
 	})
+}
+
+type executableIdentity struct {
+	fileSHA256 string
+	fileName   string
+}
+
+func orderedDistinctExecutables(events []model.ExecutionEventWrite) []model.ExecutableWrite {
+	executablesByIdentity := make(map[executableIdentity]model.ExecutableWrite, len(events))
+	for _, event := range events {
+		identity := identityForExecutable(event.Executable)
+		if _, exists := executablesByIdentity[identity]; !exists {
+			executablesByIdentity[identity] = event.Executable
+		}
+	}
+
+	identities := make([]executableIdentity, 0, len(executablesByIdentity))
+	for identity := range executablesByIdentity {
+		identities = append(identities, identity)
+	}
+	sort.Slice(identities, func(i, j int) bool {
+		if identities[i].fileSHA256 != identities[j].fileSHA256 {
+			return identities[i].fileSHA256 < identities[j].fileSHA256
+		}
+		return identities[i].fileName < identities[j].fileName
+	})
+
+	executables := make([]model.ExecutableWrite, 0, len(identities))
+	for _, identity := range identities {
+		executables = append(executables, executablesByIdentity[identity])
+	}
+
+	return executables
+}
+
+func identityForExecutable(executable model.ExecutableWrite) executableIdentity {
+	return executableIdentity{
+		fileSHA256: executable.FileSHA256,
+		fileName:   executable.FileName,
+	}
 }
 
 func isRetryableEventIngestError(err error) bool {

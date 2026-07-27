@@ -1,4 +1,4 @@
-package postgres //nolint:testpackage // exercises unexported retry classification without a database.
+package postgres //nolint:testpackage // exercises unexported transaction planning and retry classification.
 
 import (
 	"errors"
@@ -6,7 +6,63 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/woodleighschool/grinch/internal/santa/model"
 )
+
+func TestOrderedDistinctExecutablesUsesCanonicalIdentityOrder(t *testing.T) {
+	events := []model.ExecutionEventWrite{
+		{Executable: model.ExecutableWrite{FileSHA256: "sha-b", FileName: "B"}},
+		{Executable: model.ExecutableWrite{FileSHA256: "sha-a", FileName: "Z"}},
+		{Executable: model.ExecutableWrite{FileSHA256: "sha-a", FileName: "A"}},
+	}
+
+	got := orderedDistinctExecutables(events)
+
+	if len(got) != 3 {
+		t.Fatalf("orderedDistinctExecutables() returned %d executables, want 3", len(got))
+	}
+
+	want := [][2]string{
+		{"sha-a", "A"},
+		{"sha-a", "Z"},
+		{"sha-b", "B"},
+	}
+	for i, executable := range got {
+		identity := [2]string{executable.FileSHA256, executable.FileName}
+		if identity != want[i] {
+			t.Fatalf("orderedDistinctExecutables()[%d] identity = %q, want %q", i, identity, want[i])
+		}
+	}
+}
+
+func TestOrderedDistinctExecutablesKeepsFirstPayloadPerIdentity(t *testing.T) {
+	events := []model.ExecutionEventWrite{
+		{
+			Executable: model.ExecutableWrite{
+				FileSHA256: "same-sha",
+				FileName:   "same-name",
+				SigningID:  "first",
+			},
+		},
+		{
+			Executable: model.ExecutableWrite{
+				FileSHA256: "same-sha",
+				FileName:   "same-name",
+				SigningID:  "later",
+			},
+		},
+	}
+
+	got := orderedDistinctExecutables(events)
+
+	if len(got) != 1 {
+		t.Fatalf("orderedDistinctExecutables() returned %d executables, want 1", len(got))
+	}
+	if got[0].SigningID != "first" {
+		t.Fatalf("orderedDistinctExecutables()[0].SigningID = %q, want first payload preserved", got[0].SigningID)
+	}
+}
 
 func TestIsRetryableEventIngestError(t *testing.T) {
 	tests := []struct {
