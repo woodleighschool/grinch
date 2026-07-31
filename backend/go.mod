@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260723221051-096a321dccc8.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260731214504-f26c15370a21.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.3.1
