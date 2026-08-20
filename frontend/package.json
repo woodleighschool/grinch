@@ -44,5 +44,12 @@
   },
   "engines": {
     "node": ">=25.9.0"
+  },
+  "overrides": {
+    "js-yaml": "4.3.1"
+  },
+  "allowScripts": {
+    "fsevents": false,
+    "unrs-resolver": false
   }
 }
