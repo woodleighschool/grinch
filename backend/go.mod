@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.11-20260723221051-096a321dccc8.1
+	buf.build/gen/go/northpolesec/protos/protocolbuffers/go v1.36.12-20260821163146-78fba3cee493.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.3.1
@@ -22,7 +22,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/woodleighschool/go-entrasync v0.3.0
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
