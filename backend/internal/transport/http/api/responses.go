@@ -56,8 +56,7 @@ func writeError(w http.ResponseWriter, err error) {
 		return
 	}
 
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch pgErr.Code {
 		case pgerrcode.UniqueViolation:
 			writeValidationErrors(w, "Resource already exists.", nil)
